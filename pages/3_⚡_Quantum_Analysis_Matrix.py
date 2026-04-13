@@ -7,7 +7,6 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
-import streamlit.components.v1 as _components  # For iframe-based card rendering
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
@@ -213,24 +212,18 @@ def _get_sim_cache() -> dict:
     return st.session_state["_sim_result_cache"]
 
 
-# ── Iframe card renderer ─────────────────────────────────────────────────────
-# Renders the unified card matrix inside a self-resizing <iframe> via
-# streamlit.components.v1.html() instead of st.html().
+# ── Card renderer ─────────────────────────────────────────────────────────────
+# Renders the unified card matrix and parlays natively via st.html() (non-
+# iframe rendering).  This ensures normal page scrolling on desktop — iframes
+# with scrolling=False captured mouse-wheel events and blocked scroll.
 #
-# Why iframe rendering is preferred:
-#   1. Atomic delivery — the iframe either loads fully or not at all; a
-#      mid-render WebSocket closure does not crash the page.
-#   2. CSS isolation — card styles cannot leak into (or be affected by) the
-#      main Streamlit page.
-#   3. Self-resizing — targeted toggle / click listeners adjust the iframe
-#      height when <details> cards are expanded / collapsed, so no fixed
-#      height or scroll-bar is needed (ResizeObserver was removed in v3).
+# Native rendering via st.html():
+#   1. Eliminates scroll-capture — content is part of the normal page flow.
+#   2. Expanded <details> cards grow naturally without height constraints.
+#   3. Player cards are never cut off regardless of how many are expanded.
 # ---------------------------------------------------------------------------
 
-_MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (must fit expanded card)
-_HEIGHT_PER_PLAYER = 520       # px — collapsed card (~120px) + expanded props (~300px) + Joseph panel (~100px)
-_MAX_IFRAME_HEIGHT = 30000     # px — generous cap; no scrollbar inside iframes (supports ~57 players)
-_LAZY_CHUNK_SIZE = 50          # players per iframe — larger chunks = fewer iframes
+_LAZY_CHUNK_SIZE = 50          # players per st.html() call — larger chunks = fewer DOM injections
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
 # Injury status confidence penalties (points deducted from SAFE Score)
@@ -240,176 +233,34 @@ _QUESTIONABLE_INJURY_PENALTY = 4.0  # Questionable/GTD: uncertain availability
 # Tier → emoji mapping used in incremental rendering feedback
 _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
-# ── Iframe auto-height script (v4 — mobile-safe, anti-cutoff) ────────────────
-# Sends ``streamlit:setFrameHeight`` postMessage so Streamlit adjusts the
-# iframe height.  Designed to MINIMISE postMessage traffic while ensuring
-# expanded content is NEVER cut off:
-#
-#   • On load: sends ONE height message (staggered by random 50-249 ms so
-#     multiple iframes on the page don't all fire at the same instant and
-#     overwhelm the Streamlit React frontend).
-#   • On ``<details>`` toggle: sends FOUR deferred measurements
-#     (150 / 400 / 800 / 1500 ms) via ``requestAnimationFrame`` to guarantee
-#     we capture the final layout even on slow mobile devices where CSS
-#     animations (qcm-fade-in-up 0.4 s) and grid reflows take longer.
-#     Toggle sends use ``force=true`` which bypasses the noise-threshold
-#     and rate-limiter so the height update is always delivered.
-#   • On mobile scroll / address-bar show-hide: does NOTHING.
-#
-# v3 used only 2 toggle measurements (120 / 400 ms) with an 8 px safety
-# margin and included ``img.onload`` handlers.  This was insufficient:
-#   – The 8 px margin failed to cover border-box rounding on some devices,
-#     leaving expanded prop cards clipped at the bottom.
-#   – ``img.onload`` handlers on each iframe created a stream of
-#     postMessages as headshot images loaded asynchronously; with 6+
-#     iframes × many images this overwhelmed the Streamlit WebSocket
-#     on mobile, triggered disconnects, and caused full page reruns
-#     (the "app restart" bug the user reported).
-#
-# v4 fixes both issues:
-#   – Safety margin increased from 8 px → 32 px.
-#   – Four measurement retries (up from 2), each inside
-#     requestAnimationFrame for pixel-accurate layout.
-#   – Force-send on toggle/click bypasses noise filter and rate limiter.
-#   – img.onload handlers REMOVED — the toggle/click handlers cover
-#     all user-initiated height changes; any ±few px from late images
-#     is acceptable and absorbed by the 32 px margin.
-#   – Initial sendHeight staggered by random 50-249 ms.
-#   – Non-forced sends rate-limited to one per 300 ms.
-_IFRAME_RESIZE_JS = (
-    "<script>"
-    "(function(){"
-    "var lastH=0,tid=0,lastSent=0;"
-    "function measureH(){"
-    # Walk ALL direct children and compute max bottom.
-    "var h=0;"
-    "var els=document.body.children;"
-    "for(var i=0;i<els.length;i++){"
-    "var r=els[i].getBoundingClientRect();"
-    "var b=r.top+window.scrollY+r.height;"
-    "if(b>h)h=b;"
-    "}"
-    # Walk all open <details> and Joseph response panels to catch
-    # expanded content that may extend below the direct children.
-    "document.querySelectorAll('details[open] .upc-body, .upc-joseph-response').forEach(function(el){"
-    "if(el.offsetHeight>0){"
-    "var r2=el.getBoundingClientRect();"
-    "var b2=r2.top+window.scrollY+r2.height;"
-    "if(b2>h)h=b2;"
-    "}"
-    "});"
-    "return Math.max(h,document.body.scrollHeight,document.documentElement.scrollHeight);"
-    "}"
-    # Send height to Streamlit.  ``force`` bypasses the noise-threshold
-    # and rate-limiter — used for user-initiated actions (toggle, click)
-    # where we MUST update the height promptly.
-    "function send(force){"
-    "var h=Math.ceil(measureH())+32;"  # +32px safety margin (up from +8)
-    "var d=Math.abs(h-lastH);"
-    # Force: always send unless height is truly identical (< 1px)
-    "if(force){if(d<1)return;}"
-    # Non-force: skip tiny changes (< 8px) and rate-limit to 1 msg / 300ms
-    "else{if(d<8)return;"
-    "var n=Date.now();if(n-lastSent<300)return;}"
-    "lastH=h;lastSent=Date.now();"
-    "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*');"
-    "}"
-    # Schedule a forced measurement inside requestAnimationFrame (after
-    # the browser finishes layout) with a preceding setTimeout delay.
-    "function raf(ms){setTimeout(function(){requestAnimationFrame(function(){send(true)})},ms)}"
-    # Debounced non-forced send for background events (350 ms).
-    "function dSend(){clearTimeout(tid);tid=setTimeout(function(){send(false)},350)}"
-    # ── Initial height ──────────────────────────────────────
-    # Stagger by 50-249 ms random delay so multiple iframes don't
-    # fire at the same instant and overwhelm the Streamlit frontend.
-    "setTimeout(function(){send(false)},50+Math.floor(Math.random()*200));"
-    # ── Toggle handler ──────────────────────────────────────
-    # Four deferred measurements (150 / 400 / 800 / 1500 ms) ensure
-    # we capture the final layout even on slow mobile devices with
-    # CSS animations (qcm-fade-in-up takes 0.4 s) and grid reflows.
-    # Uses force=true so the height update is always delivered.
-    "document.addEventListener('toggle',function(){"
-    "raf(150);raf(400);raf(800);raf(1500);"
-    "},true);"
-    # ── Joseph M Smith panel toggle (uses display:none/block) ──
-    "document.addEventListener('click',function(e){"
-    "if(e.target.closest&&e.target.closest('.upc-joseph-row')){"
-    "raf(150);raf(400);raf(800);"
-    "}"
-    "},true);"
-    # ── MutationObserver for animated Joseph panel reveals ──
-    "var mo=new MutationObserver(function(muts){"
-    "for(var i=0;i<muts.length;i++){"
-    "if(muts[i].target.classList&&muts[i].target.classList.contains('upc-joseph-response')){"
-    "dSend();break;"
-    "}"
-    "}"
-    "});"
-    "document.querySelectorAll('.upc-joseph-response').forEach(function(el){"
-    "mo.observe(el,{attributes:true,attributeFilter:['style']})"
-    "});"
-    # NOTE: img load handlers intentionally REMOVED in v4.  They
-    # created a stream of postMessages as images loaded async; with
-    # 6+ iframes this overwhelmed the Streamlit WebSocket on mobile,
-    # triggering disconnects and full page reruns.  The toggle / click
-    # handlers cover all user-initiated height changes; any residual
-    # ±few px from late-loading images is absorbed by the 32 px margin.
-    "})()"
-    "</script>"
-)
 
+def _render_card_native(card_html):
+    """Render *card_html* natively via ``st.html()`` — no iframe.
 
-def _render_card_iframe(card_html, player_count):
-    """Render *card_html* inside a non-scrolling iframe with auto-height.
+    Uses Streamlit 1.55+ ``st.html()`` which renders content directly in
+    the page DOM (not in an iframe).  This ensures:
 
-    Uses ``streamlit.components.v1.html()`` which creates a real ``<iframe>``
-    with full CSS isolation.  The v4 resize script inside the iframe sends
-    a staggered ``streamlit:setFrameHeight`` message on load and up to four
-    ``requestAnimationFrame``-wrapped measurements on ``<details>`` toggle
-    (150 / 400 / 800 / 1500 ms) so expanded content is never cut off.
+    1. **Normal page scrolling** — no iframe capturing wheel events on
+       desktop.  Previously, iframes with ``scrolling=False`` swallowed
+       mouse-wheel events when the cursor was over the parlay or player
+       card sections, forcing users to scroll from the side of the page.
+    2. **No content cutoff** — expanded player cards grow naturally
+       within the page flow; there is no fixed iframe height to exceed.
+    3. **Dynamic accommodation** — when a ``<details>`` card is expanded,
+       the surrounding container grows to fit the content, exactly as
+       the user reported worked in a previous fix.
 
-    The iframe uses ``scrolling=False`` — it should never need a scrollbar
-    because the initial ``height`` estimate is generous and the script
-    corrects it on load.  Image-load handlers were removed in v4 to
-    eliminate the postMessage storms that caused mobile "app restart"
-    issues (WebSocket disconnects from too-frequent messages).
+    CSS classes (``.qam-*``, ``.qcm-*``, ``.upc-*``) are uniquely
+    prefixed to avoid conflicts with Streamlit's own styles.
 
     Parameters
     ----------
     card_html : str
         Complete HTML (including ``<style>`` blocks) returned by
-        :func:`utils.renderers.compile_unified_card_matrix`.
-    player_count : int
-        Number of player groups — used to estimate the initial iframe
-        height before the load-time script adjusts it.
+        :func:`utils.renderers.compile_unified_card_matrix` or the
+        parlay rendering functions.
     """
-    _est_h = max(_MIN_IFRAME_HEIGHT, min(player_count * _HEIGHT_PER_PLAYER, _MAX_IFRAME_HEIGHT))
-    _doc = (
-        "<!DOCTYPE html><html><head>"
-        '<meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<style>"
-        # overflow:visible on html/body so that:
-        #   1. scrollHeight accurately reflects the full content height
-        #      (overflow:hidden was clamping it, causing clipped cards)
-        #   2. Expanded <details> content is never cut off
-        #   3. Joseph opinion panels (toggled via JS) measure correctly
-        # The iframe itself uses scrolling=False — the postMessage height
-        # adjustment keeps the iframe exactly the right size, so no
-        # scrollbar ever appears.
-        "html{overflow:visible;overscroll-behavior:contain;touch-action:pan-y}"
-        "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
-        "overscroll-behavior:contain;overflow:visible;touch-action:pan-y}"
-        "*{-webkit-tap-highlight-color:transparent}"
-        # Prevent horizontal overflow from wide cards on narrow viewports
-        ".upc-grid,.qcm-grid-container,.qcm-grid{max-width:100%;box-sizing:border-box}"
-        "</style>"
-        "</head><body>"
-        f"{card_html}"
-        f"{_IFRAME_RESIZE_JS}"
-        "</body></html>"
-    )
-    _components.html(_doc, height=_est_h, scrolling=False)
+    st.html(card_html, unsafe_allow_javascript=True)
 
 
 st.set_page_config(
@@ -462,54 +313,38 @@ st.markdown(
     '.qam-scrolling [data-testid="stSelectbox"] div[data-baseweb],'
     '.qam-scrolling [data-testid="stMultiSelect"] div[data-baseweb]'
     '{pointer-events:none !important}'
-    # ── Promote iframes to GPU layers for smoother scroll ──
-    '[data-testid="stHtml"] iframe'
-    '{will-change:transform}'
-    # ── Ensure iframe containers expand fully (no clipping) ──
-    # On mobile, Streamlit's stHtml wrapper can clip iframe content.
-    # Allow iframes to expand to their full content height.
+    # ── Ensure st.html() containers expand fully (no clipping) ──
+    # Cards are now rendered natively via st.html(), so ensure the
+    # wrapper elements don't impose height constraints.
     '[data-testid="stHtml"]'
     '{overflow:visible !important;max-height:none !important}'
-    # ── Ensure Streamlit iframe wrapper div has no height constraint ──
     '[data-testid="stHtml"] > div'
     '{overflow:visible !important;max-height:none !important}'
-    # ── Mobile: ensure expander content doesn't clip ──
+    # ── Ensure expander content doesn't clip ──
     '.stExpander [data-testid="stExpanderDetails"]'
     '{overflow:visible !important;max-height:none !important}'
     '</style>',
     unsafe_allow_html=True,
 )
 
-# ── JavaScript: Disable QAM card iframe pointer events during scroll ──
-# When the user is actively scrolling, iframes can accidentally
-# capture touch/pointer events and trigger Streamlit component
-# re-renders (postMessage traffic, focus changes, etc.).  This
-# script sets pointer-events:none on QAM card iframes during scroll
-# and re-enables them 300ms after scrolling stops.
+# ── JavaScript: Scroll guard for widget pointer events ────────────────────────
+# When the user is actively scrolling on mobile, this script adds a
+# ``.qam-scrolling`` class to ``<body>`` which disables pointer-events on
+# interactive Streamlit widgets (via the CSS above).  This prevents
+# accidental taps during scroll that would trigger full-page reruns.
 #
-# IMPORTANT: Only targets iframes inside Streamlit's component
-# containers (data-testid="stHtml"), NOT the Streamlit framework
-# iframes used for WebSocket communication.  Previously this
-# targeted ALL iframes which broke the WebSocket connection.
+# Cards are no longer rendered in iframes (they use st.html() natively),
+# so the iframe pointer-events guard is removed.
 #
-# The touchmove pull-to-refresh prevention now uses {passive:true}
-# with CSS overscroll-behavior instead of e.preventDefault(), which
-# was blocking the main thread and starving WebSocket heartbeats.
+# The touchmove pull-to-refresh prevention uses {passive:true}
+# with CSS overscroll-behavior instead of e.preventDefault().
 st.markdown(
     """<script>
     (function(){
         if(window.__qamScrollGuard) return;
         window.__qamScrollGuard=true;
         var tid=0;
-        /* Inject a CSS rule once to batch-disable pointer events on iframes
-           during scroll.  Avoids per-iframe style mutations which cause
-           layout thrashing that cascades into postMessage storms. */
-        var sheet=document.createElement('style');
-        sheet.textContent='.qam-scrolling [data-testid="stHtml"] iframe{pointer-events:none !important}';
-        document.head.appendChild(sheet);
         function onScroll(){
-            /* Always add class + refresh the re-enable timer so continuous
-               scrolling keeps iframes disabled until scrolling stops. */
             document.body.classList.add('qam-scrolling');
             clearTimeout(tid);
             tid=setTimeout(function(){
@@ -519,8 +354,6 @@ st.markdown(
         /* Use the Streamlit main scroll container if available */
         var sc=document.querySelector('[data-testid="stAppViewContainer"]')||window;
         sc.addEventListener('scroll',onScroll,{passive:true});
-        /* Also listen on touchmove — catches scroll momentum before the
-           browser fires the 'scroll' event on the container */
         sc.addEventListener('touchmove',onScroll,{passive:true});
     })();
     </script>""",
@@ -2923,9 +2756,8 @@ def _render_results_fragment():
     st.divider()
 
     # ── 🎯 Strongly Suggested Parlays (at TOP for maximum visibility) ─
-    # Rendered via components.html() iframe to avoid WebSocket-ClosedError
-    # that occurs when large HTML payloads are sent over the Tornado
-    # WebSocket mid-rerun.
+    # Rendered natively via st.html() so content is part of the normal
+    # page flow — no iframe to capture scroll events on desktop.
     strategy_entries = _build_entry_strategy(displayed_results)
     if strategy_entries:
         st.markdown(
@@ -2940,7 +2772,7 @@ def _render_results_fragment():
             f'<div class="qam-parlay-container">{_parlay_cards}</div>'
         )
         _parlay_css = _get_qcm_css()
-        _render_card_iframe(_parlay_css + _parlay_html, len(strategy_entries))
+        _render_card_native(_parlay_css + _parlay_html)
     else:
         st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
 
@@ -3007,10 +2839,9 @@ def _render_results_fragment():
     # (headshot, name, team, season stats) with all their prop
     # analysis cards.  Click a card to expand and see full analysis.
     #
-    # Rendered inside a self-resizing <iframe> via _render_card_iframe()
-    # rather than inline st.markdown(). This eliminates the WebSocket-
-    # ClosedError crash that occurred when large HTML payloads were sent
-    # over the Tornado WebSocket mid-rerun.
+    # Rendered natively via st.html() so the content is part of the
+    # normal page flow.  This eliminates iframe scroll-capture on
+    # desktop and allows expanded cards to grow without cutoff.
     _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
     _grouped = _group_props(_active_results, _frag_players_data, _frag_todays_games)
 
@@ -3105,14 +2936,14 @@ def _render_results_fragment():
                 # Apply lazy-chunk logic within each game group
                 _gp_keys = list(_game_players.keys())
                 if len(_gp_keys) <= _LAZY_CHUNK_SIZE:
-                    _render_card_iframe(_game_html, len(_game_players))
+                    _render_card_native(_game_html)
                 else:
                     for _ci in range(0, len(_gp_keys), _LAZY_CHUNK_SIZE):
                         _chunk_keys = _gp_keys[_ci : _ci + _LAZY_CHUNK_SIZE]
                         _chunk_data = {k: _game_players[k] for k in _chunk_keys}
                         _chunk_opinions = {k: _game_opinions[k] for k in _chunk_keys if k in _game_opinions}
                         _chunk_html = _compile_unified_matrix(_chunk_data, _chunk_opinions)
-                        _render_card_iframe(_chunk_html, len(_chunk_data))
+                        _render_card_native(_chunk_html)
 
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
@@ -3125,7 +2956,7 @@ def _render_results_fragment():
                 unsafe_allow_html=True,
             )
             _out_unified_html = _compile_unified_matrix(_out_grouped)
-            _render_card_iframe(_out_unified_html, len(_out_grouped))
+            _render_card_native(_out_unified_html)
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()
