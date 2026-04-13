@@ -296,6 +296,8 @@ def render_uncertain_pick_html(pick: dict, inline_breakdown_html: str = "") -> s
 
 _QEG_EDGE_THRESHOLD = 15.0  # Minimum absolute edge % to qualify
 
+QEG_EDGE_THRESHOLD = _QEG_EDGE_THRESHOLD  # Public alias for page import
+
 
 def render_quantum_edge_gap_banner_html(
     picks: list,
@@ -326,7 +328,8 @@ def render_quantum_edge_gap_banner_html(
         '<div class="qam-edge-gap-banner">'
         '<h3>⚡ Quantum Edge Gap</h3>'
         '<p>'
-        'Extreme-edge picks where the model projects a <strong>≥&thinsp;15 %</strong> '
+        'Extreme-edge picks where the model projects a '
+        f'<strong>≥&thinsp;{_QEG_EDGE_THRESHOLD:.0f} %</strong> '
         'advantage over the line — high-conviction opportunities with the '
         'largest separation between projection and market.'
         '</p>'

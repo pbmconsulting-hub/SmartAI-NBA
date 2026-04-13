@@ -509,6 +509,7 @@ from pages.helpers.neural_analysis_helpers import (
 )
 from pages.helpers.quantum_analysis_helpers import (
     JOSEPH_DESK_SIZE_CSS as _JOSEPH_DESK_SIZE_CSS,
+    QEG_EDGE_THRESHOLD as _QEG_EDGE_THRESHOLD,
     render_dfs_flex_edge_html as _render_dfs_flex_edge_html,
     render_tier_distribution_html as _render_tier_distribution_html,
     render_news_alert_html as _render_news_alert_html,
@@ -2727,7 +2728,7 @@ def _render_results_fragment():
     # ── ⚡ Quantum Edge Gap (extreme-edge picks ≥ 15%) ────────────────────
     _edge_gap_picks = [
         r for r in displayed_results
-        if abs(r.get("edge_percentage", 0)) >= 15.0
+        if abs(r.get("edge_percentage", 0)) >= _QEG_EDGE_THRESHOLD
         and not r.get("should_avoid", False)
         and not r.get("player_is_out", False)
     ]

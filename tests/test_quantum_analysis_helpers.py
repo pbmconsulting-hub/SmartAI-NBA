@@ -13,6 +13,7 @@ from pages.helpers.quantum_analysis_helpers import (
     SIGNAL_LABELS,
     PARLAY_STARS,
     PARLAY_LABELS,
+    QEG_EDGE_THRESHOLD,
     render_dfs_flex_edge_html,
     render_tier_distribution_html,
     render_news_alert_html,
@@ -346,6 +347,20 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
         ]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("18.0%", html)  # max and avg
+
+    def test_threshold_constant(self):
+        """Ensure the exported threshold is 15.0."""
+        self.assertEqual(QEG_EDGE_THRESHOLD, 15.0)
+
+    def test_boundary_at_threshold(self):
+        """Picks exactly at the threshold boundary should render correctly."""
+        picks = [
+            {"edge_percentage": 15.0, "direction": "OVER"},
+            {"edge_percentage": -15.0, "direction": "UNDER"},
+        ]
+        html = render_quantum_edge_gap_banner_html(picks)
+        self.assertIn("2", html)  # both picks present
+        self.assertIn("15.0%", html)  # avg and max edge
 
 
 class TestQuantumEdgeGapCard(unittest.TestCase):
