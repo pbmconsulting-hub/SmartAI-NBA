@@ -15,7 +15,12 @@ import logging
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.nba_data_service import load_last_updated
 from tracking.database import initialize_database, load_user_settings, load_page_state
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_quantum_card_matrix_css as _get_qcm_css
+from pages.helpers.quantum_analysis_helpers import (
+    QEG_EDGE_THRESHOLD as _QEG_EDGE_THRESHOLD,
+    render_quantum_edge_gap_banner_html as _render_edge_gap_banner_html,
+    render_quantum_edge_gap_card_html as _render_edge_gap_card_html,
+)
 
 # ============================================================
 # SECTION: Page Configuration
@@ -1555,6 +1560,41 @@ if _home_one_click:
 
 # ============================================================
 # END SECTION 1: Cinematic Hero
+# ============================================================
+
+# ============================================================
+# SECTION 1B: Quantum Edge Gap — Extreme-edge picks (shown when
+#             analysis results exist with |edge| ≥ 15%)
+# ============================================================
+
+_home_analysis = st.session_state.get("analysis_results", [])
+_home_edge_gap_picks = [
+    r for r in _home_analysis
+    if abs(r.get("edge_percentage", 0)) >= _QEG_EDGE_THRESHOLD
+    and not r.get("should_avoid", False)
+    and not r.get("player_is_out", False)
+]
+_home_edge_gap_picks = sorted(
+    _home_edge_gap_picks,
+    key=lambda r: abs(r.get("edge_percentage", 0)),
+    reverse=True,
+)
+
+if _home_edge_gap_picks:
+    st.markdown(_get_qcm_css(), unsafe_allow_html=True)
+    st.markdown(
+        _render_edge_gap_banner_html(_home_edge_gap_picks),
+        unsafe_allow_html=True,
+    )
+    for _heg_idx, _heg in enumerate(_home_edge_gap_picks, start=1):
+        st.markdown(
+            _render_edge_gap_card_html(_heg, rank=_heg_idx),
+            unsafe_allow_html=True,
+        )
+    st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
+
+# ============================================================
+# END SECTION 1B: Quantum Edge Gap
 # ============================================================
 
 # ============================================================
