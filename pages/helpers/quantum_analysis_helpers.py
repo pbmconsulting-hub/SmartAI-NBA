@@ -326,12 +326,17 @@ def render_quantum_edge_gap_banner_html(
 
     return (
         '<div class="qam-edge-gap-banner">'
-        '<h3>⚡ Quantum Edge Gap</h3>'
+        '<div class="qam-edge-gap-banner-inner">'
+        # ── Header row: icon + title ──
+        '<div class="qam-edge-gap-banner-header">'
+        '<div class="qam-edge-gap-banner-icon">⚡</div>'
+        '<h3>Quantum Edge Gap'
+        f'<span>≥&thinsp;{_QEG_EDGE_THRESHOLD:.0f}% EDGE</span></h3>'
+        '</div>'
         '<p>'
-        'Extreme-edge picks where the model projects a '
-        f'<strong>≥&thinsp;{_QEG_EDGE_THRESHOLD:.0f} %</strong> '
-        'advantage over the line — high-conviction opportunities with the '
-        'largest separation between projection and market.'
+        'Extreme-edge picks where the model projects a massive advantage '
+        'over the line — high-conviction opportunities with the largest '
+        'separation between projection and market.'
         '</p>'
         '<div class="qeg-stats-row">'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{total}</span>'
@@ -346,19 +351,22 @@ def render_quantum_edge_gap_banner_html(
         f'<span class="qeg-stat-lbl">Max Edge</span></div>'
         '</div>'
         '</div>'
+        '</div>'
     )
 
 
 _NBA_HEADSHOT_CDN = "https://cdn.nba.com/headshots/nba/latest/260x190"
 
 
-def render_quantum_edge_gap_card_html(result: dict) -> str:
+def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     """Return HTML for a single Quantum Edge Gap pick card.
 
     Parameters
     ----------
     result:
         A single prop analysis result dict from the engine.
+    rank:
+        1-based position of this pick in the edge gap list (0 = no rank shown).
     """
     player_name = _html.escape(str(result.get("player_name", "Unknown")))
     stat_type = _html.escape(str(result.get("stat_type", "")))
@@ -383,6 +391,7 @@ def render_quantum_edge_gap_card_html(result: dict) -> str:
         confidence = float(confidence)
     except (ValueError, TypeError):
         confidence = 0
+    conf_pct = max(0, min(100, confidence))
 
     # Probability
     prob_over = result.get("probability_over", 0)
@@ -405,6 +414,7 @@ def render_quantum_edge_gap_card_html(result: dict) -> str:
     dir_label = "OVER" if direction == "OVER" else "UNDER"
     dir_css = "qeg-dir-over" if direction == "OVER" else "qeg-dir-under"
     card_dir_css = "qeg-card-over" if direction == "OVER" else "qeg-card-under"
+    dir_arrow = "▲" if direction == "OVER" else "▼"
 
     # Projection
     projection = result.get("adjusted_projection", 0)
@@ -430,6 +440,21 @@ def render_quantum_edge_gap_card_html(result: dict) -> str:
     except (ValueError, TypeError):
         p90_d = "—"
 
+    # Season average for this stat type (for comparison)
+    _stat_avg_keys = {
+        "points": "season_pts_avg",
+        "rebounds": "season_reb_avg",
+        "assists": "season_ast_avg",
+    }
+    stat_key_lower = stat_type.lower().replace(" ", "_")
+    season_avg_key = _stat_avg_keys.get(stat_key_lower, "")
+    season_avg = result.get(season_avg_key, 0) if season_avg_key else 0
+    try:
+        season_avg = float(season_avg)
+    except (ValueError, TypeError):
+        season_avg = 0
+    avg_display = f"{season_avg:.1f}" if season_avg > 0 else ""
+
     # Headshot
     player_id = result.get("player_id", "")
     headshot_url = (
@@ -451,10 +476,29 @@ def render_quantum_edge_gap_card_html(result: dict) -> str:
     tier_emoji_map = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
     tier_emoji = tier_emoji_map.get(tier, "🥉")
 
+    # Rank badge
+    rank_html = (
+        f'<div class="qeg-rank">#{rank}</div>'
+        if rank > 0
+        else ""
+    )
+
+    # Confidence bar color based on direction
+    conf_color = "#00ff88" if direction == "OVER" else "#ff6b6b"
+
+    # Season avg sub-text
+    avg_sub_html = (
+        f'<div class="qeg-stat-block-sub">Avg: {avg_display}</div>'
+        if avg_display
+        else ""
+    )
+
     return (
         f'<div class="qeg-card {card_dir_css}">'
-        # ── Top row: identity + metrics + edge highlight ──
+        # ── Top row: rank + identity + center (conf bar + metrics) + edge ──
         f'<div class="qeg-card-top">'
+        # Rank
+        f'{rank_html}'
         # Identity
         f'<div class="qeg-card-identity">'
         f'{headshot_html}'
@@ -463,11 +507,20 @@ def render_quantum_edge_gap_card_html(result: dict) -> str:
         f'<span class="qeg-player-meta">{team} · {stat_display} · {platform}</span>'
         f'</div>'
         f'</div>'
-        # Metrics
+        # Center: confidence bar + metric pills
+        f'<div class="qeg-card-center">'
+        # Confidence bar
+        f'<div class="qeg-conf-row">'
+        f'<span class="qeg-conf-label">SAFE</span>'
+        f'<div class="qeg-conf-bar-track">'
+        f'<div class="qeg-conf-bar-fill" style="width:{conf_pct:.0f}%;"></div>'
+        f'</div>'
+        f'<span class="qeg-conf-val">{confidence:.0f}</span>'
+        f'</div>'
+        # Metrics strip
         f'<div class="qeg-card-metrics">'
         f'<div class="qeg-metric">'
-        f'<span class="qeg-direction-badge {dir_css}">{dir_label}</span>'
-        f'<div class="qeg-metric-lbl">Direction</div>'
+        f'<span class="qeg-direction-badge {dir_css}">{dir_arrow} {dir_label}</span>'
         f'</div>'
         f'<div class="qeg-metric">'
         f'<div class="qeg-metric-val">{line_display}</div>'
@@ -478,22 +531,23 @@ def render_quantum_edge_gap_card_html(result: dict) -> str:
         f'<div class="qeg-metric-lbl">Prob</div>'
         f'</div>'
         f'<div class="qeg-metric">'
-        f'<div class="qeg-metric-val">{confidence:.0f}</div>'
-        f'<div class="qeg-metric-lbl">SAFE</div>'
-        f'</div>'
-        f'<div class="qeg-metric">'
         f'<div class="qeg-metric-val">{tier_emoji} {tier}</div>'
         f'<div class="qeg-metric-lbl">Tier</div>'
         f'</div>'
         f'</div>'
-        # Edge highlight (big number)
-        f'<div class="qeg-edge-highlight">{edge_display}</div>'
+        f'</div>'
+        # Edge highlight callout
+        f'<div class="qeg-edge-highlight">'
+        f'{edge_display}'
+        f'<span class="qeg-edge-highlight-lbl">Edge</span>'
+        f'</div>'
         f'</div>'
         # ── Bottom row: stat blocks ──
         f'<div class="qeg-card-bottom">'
         f'<div class="qeg-stat-block">'
         f'<div class="qeg-stat-block-title">Projection</div>'
         f'<div class="qeg-stat-block-val">{proj_display}</div>'
+        f'{avg_sub_html}'
         f'</div>'
         f'<div class="qeg-stat-block">'
         f'<div class="qeg-stat-block-title">P10 / Median / P90</div>'

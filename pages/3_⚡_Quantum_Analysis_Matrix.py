@@ -2744,9 +2744,9 @@ def _render_results_fragment():
             _render_edge_gap_banner_html(_edge_gap_picks),
             unsafe_allow_html=True,
         )
-        for _eg in _edge_gap_picks:
+        for _eg_idx, _eg in enumerate(_edge_gap_picks, start=1):
             st.markdown(
-                _render_edge_gap_card_html(_eg),
+                _render_edge_gap_card_html(_eg, rank=_eg_idx),
                 unsafe_allow_html=True,
             )
         st.divider()
