@@ -483,9 +483,6 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         else ""
     )
 
-    # Confidence bar color based on direction
-    conf_color = "#00ff88" if direction == "OVER" else "#ff6b6b"
-
     # Season avg sub-text
     avg_sub_html = (
         f'<div class="qeg-stat-block-sub">Avg: {avg_display}</div>'
