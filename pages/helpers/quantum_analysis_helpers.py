@@ -655,7 +655,10 @@ def render_quantum_edge_gap_grouped_html(picks: list) -> str:
                 f'<div class="qeg-group-body">{"".join(inner_cards)}</div>'
                 f'</details>'
             )
-    return "".join(parts)# ── Gold Tier Banner ──────────────────────────────────────────────────────────
+    return "".join(parts)
+
+
+# ── Gold Tier Banner ──────────────────────────────────────────────────────────
 
 def render_gold_tier_banner_html() -> str:
     """Return the Gold Tier picks banner HTML."""
