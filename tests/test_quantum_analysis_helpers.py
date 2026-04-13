@@ -652,22 +652,23 @@ class TestEdgeHeatStrip(unittest.TestCase):
     """Verify edge heat strip width calculation."""
 
     def test_heat_width_high_edge(self):
-        """40% edge maps to (40-10)/40*100 = 75% width."""
+        """40% edge → (40-10)/40*100 = 75% width."""
         result = {"player_name": "P", "direction": "OVER", "edge_percentage": 40.0}
         html = render_quantum_edge_gap_card_html(result)
         self.assertIn("width:75%", html)
 
     def test_heat_width_low_edge(self):
-        """15% edge maps to (15-10)/40*100 = 12.5% width."""
+        """15% edge → (15-10)/40*100 ≈ 12% width (rounded)."""
         result = {"player_name": "P", "direction": "OVER", "edge_percentage": 15.0}
         html = render_quantum_edge_gap_card_html(result)
         self.assertIn("width:12%", html)
 
     def test_heat_width_zero_edge(self):
-        """0% edge maps to 0 (clamped)."""
+        """0% edge → clamped to 0% width."""
         result = {"player_name": "P", "direction": "OVER", "edge_percentage": 0}
         html = render_quantum_edge_gap_card_html(result)
         self.assertIn("qeg-heat-fill", html)
+        self.assertIn("width:0%", html)
 
     def test_heat_display_absolute_value(self):
         """Under card heat pct shows absolute edge."""

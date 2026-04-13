@@ -525,7 +525,8 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     # Prop call line (e.g. "▲ OVER 25.5 Points")
     prop_call = f"{dir_arrow} {dir_label} {line_display} {stat_display}"
 
-    # Edge heat bar width (clamped 0-100, mapped from 15-50% edge)
+    # Edge heat bar width: maps [10%, 50%] → [0%, 100%] so picks at the
+    # 15% threshold already show visible fill (≈12%).
     abs_edge = abs(edge_val)
     heat_width = max(0, min(100, (abs_edge - 10) / 40 * 100))
     heat_pct_display = f"{abs_edge:.1f}%"
