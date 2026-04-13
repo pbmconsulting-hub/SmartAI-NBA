@@ -474,6 +474,19 @@ def _build_single_card_html(result, index=0, compact=False):
     _compact_cls = " qcm-card-compact" if compact else ""
 
     # ── Build the identity / header section ──────────────────────
+    # Inline badges for special status (best pick, uncertain, should-avoid)
+    _is_best_pick = result.get("_is_best_pick", False)
+    _is_uncertain = result.get("is_uncertain", False)
+    _should_avoid = result.get("should_avoid", False)
+
+    _status_badges = ""
+    if _is_best_pick:
+        _status_badges += '<span class="qcm-badge qcm-badge-best">⭐ Top Pick</span>'
+    if _is_uncertain:
+        _status_badges += '<span class="qcm-badge qcm-badge-uncertain">⚠️ Uncertain</span>'
+    if _should_avoid:
+        _status_badges += '<span class="qcm-badge qcm-badge-avoid">🚫 Caution</span>'
+
     if compact:
         # Compact mode: streamlined prop-focused header (no headshot / name)
         _prop_title = _escape(prop_text)
@@ -481,6 +494,7 @@ def _build_single_card_html(result, index=0, compact=False):
     <div class="qcm-compact-left">
       <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
       <span class="qcm-compact-prop" title="{_prop_title}">{prop_text}</span>
+      {_status_badges}
     </div>
     <div class="qcm-safe-score">
       <div class="qcm-safe-score-label">SAFE Score™</div>

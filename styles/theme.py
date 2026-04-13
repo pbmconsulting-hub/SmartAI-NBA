@@ -7231,6 +7231,36 @@ QUANTUM_CARD_MATRIX_CSS = """
     font-size: 1.1rem;
 }
 
+/* ── Inline Prop Badges (Best Pick, Uncertain, Caution) ──── */
+.qcm-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.qcm-badge-best {
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.35);
+    color: #FFD700;
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.2);
+}
+.qcm-badge-uncertain {
+    background: rgba(255, 193, 7, 0.10);
+    border: 1px solid rgba(255, 193, 7, 0.30);
+    color: #ffc107;
+}
+.qcm-badge-avoid {
+    background: rgba(255, 68, 68, 0.10);
+    border: 1px solid rgba(255, 68, 68, 0.25);
+    color: #ff4444;
+}
+
 /* ── Confidence Bar ─────────────────────────────────────── */
 .qcm-conf-bar-wrap {
     margin: 4px 0 10px;
@@ -7579,6 +7609,30 @@ QUANTUM_CARD_MATRIX_CSS = """
     .qcm-compact-prop {
         font-size: 0.80rem;
     }
+    .qcm-badge {
+        font-size: 0.56rem;
+        padding: 1px 5px;
+    }
+    .qcm-compact-left {
+        flex-wrap: wrap;
+    }
+    .qam-top-picks-bar {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+    .qam-top-picks-label {
+        font-size: 0.74rem;
+    }
+    .qam-top-pill {
+        font-size: 0.60rem;
+        padding: 3px 8px;
+    }
+    .qam-uncertain-banner {
+        padding: 8px 12px;
+    }
+    .qam-uncertain-text {
+        font-size: 0.68rem;
+    }
 }
 @media (max-width: 480px) {
     .qcm-card {
@@ -7610,6 +7664,14 @@ QUANTUM_CARD_MATRIX_CSS = """
     }
     .qcm-card-compact .qcm-safe-score-value {
         font-size: 0.95rem;
+    }
+    .qcm-badge {
+        font-size: 0.52rem;
+        padding: 1px 4px;
+    }
+    .qam-top-pill {
+        font-size: 0.56rem;
+        padding: 2px 6px;
     }
 }
 
@@ -8909,6 +8971,86 @@ QUANTUM_CARD_MATRIX_CSS = """
     background: rgba(0,198,255,0.10);
     color: #00C6FF;
 }
+
+/* ── Top Picks Summary Bar ─────────────────────────────────── */
+.qam-top-picks-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 18px;
+    background: linear-gradient(135deg, rgba(255,215,0,0.04) 0%, rgba(0,240,255,0.03) 100%);
+    border: 1px solid rgba(255,215,0,0.18);
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+.qam-top-picks-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #FFD700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+.qam-top-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.qam-top-pill:hover {
+    box-shadow: 0 0 10px rgba(255,215,0,0.08);
+}
+
+/* ── Uncertain Picks Inline Banner ─────────────────────────── */
+.qam-uncertain-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255,193,7,0.05);
+    border: 1px solid rgba(255,193,7,0.18);
+    border-left: 3px solid #ffc107;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+}
+.qam-uncertain-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+.qam-uncertain-text {
+    font-size: 0.76rem;
+    color: #d4a84a;
+    line-height: 1.45;
+}
+
+/* ── AI/Tech Theme Accents ─────────────────────────────────── */
+/* Subtle neural-net grid pattern on game matchup cards */
+.qam-matchup-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    border-radius: 14px;
+    background: radial-gradient(circle at 20% 50%, rgba(0,198,255,0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(255,94,0,0.02) 0%, transparent 50%);
+    opacity: 0.7;
+}
+.qam-matchup-card {
+    position: relative;
+    overflow: hidden;
+}
 """
 
 
@@ -8940,6 +9082,9 @@ UNIFIED_PLAYER_CARD_CSS = """
     gap: 14px;
     padding: 8px 0;
     width: 100%;
+    /* AI accent: faint vertical data-line on left edge */
+    border-left: 2px solid transparent;
+    border-image: linear-gradient(180deg, rgba(0,240,255,0.15) 0%, transparent 60%) 1;
 }
 
 /* ── Expandable wrapper (<details>) ─────────────────────── */
@@ -8954,10 +9099,16 @@ UNIFIED_PLAYER_CARD_CSS = """
     font-family: 'Inter', sans-serif;
     color: #e0eeff;
     overflow: visible;
+    /* AI accent: subtle top-edge gradient line */
+    border-top: 2px solid transparent;
+    border-image: linear-gradient(90deg, transparent 5%, rgba(0,240,255,0.18) 50%, transparent 95%) 1;
+    border-image-slice: 1;
 }
 .upc-card[open] {
     border-color: rgba(0, 240, 255, 0.22);
     box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 240, 255, 0.10);
+    border-image: linear-gradient(90deg, transparent 2%, rgba(0,240,255,0.35) 50%, transparent 98%) 1;
+    border-image-slice: 1;
 }
 
 /* ── Summary (always-visible header) ────────────────────── */

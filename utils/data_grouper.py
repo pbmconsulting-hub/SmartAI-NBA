@@ -79,4 +79,14 @@ def group_props_by_player(
 
         aggregated[name]["props"].append(result)
 
+    # Sort props within each player: highest confidence / best tier first
+    _tier_rank = {"Platinum": 0, "Gold": 1, "Silver": 2, "Bronze": 3}
+    for data in aggregated.values():
+        data["props"].sort(
+            key=lambda p: (
+                _tier_rank.get(p.get("tier", "Bronze"), 3),
+                -(p.get("confidence_score", 0) or 0),
+            ),
+        )
+
     return aggregated
