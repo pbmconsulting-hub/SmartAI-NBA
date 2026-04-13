@@ -10237,3 +10237,345 @@ def get_preflight_checklist_html(checks: list[tuple[str, bool, str]]) -> str:
 # ============================================================
 # END SECTION: Smart NBA Data — Premium Glassmorphic Card / Widget Helpers
 # ============================================================
+
+
+# ============================================================
+# SECTION: Prop Scanner — CSS & HTML Helpers
+# ============================================================
+
+_PROP_SCANNER_CSS = """
+<style>
+/* ─── Platform Color Badges ───────────────────────────── */
+.plat-draftkings  { background:#2b6cb0; color:#bee3f8; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; display:inline-block; }
+.plat-prizepicks  { background:#16a34a; color:#dcfce7; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; display:inline-block; }
+.plat-underdog    { background:#ca8a04; color:#fef9c3; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; display:inline-block; }
+.plat-default     { background:#1a2035; color:#c0d0e8; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; border:1px solid rgba(0,240,255,0.20); display:inline-block; }
+
+/* ─── Team Pill ───────────────────────────────────────── */
+.team-pill { background:rgba(0,240,255,0.12); color:#fff; border:1px solid rgba(0,240,255,0.30); padding:1px 6px; border-radius:4px; font-size:0.8rem; font-weight:700; display:inline-block; }
+
+/* ─── Line Type Badges (Goblin / Demon / Standard) ────── */
+.line-type-goblin   { background:rgba(0,255,128,0.15); color:#00ff90; padding:2px 8px; border-radius:5px; font-size:0.75rem; font-weight:700; border:1px solid rgba(0,255,128,0.35); display:inline-block; }
+.line-type-demon    { background:rgba(255,60,60,0.15); color:#ff4444; padding:2px 8px; border-radius:5px; font-size:0.75rem; font-weight:700; border:1px solid rgba(255,60,60,0.35); display:inline-block; }
+.line-type-standard { background:rgba(80,90,120,0.20); color:#8a9bb8; padding:2px 8px; border-radius:5px; font-size:0.75rem; font-weight:700; border:1px solid rgba(80,90,120,0.25); display:inline-block; }
+
+/* ─── Value Signal Gauge Bar ──────────────────────────── */
+.vs-gauge-wrap {
+    display:flex; align-items:center; gap:6px; min-width:140px;
+}
+.vs-gauge-track {
+    flex:1; height:8px; background:rgba(255,255,255,0.08); border-radius:4px;
+    position:relative; overflow:hidden; min-width:60px;
+}
+.vs-gauge-fill {
+    height:100%; border-radius:4px; transition:width 0.3s ease;
+}
+.vs-gauge-low  .vs-gauge-fill { background:linear-gradient(90deg,#00ff9d,#00d084); }
+.vs-gauge-high .vs-gauge-fill { background:linear-gradient(90deg,#ff9966,#ff6b6b); }
+.vs-gauge-fair .vs-gauge-fill { background:linear-gradient(90deg,#69b4ff,#4a9eff); }
+.vs-gauge-label {
+    font-size:0.72rem; font-weight:700; white-space:nowrap;
+}
+.vs-gauge-low  .vs-gauge-label { color:#00ff9d; }
+.vs-gauge-high .vs-gauge-label { color:#ff6b6b; }
+.vs-gauge-fair .vs-gauge-label { color:#69b4ff; }
+
+/* ─── Confidence Score Badge ──────────────────────────── */
+.conf-badge {
+    display:inline-block; padding:2px 8px; border-radius:6px;
+    font-size:0.78rem; font-weight:800; font-family:'JetBrains Mono',monospace;
+    letter-spacing:0.02em;
+}
+.conf-high   { background:rgba(0,255,128,0.15); color:#00ff90; border:1px solid rgba(0,255,128,0.35); }
+.conf-medium { background:rgba(0,200,255,0.14); color:#00c8ff; border:1px solid rgba(0,200,255,0.35); }
+.conf-low    { background:rgba(255,200,0,0.13); color:#e6b800; border:1px solid rgba(255,200,0,0.30); }
+.conf-poor   { background:rgba(255,60,60,0.14); color:#ff5050; border:1px solid rgba(255,60,60,0.32); }
+
+/* ─── Prop Scanner Card Grid ──────────────────────────── */
+.ps-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+    gap:14px; padding:8px 0; width:100%;
+}
+@keyframes ps-card-in {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+.ps-card {
+    background:rgba(11,14,26,0.85);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+    padding:14px 16px;
+    font-family:'Inter',sans-serif;
+    animation:ps-card-in 0.3s ease both;
+    position:relative;
+    overflow:hidden;
+    transition:border-color 0.2s;
+}
+.ps-card:hover { border-color:rgba(0,240,255,0.25); }
+.ps-card-pos { border-left:3px solid #00e57a; }
+.ps-card-neg { border-left:3px solid #ff5050; }
+.ps-card-neu { border-left:3px solid #3a5580; }
+
+.ps-card-header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    margin-bottom:10px; gap:8px;
+}
+.ps-card-player-wrap {
+    display:flex; align-items:center; gap:10px;
+}
+.ps-card-headshot {
+    width:48px; height:48px; border-radius:50%;
+    object-fit:cover; border:2px solid rgba(0,240,255,0.20);
+    background:rgba(20,30,50,0.5);
+    flex-shrink:0;
+}
+.ps-card-player {
+    font-size:0.92rem; font-weight:700; color:#e0eeff;
+    line-height:1.2;
+}
+.ps-card-team {
+    font-size:0.72rem; color:#5a6e8a; font-weight:600;
+}
+
+.ps-card-stat-row {
+    display:flex; align-items:center; gap:8px; margin-bottom:8px;
+    flex-wrap:wrap;
+}
+.ps-card-stat {
+    font-size:0.78rem; color:#8a9bb8; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.04em;
+}
+.ps-card-line {
+    font-size:1.2rem; font-weight:800; color:#e0eeff;
+    font-family:'JetBrains Mono',monospace;
+}
+.ps-card-avg {
+    font-size:0.72rem; color:#5a6e8a; font-weight:500;
+}
+
+.ps-card-metrics {
+    display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap;
+}
+.ps-card-metric-box {
+    flex:1 1 60px; text-align:center;
+    background:rgba(255,255,255,0.03); border-radius:8px;
+    padding:6px 4px;
+}
+.ps-card-metric-val {
+    font-size:0.88rem; font-weight:700;
+    font-family:'JetBrains Mono',monospace;
+}
+.ps-card-metric-lbl {
+    font-size:0.62rem; color:#5a6e8a; text-transform:uppercase;
+    letter-spacing:0.06em; margin-top:2px;
+}
+
+.ps-card-footer {
+    display:flex; justify-content:space-between; align-items:center;
+    border-top:1px solid rgba(255,255,255,0.05);
+    padding-top:8px; margin-top:4px;
+}
+
+/* ─── Line Movement Alert ─────────────────────────────── */
+.lm-alert {
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:0.72rem; font-weight:700; padding:2px 6px;
+    border-radius:4px;
+}
+.lm-alert-down { background:rgba(0,255,157,0.10); color:#00ff9d; border:1px solid rgba(0,255,157,0.30); }
+.lm-alert-up   { background:rgba(255,100,100,0.10); color:#ff6b6b; border:1px solid rgba(255,100,100,0.30); }
+
+/* ─── Responsive tweaks ───────────────────────────────── */
+@media (max-width:768px) {
+    .ps-grid { grid-template-columns:1fr; }
+    .ps-card-metrics { gap:6px; }
+}
+</style>
+"""
+
+
+def get_prop_scanner_css() -> str:
+    """Return the CSS block for Prop Scanner page components."""
+    return _PROP_SCANNER_CSS
+
+
+def get_platform_badge_html(platform: str) -> str:
+    """Return an HTML badge for a sportsbook platform name."""
+    pl = platform.lower() if platform else ""
+    if "prizepicks" in pl:
+        return '<span class="plat-prizepicks">🟢 PrizePicks</span>'
+    if "underdog" in pl:
+        return '<span class="plat-underdog">🟡 Underdog Fantasy</span>'
+    if "draftkings" in pl or "pick6" in pl or "dk" in pl:
+        return '<span class="plat-draftkings">🔵 DraftKings Pick6</span>'
+    if platform:
+        return f'<span class="plat-default">{_html.escape(platform)}</span>'
+    return ""
+
+
+def get_line_type_badge_html(odds_type: str) -> str:
+    """Return an HTML badge for goblin / demon / standard line type."""
+    ot = (odds_type or "standard").lower()
+    if ot == "goblin":
+        return '<span class="line-type-goblin">🟢 Goblin</span>'
+    if ot == "demon":
+        return '<span class="line-type-demon">🔴 Demon</span>'
+    return '<span class="line-type-standard">⚪ Standard</span>'
+
+
+def get_value_gauge_html(line_diff_pct: float) -> str:
+    """Return an HTML mini gauge bar for value signal (line vs season avg).
+
+    *line_diff_pct* is ``(line - avg) / avg * 100``.
+    Negative = OVER value (green).  Positive = UNDER value (orange).
+    """
+    try:
+        diff = float(line_diff_pct)
+    except (TypeError, ValueError):
+        return '<span style="color:#5a6e8a;font-size:0.72rem;">—</span>'
+
+    abs_diff = min(abs(diff), 50)  # cap at 50 for gauge width
+    pct_width = max(int(abs_diff * 2), 8)  # 0-100% scale
+
+    if diff < -12:
+        cls = "vs-gauge-low"
+        label = f"🔥 {diff:+.0f}%"
+    elif diff > 15:
+        cls = "vs-gauge-high"
+        label = f"⚠️ {diff:+.0f}%"
+    else:
+        cls = "vs-gauge-fair"
+        label = f"✅ {diff:+.0f}%" if abs(diff) >= 0.5 else "✅ Fair"
+
+    return (
+        f'<div class="vs-gauge-wrap {cls}">'
+        f'<div class="vs-gauge-track"><div class="vs-gauge-fill" style="width:{pct_width}%;"></div></div>'
+        f'<span class="vs-gauge-label">{label}</span>'
+        f'</div>'
+    )
+
+
+def get_confidence_badge_html(score: int) -> str:
+    """Return an HTML badge for a 0-100 confidence score."""
+    score = max(0, min(100, int(score)))
+    if score >= 75:
+        cls = "conf-high"
+    elif score >= 55:
+        cls = "conf-medium"
+    elif score >= 35:
+        cls = "conf-low"
+    else:
+        cls = "conf-poor"
+    return f'<span class="conf-badge {cls}">{score}</span>'
+
+
+def get_line_movement_html(old_line: float, new_line: float) -> str:
+    """Return an HTML badge showing how a prop line moved."""
+    try:
+        old_line = float(old_line)
+        new_line = float(new_line)
+    except (TypeError, ValueError):
+        return ""
+    diff = new_line - old_line
+    if abs(diff) < 0.01:
+        return ""
+    if diff < 0:
+        return (
+            f'<span class="lm-alert lm-alert-down">'
+            f'{old_line:.1f} → {new_line:.1f} ⬇️</span>'
+        )
+    return (
+        f'<span class="lm-alert lm-alert-up">'
+        f'{old_line:.1f} → {new_line:.1f} ⬆️</span>'
+    )
+
+
+def get_prop_card_html(
+    player_name: str,
+    team: str,
+    stat_type: str,
+    line: float,
+    season_avg: float,
+    line_diff_pct: float,
+    odds_type: str,
+    platform: str,
+    status_emoji: str,
+    player_status: str,
+    confidence_score: int = 0,
+    player_id: int = 0,
+    movement_html: str = "",
+) -> str:
+    """Return a single prop card for the Prop Scanner card grid.
+
+    Uses 260x190 NBA CDN headshot URLs (CSS sizes to 48px circle).
+    """
+    safe_player = _html.escape(player_name)
+    safe_team = _html.escape(team)
+    safe_stat = _html.escape(stat_type.replace("_", " ").title())
+
+    # Card accent
+    if line_diff_pct < -12:
+        accent = "ps-card-pos"
+    elif line_diff_pct > 15:
+        accent = "ps-card-neg"
+    else:
+        accent = "ps-card-neu"
+
+    # Headshot (260x190 per project conventions)
+    headshot_url = (
+        f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
+        if player_id
+        else ""
+    )
+    headshot_html = (
+        f'<img class="ps-card-headshot" src="{headshot_url}" alt="" loading="lazy" '
+        f'onerror="this.style.display=\'none\'">'
+        if headshot_url
+        else ""
+    )
+
+    plat_badge = get_platform_badge_html(platform)
+    type_badge = get_line_type_badge_html(odds_type)
+    gauge = get_value_gauge_html(line_diff_pct)
+    conf_badge = get_confidence_badge_html(confidence_score) if confidence_score else ""
+
+    avg_html = f'<span class="ps-card-avg">avg {season_avg:.1f}</span>' if season_avg > 0 else ""
+
+    return f"""<div class="ps-card {accent}">
+  <div class="ps-card-header">
+    <div class="ps-card-player-wrap">
+      {headshot_html}
+      <div>
+        <div class="ps-card-player">{safe_player}</div>
+        <span class="ps-card-team">{safe_team}</span>
+      </div>
+    </div>
+    {plat_badge}
+  </div>
+  <div class="ps-card-stat-row">
+    <span class="ps-card-stat">{safe_stat}</span>
+    <span class="ps-card-line">{line:.1f}</span>
+    {avg_html}
+    {type_badge}
+  </div>
+  <div class="ps-card-metrics">
+    <div class="ps-card-metric-box">
+      {gauge}
+      <div class="ps-card-metric-lbl">Value</div>
+    </div>
+    <div class="ps-card-metric-box">
+      <div class="ps-card-metric-val">{status_emoji} {_html.escape(player_status)}</div>
+      <div class="ps-card-metric-lbl">Status</div>
+    </div>
+    {f'<div class="ps-card-metric-box"><div class="ps-card-metric-val">{conf_badge}</div><div class="ps-card-metric-lbl">Confidence</div></div>' if conf_badge else ''}
+  </div>
+  <div class="ps-card-footer">
+    {movement_html}
+  </div>
+</div>"""
+
+
+# ============================================================
+# END SECTION: Prop Scanner — CSS & HTML Helpers
+# ============================================================
