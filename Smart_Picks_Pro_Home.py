@@ -19,7 +19,8 @@ from styles.theme import get_global_css, get_quantum_card_matrix_css as _get_qcm
 from pages.helpers.quantum_analysis_helpers import (
     QEG_EDGE_THRESHOLD as _QEG_EDGE_THRESHOLD,
     render_quantum_edge_gap_banner_html as _render_edge_gap_banner_html,
-    render_quantum_edge_gap_card_html as _render_edge_gap_card_html,
+    render_quantum_edge_gap_grouped_html as _render_edge_gap_grouped_html,
+    deduplicate_qeg_picks as _deduplicate_qeg_picks,
 )
 
 # ============================================================
@@ -1564,7 +1565,7 @@ if _home_one_click:
 
 # ============================================================
 # SECTION 1B: Quantum Edge Gap — Extreme-edge picks (shown when
-#             analysis results exist with |edge| ≥ 15%)
+#             analysis results exist with |edge| ≥ 20%, standard only)
 # ============================================================
 
 _home_analysis = st.session_state.get("analysis_results", [])
@@ -1573,7 +1574,9 @@ _home_edge_gap_picks = [
     if abs(r.get("edge_percentage", 0)) >= _QEG_EDGE_THRESHOLD
     and not r.get("should_avoid", False)
     and not r.get("player_is_out", False)
+    and str(r.get("bet_type", "standard")).lower() == "standard"
 ]
+_home_edge_gap_picks = _deduplicate_qeg_picks(_home_edge_gap_picks)
 _home_edge_gap_picks = sorted(
     _home_edge_gap_picks,
     key=lambda r: abs(r.get("edge_percentage", 0)),
@@ -1586,11 +1589,10 @@ if _home_edge_gap_picks:
         _render_edge_gap_banner_html(_home_edge_gap_picks),
         unsafe_allow_html=True,
     )
-    for _heg_idx, _heg in enumerate(_home_edge_gap_picks, start=1):
-        st.markdown(
-            _render_edge_gap_card_html(_heg, rank=_heg_idx),
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        _render_edge_gap_grouped_html(_home_edge_gap_picks),
+        unsafe_allow_html=True,
+    )
     st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
