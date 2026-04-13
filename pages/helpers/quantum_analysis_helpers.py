@@ -292,6 +292,219 @@ def render_uncertain_pick_html(pick: dict, inline_breakdown_html: str = "") -> s
     )
 
 
+# ── Quantum Edge Gap Banner ──────────────────────────────────────────────────
+
+_QEG_EDGE_THRESHOLD = 15.0  # Minimum absolute edge % to qualify
+
+
+def render_quantum_edge_gap_banner_html(
+    picks: list,
+) -> str:
+    """Return the Quantum Edge Gap section banner HTML with summary stats.
+
+    Parameters
+    ----------
+    picks:
+        List of result dicts that qualified for the edge gap
+        (|edge_percentage| >= _QEG_EDGE_THRESHOLD).
+    """
+    total = len(picks)
+    over_ct = sum(1 for p in picks if p.get("direction", "").upper() == "OVER")
+    under_ct = total - over_ct
+    avg_edge = (
+        sum(abs(p.get("edge_percentage", 0)) for p in picks) / total
+        if total
+        else 0
+    )
+    max_edge = (
+        max(abs(p.get("edge_percentage", 0)) for p in picks)
+        if total
+        else 0
+    )
+
+    return (
+        '<div class="qam-edge-gap-banner">'
+        '<h3>⚡ Quantum Edge Gap</h3>'
+        '<p>'
+        'Extreme-edge picks where the model projects a <strong>≥&thinsp;15 %</strong> '
+        'advantage over the line — high-conviction opportunities with the '
+        'largest separation between projection and market.'
+        '</p>'
+        '<div class="qeg-stats-row">'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{total}</span>'
+        f'<span class="qeg-stat-lbl">Picks</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{over_ct}</span>'
+        f'<span class="qeg-stat-lbl">Over</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{under_ct}</span>'
+        f'<span class="qeg-stat-lbl">Under</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{avg_edge:.1f}%</span>'
+        f'<span class="qeg-stat-lbl">Avg Edge</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{max_edge:.1f}%</span>'
+        f'<span class="qeg-stat-lbl">Max Edge</span></div>'
+        '</div>'
+        '</div>'
+    )
+
+
+_NBA_HEADSHOT_CDN = "https://cdn.nba.com/headshots/nba/latest/260x190"
+
+
+def render_quantum_edge_gap_card_html(result: dict) -> str:
+    """Return HTML for a single Quantum Edge Gap pick card.
+
+    Parameters
+    ----------
+    result:
+        A single prop analysis result dict from the engine.
+    """
+    player_name = _html.escape(str(result.get("player_name", "Unknown")))
+    stat_type = _html.escape(str(result.get("stat_type", "")))
+    team = _html.escape(
+        str(result.get("player_team", result.get("team", "")))
+    )
+    platform = _html.escape(str(result.get("platform", "")))
+    tier = _html.escape(str(result.get("tier", "Bronze")))
+
+    # Prop line
+    prop_line = result.get("prop_line", result.get("line", 0))
+    try:
+        line_val = float(prop_line)
+        line_display = f"{line_val:g}"
+    except (ValueError, TypeError):
+        line_val = 0
+        line_display = "—"
+
+    # Confidence
+    confidence = result.get("confidence_score", 0)
+    try:
+        confidence = float(confidence)
+    except (ValueError, TypeError):
+        confidence = 0
+
+    # Probability
+    prob_over = result.get("probability_over", 0)
+    try:
+        prob_pct = f"{float(prob_over) * 100:.1f}%"
+    except (ValueError, TypeError):
+        prob_pct = "—"
+
+    # Edge
+    edge = result.get("edge_percentage", result.get("edge", 0))
+    try:
+        edge_val = float(edge)
+        edge_display = f"{edge_val:+.1f}%"
+    except (ValueError, TypeError):
+        edge_val = 0
+        edge_display = "—"
+
+    # Direction
+    direction = str(result.get("direction", "")).upper()
+    dir_label = "OVER" if direction == "OVER" else "UNDER"
+    dir_css = "qeg-dir-over" if direction == "OVER" else "qeg-dir-under"
+    card_dir_css = "qeg-card-over" if direction == "OVER" else "qeg-card-under"
+
+    # Projection
+    projection = result.get("adjusted_projection", 0)
+    try:
+        proj_display = f"{float(projection):.1f}"
+    except (ValueError, TypeError):
+        proj_display = "—"
+
+    # Percentiles
+    p10 = result.get("percentile_10", 0)
+    p50 = result.get("percentile_50", 0)
+    p90 = result.get("percentile_90", 0)
+    try:
+        p10_d = f"{float(p10):.1f}"
+    except (ValueError, TypeError):
+        p10_d = "—"
+    try:
+        p50_d = f"{float(p50):.1f}"
+    except (ValueError, TypeError):
+        p50_d = "—"
+    try:
+        p90_d = f"{float(p90):.1f}"
+    except (ValueError, TypeError):
+        p90_d = "—"
+
+    # Headshot
+    player_id = result.get("player_id", "")
+    headshot_url = (
+        f"{_NBA_HEADSHOT_CDN}/{player_id}.png"
+        if player_id
+        else ""
+    )
+    headshot_html = (
+        f'<img class="qeg-headshot" src="{_html.escape(headshot_url)}" '
+        f'alt="{player_name}" loading="lazy">'
+        if headshot_url
+        else ""
+    )
+
+    # Stat type display label
+    stat_display = stat_type.replace("_", " ").title()
+
+    # Tier emoji
+    tier_emoji_map = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+    tier_emoji = tier_emoji_map.get(tier, "🥉")
+
+    return (
+        f'<div class="qeg-card {card_dir_css}">'
+        # ── Top row: identity + metrics + edge highlight ──
+        f'<div class="qeg-card-top">'
+        # Identity
+        f'<div class="qeg-card-identity">'
+        f'{headshot_html}'
+        f'<div class="qeg-player-info">'
+        f'<span class="qeg-player-name">{player_name}</span>'
+        f'<span class="qeg-player-meta">{team} · {stat_display} · {platform}</span>'
+        f'</div>'
+        f'</div>'
+        # Metrics
+        f'<div class="qeg-card-metrics">'
+        f'<div class="qeg-metric">'
+        f'<span class="qeg-direction-badge {dir_css}">{dir_label}</span>'
+        f'<div class="qeg-metric-lbl">Direction</div>'
+        f'</div>'
+        f'<div class="qeg-metric">'
+        f'<div class="qeg-metric-val">{line_display}</div>'
+        f'<div class="qeg-metric-lbl">Line</div>'
+        f'</div>'
+        f'<div class="qeg-metric">'
+        f'<div class="qeg-metric-val">{prob_pct}</div>'
+        f'<div class="qeg-metric-lbl">Prob</div>'
+        f'</div>'
+        f'<div class="qeg-metric">'
+        f'<div class="qeg-metric-val">{confidence:.0f}</div>'
+        f'<div class="qeg-metric-lbl">SAFE</div>'
+        f'</div>'
+        f'<div class="qeg-metric">'
+        f'<div class="qeg-metric-val">{tier_emoji} {tier}</div>'
+        f'<div class="qeg-metric-lbl">Tier</div>'
+        f'</div>'
+        f'</div>'
+        # Edge highlight (big number)
+        f'<div class="qeg-edge-highlight">{edge_display}</div>'
+        f'</div>'
+        # ── Bottom row: stat blocks ──
+        f'<div class="qeg-card-bottom">'
+        f'<div class="qeg-stat-block">'
+        f'<div class="qeg-stat-block-title">Projection</div>'
+        f'<div class="qeg-stat-block-val">{proj_display}</div>'
+        f'</div>'
+        f'<div class="qeg-stat-block">'
+        f'<div class="qeg-stat-block-title">P10 / Median / P90</div>'
+        f'<div class="qeg-stat-block-val">{p10_d} / {p50_d} / {p90_d}</div>'
+        f'</div>'
+        f'<div class="qeg-stat-block">'
+        f'<div class="qeg-stat-block-title">Edge %</div>'
+        f'<div class="qeg-stat-block-val">{edge_display}</div>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
 # ── Gold Tier Banner ──────────────────────────────────────────────────────────
 
 def render_gold_tier_banner_html() -> str:

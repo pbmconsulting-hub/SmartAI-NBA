@@ -7799,6 +7799,228 @@ QUANTUM_CARD_MATRIX_CSS = """
     color: #ffe082;
     font-size: 0.82rem;
 }
+/* ── Quantum Edge Gap Section ─────────────────────────────── */
+@keyframes qeg-border-glow {
+    0%, 100% { box-shadow: 0 0 12px rgba(0, 255, 136, 0.20), inset 0 0 12px rgba(0, 255, 136, 0.04); }
+    50%      { box-shadow: 0 0 24px rgba(0, 255, 136, 0.35), inset 0 0 18px rgba(0, 255, 136, 0.08); }
+}
+.qam-edge-gap-banner {
+    background: linear-gradient(135deg, #041a10 0%, #0a2618 50%, #061f12 100%);
+    border: 2px solid #00ff88;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 8px;
+    animation: qeg-border-glow 3s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+.qam-edge-gap-banner::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(0, 255, 136, 0.08) 0%, transparent 60%);
+    pointer-events: none;
+}
+.qam-edge-gap-banner h3 {
+    color: #00ff88;
+    font-family: Orbitron, sans-serif;
+    font-size: 1.15rem;
+    margin: 0 0 6px;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+    position: relative;
+}
+.qam-edge-gap-banner p {
+    color: #80ffbb;
+    font-size: 0.85rem;
+    margin: 0;
+    position: relative;
+    line-height: 1.5;
+}
+.qam-edge-gap-banner .qeg-stats-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    position: relative;
+}
+.qam-edge-gap-banner .qeg-stat-pill {
+    background: rgba(0, 255, 136, 0.10);
+    border: 1px solid rgba(0, 255, 136, 0.30);
+    border-radius: 8px;
+    padding: 6px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 72px;
+}
+.qam-edge-gap-banner .qeg-stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #00ff88;
+    font-variant-numeric: tabular-nums;
+}
+.qam-edge-gap-banner .qeg-stat-lbl {
+    font-size: 0.68rem;
+    color: #80ffbb;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+}
+
+/* ── Quantum Edge Gap individual card ────────────────────── */
+@keyframes qeg-card-pulse {
+    0%, 100% { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 255, 136, 0.10); }
+    50%      { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 28px rgba(0, 255, 136, 0.22); }
+}
+.qeg-card {
+    background: linear-gradient(135deg, rgba(4, 26, 16, 0.92), rgba(10, 38, 24, 0.88));
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    border-left: 4px solid #00ff88;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+    color: #e0eeff;
+    animation: qeg-card-pulse 3s ease-in-out infinite;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    position: relative;
+    overflow: hidden;
+}
+.qeg-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 10% 50%, rgba(0, 255, 136, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+.qeg-card-over  { border-left-color: #00ff88; }
+.qeg-card-under { border-left-color: #ff4444; }
+
+.qeg-card-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+    position: relative;
+}
+.qeg-card-identity {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 180px;
+}
+.qeg-headshot {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(0, 255, 136, 0.35);
+    background: #0a1a12;
+}
+.qeg-player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.qeg-player-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f0f4f8;
+}
+.qeg-player-meta {
+    font-size: 0.72rem;
+    color: #80a0b8;
+}
+.qeg-card-metrics {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    position: relative;
+}
+.qeg-metric {
+    text-align: center;
+    padding: 6px 12px;
+    background: rgba(0, 255, 136, 0.06);
+    border: 1px solid rgba(0, 255, 136, 0.12);
+    border-radius: 8px;
+    min-width: 64px;
+}
+.qeg-metric-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #00ff88;
+    font-variant-numeric: tabular-nums;
+}
+.qeg-metric-lbl {
+    font-size: 0.62rem;
+    color: #80a0b8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+}
+.qeg-direction-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.06em;
+}
+.qeg-dir-over {
+    background: rgba(0, 255, 136, 0.15);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.30);
+}
+.qeg-dir-under {
+    background: rgba(255, 68, 68, 0.15);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.30);
+}
+.qeg-edge-highlight {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.15rem;
+    font-weight: 800;
+    padding: 4px 14px;
+    border-radius: 8px;
+    background: rgba(0, 255, 136, 0.12);
+    border: 1px solid rgba(0, 255, 136, 0.35);
+    color: #00ff88;
+    text-align: center;
+    min-width: 80px;
+    position: relative;
+}
+.qeg-card-bottom {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    position: relative;
+}
+.qeg-stat-block {
+    flex: 1;
+    min-width: 120px;
+    background: rgba(0, 255, 136, 0.04);
+    border: 1px solid rgba(0, 255, 136, 0.10);
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+.qeg-stat-block-title {
+    font-size: 0.65rem;
+    color: #80a0b8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+}
+.qeg-stat-block-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e0eeff;
+}
 .qam-gold-banner {
     background: linear-gradient(135deg, #1a1200, #231800);
     border: 2px solid #ffd700;
