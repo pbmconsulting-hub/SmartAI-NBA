@@ -2739,14 +2739,15 @@ def _render_results_fragment():
             unsafe_allow_html=True,
         )
 
-    # ── ⚡ Quantum Edge Gap (standard-line picks where line deviates ≥ 20% from avg)
-    # OVER: line is 20–100% below season avg. UNDER: line is 20–100% above avg.
+    # ── ⚡ Quantum Edge Gap (standard-line picks where line deviates ≥ 20% from avg
+    #    OR edge_percentage ≥ 20%).
+    # OVER: line 20–100% below season avg. UNDER: line 20–100% above avg.
     # Only standard odds_type; exclude goblin / demon.
     _edge_gap_picks = _filter_qeg_picks(displayed_results)
     _edge_gap_picks = _deduplicate_qeg_picks(_edge_gap_picks)
     _edge_gap_picks = sorted(
         _edge_gap_picks,
-        key=lambda r: abs(r.get("line_vs_avg_pct", 0)),
+        key=lambda r: max(abs(r.get("line_vs_avg_pct", 0)), abs(r.get("edge_percentage", 0))),
         reverse=True,
     )
 

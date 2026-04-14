@@ -307,8 +307,8 @@ def render_quantum_edge_gap_banner_html(
     Parameters
     ----------
     picks:
-        List of result dicts that qualified for the edge gap
-        (line_vs_avg_pct ≥ 20 % deviation in the qualifying direction).
+        List of result dicts that qualified for the edge gap (either
+        line_vs_avg_pct deviation or edge_percentage ≥ threshold).
     """
     total = len(picks)
     over_ct = sum(1 for p in picks if p.get("direction", "").upper() == "OVER")
@@ -320,6 +320,11 @@ def render_quantum_edge_gap_banner_html(
     )
     max_dev = (
         max(abs(p.get("line_vs_avg_pct", 0)) for p in picks)
+        if total
+        else 0
+    )
+    avg_edge = (
+        sum(abs(p.get("edge_percentage", 0)) for p in picks) / total
         if total
         else 0
     )
@@ -337,8 +342,9 @@ def render_quantum_edge_gap_banner_html(
         '</div>'
         '<p>'
         f'Standard-line picks where the line deviates ≥&thinsp;{_thr}% from the '
-        f'season average — OVER when the line is set {_thr}–100% below avg, '
-        f'UNDER when the line is set {_thr}–100% above avg.'
+        f'season average (OVER: line {_thr}–100% below avg, '
+        f'UNDER: line {_thr}–100% above avg) or the model edge '
+        f'is ≥&thinsp;{_thr}%.'
         '</p>'
         '<div class="qeg-stats-row">'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{total}</span>'
@@ -351,6 +357,8 @@ def render_quantum_edge_gap_banner_html(
         f'<span class="qeg-stat-lbl">Avg Dev</span></div>'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{max_dev:.1f}%</span>'
         f'<span class="qeg-stat-lbl">Max Dev</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{avg_edge:.1f}%</span>'
+        f'<span class="qeg-stat-lbl">Avg Edge</span></div>'
         '</div>'
         '</div>'
         '</div>'
@@ -599,13 +607,15 @@ def filter_qeg_picks(
        absent, which defaults to ``"standard"``).
     2. **Exclude goblins / demons** – any pick whose ``odds_type`` is
        ``"goblin"`` or ``"demon"`` is dropped.
-    3. **Line deviation threshold** – ``line_vs_avg_pct`` must show the
-       line deviating ≥ *edge_threshold* % from the season average **in the
-       qualifying direction**:
-       • **OVER** picks: ``line_vs_avg_pct <= -threshold`` (line is 20–100 %
-         *below* the season average).
-       • **UNDER** picks: ``line_vs_avg_pct >= +threshold`` (line is 20–100 %
-         *above* the season average).
+    3. **Qualification** – a pick qualifies if it meets **either** criterion:
+
+       a. **Line deviation** – ``line_vs_avg_pct`` deviates ≥ *threshold* %
+          from the season average in the qualifying direction:
+          • **OVER**: ``line_vs_avg_pct <= -threshold`` (line 20–100 % below avg).
+          • **UNDER**: ``line_vs_avg_pct >= +threshold`` (line 20–100 % above avg).
+
+       b. **Edge percentage** – ``|edge_percentage| >= threshold``.
+
     4. **No other hiding** – ``should_avoid`` and ``player_is_out`` are
        intentionally *not* checked so extreme-deviation picks are surfaced.
 
@@ -614,8 +624,8 @@ def filter_qeg_picks(
     results:
         Full list of analysis result dicts (e.g. ``displayed_results``).
     edge_threshold:
-        Minimum absolute line-vs-avg deviation %. Defaults to the
-        module-level ``_QEG_LINE_DEVIATION_THRESHOLD`` (20.0).
+        Minimum threshold %. Defaults to the module-level
+        ``_QEG_LINE_DEVIATION_THRESHOLD`` (20.0).
     """
     thr = edge_threshold if edge_threshold is not None else _QEG_LINE_DEVIATION_THRESHOLD
     filtered: list = []
@@ -623,13 +633,20 @@ def filter_qeg_picks(
         odds_type = str(r.get("odds_type", "standard")).strip().lower()
         if odds_type != "standard":
             continue
+
         line_dev = float(r.get("line_vs_avg_pct", 0) or 0)
         direction = str(r.get("direction", "")).upper()
-        # OVER: line must be >= thr% BELOW avg (line_vs_avg_pct <= -thr)
-        # UNDER: line must be >= thr% ABOVE avg (line_vs_avg_pct >= +thr)
-        if direction == "OVER" and line_dev <= -thr:
-            filtered.append(r)
-        elif direction == "UNDER" and line_dev >= thr:
+        edge_pct = abs(float(r.get("edge_percentage", 0) or 0))
+
+        # Criterion A: line deviation in the qualifying direction
+        line_qualifies = (
+            (direction == "OVER" and line_dev <= -thr)
+            or (direction == "UNDER" and line_dev >= thr)
+        )
+        # Criterion B: edge percentage magnitude
+        edge_qualifies = edge_pct >= thr
+
+        if line_qualifies or edge_qualifies:
             filtered.append(r)
     return filtered
 
