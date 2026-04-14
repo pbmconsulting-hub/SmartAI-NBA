@@ -1209,12 +1209,17 @@ def enrich_prop_with_player_data(prop, players_list):
             "personal_fouls": enriched["season_pf_avg"],
         }
         # Compute combo-stat season averages from their components
+        _pts = enriched["season_pts_avg"]
+        _reb = enriched["season_reb_avg"]
+        _ast = enriched["season_ast_avg"]
+        _blk = enriched["season_blk_avg"]
+        _stl = enriched["season_stl_avg"]
         _combo_avg_map = {
-            "points_rebounds": enriched["season_pts_avg"] + enriched["season_reb_avg"],
-            "points_assists": enriched["season_pts_avg"] + enriched["season_ast_avg"],
-            "rebounds_assists": enriched["season_reb_avg"] + enriched["season_ast_avg"],
-            "points_rebounds_assists": enriched["season_pts_avg"] + enriched["season_reb_avg"] + enriched["season_ast_avg"],
-            "blocks_steals": enriched["season_blk_avg"] + enriched["season_stl_avg"],
+            "points_rebounds": _pts + _reb,
+            "points_assists": _pts + _ast,
+            "rebounds_assists": _reb + _ast,
+            "points_rebounds_assists": _pts + _reb + _ast,
+            "blocks_steals": _blk + _stl,
         }
         stat_avg_map.update(_combo_avg_map)
         season_avg = stat_avg_map.get(stat_type, 0)
