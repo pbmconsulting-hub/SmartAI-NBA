@@ -1177,7 +1177,17 @@ def enrich_prop_with_player_data(prop, players_list):
         enriched["season_reb_avg"] = float(player.get("rebounds_avg", 0) or 0)
         enriched["season_ast_avg"] = float(player.get("assists_avg", 0) or 0)
         enriched["season_threes_avg"] = float(player.get("threes_avg", 0) or 0)
+        enriched["season_stl_avg"] = float(player.get("steals_avg", 0) or 0)
+        enriched["season_blk_avg"] = float(player.get("blocks_avg", 0) or 0)
+        enriched["season_tov_avg"] = float(player.get("turnovers_avg", 0) or 0)
         enriched["season_minutes_avg"] = float(player.get("minutes_avg", 0) or 0)
+        enriched["season_ftm_avg"] = float(player.get("ftm_avg", 0) or 0)
+        enriched["season_fga_avg"] = float(player.get("fga_avg", 0) or 0)
+        enriched["season_fgm_avg"] = float(player.get("fgm_avg", 0) or 0)
+        enriched["season_fta_avg"] = float(player.get("fta_avg", 0) or 0)
+        enriched["season_oreb_avg"] = float(player.get("offensive_rebounds_avg", 0) or 0)
+        enriched["season_dreb_avg"] = float(player.get("defensive_rebounds_avg", 0) or 0)
+        enriched["season_pf_avg"] = float(player.get("personal_fouls_avg", 0) or 0)
 
         # Calculate how the prop line compares to the season average
         stat_type = prop.get("stat_type", "").lower()
@@ -1186,7 +1196,27 @@ def enrich_prop_with_player_data(prop, players_list):
             "rebounds": enriched["season_reb_avg"],
             "assists": enriched["season_ast_avg"],
             "threes": enriched["season_threes_avg"],
+            "steals": enriched["season_stl_avg"],
+            "blocks": enriched["season_blk_avg"],
+            "turnovers": enriched["season_tov_avg"],
+            "minutes": enriched["season_minutes_avg"],
+            "ftm": enriched["season_ftm_avg"],
+            "fga": enriched["season_fga_avg"],
+            "fgm": enriched["season_fgm_avg"],
+            "fta": enriched["season_fta_avg"],
+            "offensive_rebounds": enriched["season_oreb_avg"],
+            "defensive_rebounds": enriched["season_dreb_avg"],
+            "personal_fouls": enriched["season_pf_avg"],
         }
+        # Compute combo-stat season averages from their components
+        _combo_avg_map = {
+            "points_rebounds": enriched["season_pts_avg"] + enriched["season_reb_avg"],
+            "points_assists": enriched["season_pts_avg"] + enriched["season_ast_avg"],
+            "rebounds_assists": enriched["season_reb_avg"] + enriched["season_ast_avg"],
+            "points_rebounds_assists": enriched["season_pts_avg"] + enriched["season_reb_avg"] + enriched["season_ast_avg"],
+            "blocks_steals": enriched["season_blk_avg"] + enriched["season_stl_avg"],
+        }
+        stat_avg_map.update(_combo_avg_map)
         season_avg = stat_avg_map.get(stat_type, 0)
         prop_line = float(prop.get("line", 0) or 0)
 

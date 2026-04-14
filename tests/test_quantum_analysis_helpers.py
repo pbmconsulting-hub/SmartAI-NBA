@@ -456,7 +456,7 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         # Gauge present for under cards too
         self.assertIn("qeg-edge-gauge", html)
         # Under prop call
-        self.assertIn("▼ UNDER 4.5 Threes", html)
+        self.assertIn("▼ UNDER 4.5 3-Point Made", html)
 
     def test_xss_prevention(self):
         result = {

@@ -1081,6 +1081,14 @@ if run_analysis:
                         "line":          prop_line,
                         "platform":      platform,
                         "season_pts_avg": 0, "season_reb_avg": 0, "season_ast_avg": 0,
+                        "season_threes_avg": 0, "season_stl_avg": 0, "season_blk_avg": 0,
+                        "season_tov_avg": 0, "season_minutes_avg": 0,
+                        "season_ftm_avg": 0, "season_fga_avg": 0, "season_fgm_avg": 0,
+                        "season_fta_avg": 0, "season_oreb_avg": 0, "season_dreb_avg": 0,
+                        "season_pf_avg": 0,
+                        "season_pts_reb_avg": 0, "season_pts_ast_avg": 0,
+                        "season_reb_ast_avg": 0, "season_pra_avg": 0,
+                        "season_blk_stl_avg": 0,
                         "points_avg": 0, "rebounds_avg": 0, "assists_avg": 0,
                         "opponent":      "",
                         "is_home":       None,
@@ -1759,6 +1767,40 @@ if run_analysis:
                     "season_pts_avg":   float(player_data.get("points_avg",   0) or 0),
                     "season_reb_avg":   float(player_data.get("rebounds_avg", 0) or 0),
                     "season_ast_avg":   float(player_data.get("assists_avg",  0) or 0),
+                    "season_threes_avg": float(player_data.get("threes_avg",  0) or 0),
+                    "season_stl_avg":   float(player_data.get("steals_avg",   0) or 0),
+                    "season_blk_avg":   float(player_data.get("blocks_avg",   0) or 0),
+                    "season_tov_avg":   float(player_data.get("turnovers_avg",0) or 0),
+                    "season_minutes_avg": float(player_data.get("minutes_avg",0) or 0),
+                    "season_ftm_avg":   float(player_data.get("ftm_avg",      0) or 0),
+                    "season_fga_avg":   float(player_data.get("fga_avg",      0) or 0),
+                    "season_fgm_avg":   float(player_data.get("fgm_avg",      0) or 0),
+                    "season_fta_avg":   float(player_data.get("fta_avg",      0) or 0),
+                    "season_oreb_avg":  float(player_data.get("offensive_rebounds_avg", 0) or 0),
+                    "season_dreb_avg":  float(player_data.get("defensive_rebounds_avg", 0) or 0),
+                    "season_pf_avg":    float(player_data.get("personal_fouls_avg", 0) or 0),
+                    # Combo-stat season averages (summed from components)
+                    "season_pts_reb_avg": (
+                        float(player_data.get("points_avg", 0) or 0)
+                        + float(player_data.get("rebounds_avg", 0) or 0)
+                    ),
+                    "season_pts_ast_avg": (
+                        float(player_data.get("points_avg", 0) or 0)
+                        + float(player_data.get("assists_avg", 0) or 0)
+                    ),
+                    "season_reb_ast_avg": (
+                        float(player_data.get("rebounds_avg", 0) or 0)
+                        + float(player_data.get("assists_avg", 0) or 0)
+                    ),
+                    "season_pra_avg": (
+                        float(player_data.get("points_avg", 0) or 0)
+                        + float(player_data.get("rebounds_avg", 0) or 0)
+                        + float(player_data.get("assists_avg", 0) or 0)
+                    ),
+                    "season_blk_stl_avg": (
+                        float(player_data.get("blocks_avg", 0) or 0)
+                        + float(player_data.get("steals_avg", 0) or 0)
+                    ),
                     "points_avg":       float(player_data.get("points_avg",   0) or 0),
                     "rebounds_avg":     float(player_data.get("rebounds_avg", 0) or 0),
                     "assists_avg":      float(player_data.get("assists_avg",  0) or 0),
@@ -1989,6 +2031,14 @@ if run_analysis:
                     "line": _err_line,
                     "platform": prop.get("platform", "DraftKings"),
                     "season_pts_avg": 0, "season_reb_avg": 0, "season_ast_avg": 0,
+                    "season_threes_avg": 0, "season_stl_avg": 0, "season_blk_avg": 0,
+                    "season_tov_avg": 0, "season_minutes_avg": 0,
+                    "season_ftm_avg": 0, "season_fga_avg": 0, "season_fgm_avg": 0,
+                    "season_fta_avg": 0, "season_oreb_avg": 0, "season_dreb_avg": 0,
+                    "season_pf_avg": 0,
+                    "season_pts_reb_avg": 0, "season_pts_ast_avg": 0,
+                    "season_reb_ast_avg": 0, "season_pra_avg": 0,
+                    "season_blk_stl_avg": 0,
                     "points_avg": 0, "rebounds_avg": 0, "assists_avg": 0,
                     "opponent": "",
                     "is_home": None,
