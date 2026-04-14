@@ -225,7 +225,7 @@ def _get_sim_cache() -> dict:
 
 _LAZY_CHUNK_SIZE = 50          # players per st.html() call — larger chunks = fewer DOM injections
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
-_MAX_TOP_PICKS = 8             # max props flagged as "Top Pick" in the summary bar
+_MAX_TOP_PICKS = 3             # max props flagged as "Top Pick" in the summary bar
 _MAX_UNCERTAIN_NAMES = 6       # max player names shown in the uncertain-picks banner
 
 # Injury status confidence penalties (points deducted from SAFE Score)
@@ -2771,7 +2771,8 @@ def _render_results_fragment():
         r for r in displayed_results
         if not r.get("should_avoid", False)
         and not r.get("player_is_out", False)
-        and r.get("tier", "Bronze") in {"Platinum", "Gold", "Silver"}
+        and r.get("tier", "Bronze") in {"Platinum", "Gold"}
+        and float(r.get("confidence_score", 0)) >= 70
     ]
     _single_bet_pool = sorted(
         _single_bet_pool,
