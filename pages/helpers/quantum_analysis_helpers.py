@@ -634,9 +634,9 @@ def filter_qeg_picks(
         if odds_type != "standard":
             continue
 
-        line_dev = float(r.get("line_vs_avg_pct", 0) or 0)
+        line_dev = float(r.get("line_vs_avg_pct", 0))
         direction = str(r.get("direction", "")).upper()
-        edge_pct = abs(float(r.get("edge_percentage", 0) or 0))
+        edge_pct = abs(float(r.get("edge_percentage", 0)))
 
         # Criterion A: line deviation in the qualifying direction
         line_qualifies = (
