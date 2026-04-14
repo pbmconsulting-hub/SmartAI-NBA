@@ -969,12 +969,15 @@ _FALLBACK_HEADSHOT = (
 def _build_unified_player_header(player_name, vitals, props=None):
     """Build the always-visible summary header for a unified player card.
 
+    Uses a compact horizontal strip: headshot → name/meta → stats → count.
+    No prop pills in the collapsed header to avoid visual clutter.
+
     Args:
         player_name (str): Display name.
         vitals (dict): ``{"headshot_url", "position", "team",
             "next_opponent", "season_stats": {"ppg","rpg","apg"}}``.
-        props (list[dict] | None): Prop analysis results — used to show
-            prop summaries (e.g. "More 4.5 FGA") in the collapsed header.
+        props (list[dict] | None): Prop analysis results (used only for
+            counting in the collapsed header).
 
     Returns:
         str: HTML for the ``<summary>`` content (not the tag itself).
@@ -992,69 +995,55 @@ def _build_unified_player_header(player_name, vitals, props=None):
     apg = stats.get("apg", 0.0)
 
     team_primary, _ = get_team_colors(team)
-    team_badge = (
-        f'<span class="upc-team-badge" style="background:{team_primary};">'
-        f'{team}</span>'
-    ) if team and team != "N/A" else ""
 
-    # Build prop summary pills for the collapsed header
-    prop_pills_html = ""
+    # Tier summary: count props per tier for a compact colour bar
+    _tier_counts = {"platinum": 0, "gold": 0, "silver": 0, "bronze": 0}
     if props:
-        _stat_emoji = {
-            "points": "🏀", "rebounds": "📊", "assists": "🎯",
-            "threes": "🎯", "steals": "⚡", "blocks": "🛡️",
-            "turnovers": "❌", "fga": "🏀", "ftm": "🏀",
-            "pts+reb": "📊", "pts+ast": "🎯", "reb+ast": "📊",
-            "pts+reb+ast": "🏀", "fantasy_score": "⭐",
-            "double_double": "✌️", "triple_double": "🏆",
-        }
-        _tier_colors = {
-            "platinum": "#c800ff", "gold": "#ff5e00",
-            "silver": "#b0c0d8", "bronze": "#64748b",
-        }
-        pills = []
         for p in props:
-            stat = (p.get("stat_type", "") or "").lower()
-            stat_label = _escape(
-                (p.get("stat_type", "") or "").replace("_", " ").title()
+            t = (p.get("tier", "") or "").lower()
+            if t in _tier_counts:
+                _tier_counts[t] += 1
+    _tier_dots = ""
+    _tier_meta = {
+        "platinum": ("#c800ff", "💎"),
+        "gold": ("#ff5e00", "🥇"),
+        "silver": ("#b0c0d8", "🥈"),
+        "bronze": ("#64748b", "🥉"),
+    }
+    for tk, (tc, te) in _tier_meta.items():
+        cnt = _tier_counts[tk]
+        if cnt > 0:
+            _tier_dots += (
+                f'<span class="upc-tier-dot" style="color:{tc};">'
+                f'{te}{cnt}</span>'
             )
-            line = p.get("prop_line", p.get("line", 0))
-            try:
-                line_d = f"{float(line):g}"
-            except (ValueError, TypeError):
-                line_d = "—"
-            prob_over = p.get("probability_over", 0)
-            direction = p.get("direction", "")
-            if not direction:
-                try:
-                    direction = "OVER" if prob_over and float(prob_over) >= 0.5 else "UNDER"
-                except (ValueError, TypeError):
-                    direction = "OVER"
-            dir_label = "More" if direction.upper() == "OVER" else "Less"
-            emoji = _stat_emoji.get(stat, "🏀")
-            tier = (p.get("tier", "") or "").lower()
-            pill_border = _tier_colors.get(tier, "#334155")
-            pills.append(
-                f'<span class="upc-prop-pill" style="border-color:{pill_border};">'
-                f'{emoji} {dir_label} {line_d} {stat_label}</span>'
-            )
-        prop_pills_html = (
-            f'<div class="upc-prop-pills">{"".join(pills)}</div>'
-        )
 
     return (
         f'<img class="upc-headshot" src="{headshot}" alt="{safe_name}" '
         f'onerror="this.onerror=null;this.src=\'{_FALLBACK_HEADSHOT}\'">'
         f'<div class="upc-identity">'
-        f'<div class="upc-player-name">{safe_name}{team_badge}</div>'
-        f'<div class="upc-subtitle">{position} · {team} vs {opponent}</div>'
-        f'<div class="upc-stats">'
-        f'<span class="upc-stat-pill">{ppg} PPG</span>'
-        f'<span class="upc-stat-pill">{rpg} RPG</span>'
-        f'<span class="upc-stat-pill">{apg} APG</span>'
+        f'<div class="upc-row-top">'
+        f'<span class="upc-player-name">{safe_name}</span>'
+        f'<span class="upc-team-pip" style="background:{team_primary};">'
+        f'{team}</span>'
         f'</div>'
-        f'{prop_pills_html}'
+        f'<span class="upc-meta">{position} · {team} vs {opponent}</span>'
         f'</div>'
+        f'<div class="upc-stats-col">'
+        f'<div class="upc-stat-row">'
+        f'<span class="upc-stat-val">{ppg}</span>'
+        f'<span class="upc-stat-lbl">PPG</span>'
+        f'</div>'
+        f'<div class="upc-stat-row">'
+        f'<span class="upc-stat-val">{rpg}</span>'
+        f'<span class="upc-stat-lbl">RPG</span>'
+        f'</div>'
+        f'<div class="upc-stat-row">'
+        f'<span class="upc-stat-val">{apg}</span>'
+        f'<span class="upc-stat-lbl">APG</span>'
+        f'</div>'
+        f'</div>'
+        f'<div class="upc-tier-summary">{_tier_dots}</div>'
     )
 
 

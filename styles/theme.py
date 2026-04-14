@@ -2371,11 +2371,12 @@ input:focus, textarea:focus, select:focus,
     .qds-prop-verdict { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
 
     /* ─── UPC Cards (Player Simulator) ────────────────────── */
-    .upc-card > summary { padding: 10px 14px !important; gap: 10px !important; }
-    .upc-headshot { width: 60px !important; height: 60px !important; }
-    .upc-player-name { font-size: 0.92rem !important; }
-    .upc-stat-pill { font-size: 0.62rem !important; padding: 2px 5px !important; }
-    .upc-body { padding: 0 14px 12px !important; }
+    .upc-card > summary { padding: 8px 12px !important; gap: 8px !important; }
+    .upc-headshot { width: 40px !important; height: 40px !important; }
+    .upc-player-name { font-size: 0.86rem !important; }
+    .upc-stat-val { font-size: 0.66rem !important; }
+    .upc-stat-lbl { font-size: 0.46rem !important; }
+    .upc-body { padding: 0 10px 10px !important; }
     .upc-joseph-row { padding: 8px 10px !important; gap: 8px !important; }
     .upc-joseph-avatar { width: 32px !important; height: 32px !important; }
     .upc-joseph-response { padding: 10px 12px !important; }
@@ -8912,100 +8913,122 @@ QUANTUM_CARD_MATRIX_CSS = """
     padding: 4px 0;
 }
 
-/* ── QAM Matchup Card (redesigned proportions) ────────────── */
-.qam-matchup-card {
-    background: linear-gradient(145deg, rgba(8,12,24,0.95) 0%, rgba(0,198,255,0.06) 50%, rgba(255,94,0,0.04) 100%);
-    border: 1px solid rgba(0,198,255,0.22);
-    border-radius: 16px;
-    padding: 18px 24px 14px;
-    margin-bottom: 10px;
-    transition: border-color 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s cubic-bezier(0.4,0,0.2,1);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 2px 16px rgba(0,0,0,0.40), 0 0 1px rgba(0,198,255,0.10);
-}
-.qam-matchup-card:hover {
-    border-color: rgba(0,198,255,0.40);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.50), 0 0 24px rgba(0,198,255,0.10);
-    transform: translateY(-1px);
-}
-.qam-matchup-teams {
+/* ── QAM Matchup Banner (horizontal split-bar layout) ─────── */
+.qam-mu-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 28px;
-    flex-wrap: wrap;
+    gap: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(11,14,26,0.96) 0%,
+        rgba(20,26,40,0.92) 50%,
+        rgba(11,14,26,0.96) 100%
+    );
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 0;
+    margin-bottom: 10px;
+    overflow: hidden;
+    position: relative;
+    font-family: 'Inter', sans-serif;
 }
-.qam-matchup-team {
+/* Gradient accent from each team color (faint wash on each side) */
+.qam-mu-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 14px;
+    background:
+        radial-gradient(ellipse at 5% 50%, var(--away-clr) 0%, transparent 50%),
+        radial-gradient(ellipse at 95% 50%, var(--home-clr) 0%, transparent 50%);
+    opacity: 0.08;
+}
+.qam-mu-side {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    padding: 14px 20px;
+    position: relative;
+    z-index: 1;
+}
+.qam-mu-away { justify-content: flex-start; }
+.qam-mu-home { justify-content: flex-end; }
+.qam-mu-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.50));
+    transition: transform 0.25s ease;
+}
+.qam-mu-bar:hover .qam-mu-logo {
+    transform: scale(1.08);
+}
+.qam-mu-team-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.qam-mu-abbrev {
+    font-family: 'Orbitron', monospace, sans-serif;
+    font-weight: 800;
+    font-size: 1.10rem;
+    letter-spacing: 0.08em;
+}
+.qam-mu-record {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #8a9bb8;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+/* Centre column */
+.qam-mu-centre {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    min-width: 90px;
+    gap: 4px;
+    padding: 10px 16px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
-.qam-matchup-logo {
-    width: 56px;
-    height: 56px;
-    object-fit: contain;
-    filter: drop-shadow(0 0 10px rgba(0,198,255,0.30));
-    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), filter 0.25s ease;
-}
-.qam-matchup-card:hover .qam-matchup-logo {
-    transform: scale(1.10);
-    filter: drop-shadow(0 0 14px rgba(0,198,255,0.40));
-}
-.qam-matchup-abbrev {
-    font-family: 'Orbitron', sans-serif;
+.qam-mu-at {
+    font-family: 'Orbitron', monospace, sans-serif;
+    font-size: 0.80rem;
     font-weight: 700;
-    font-size: 1.05rem;
-    letter-spacing: 0.06em;
-    text-shadow: 0 0 10px rgba(0,198,255,0.15);
-}
-.qam-matchup-record {
-    font-size: 0.74rem;
-    color: #8a9bb8;
-    font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums;
-}
-.qam-matchup-vs {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 0.88rem;
-    color: #8aa0c0;
-    padding: 6px 18px;
-    background: linear-gradient(135deg, rgba(0,198,255,0.10), rgba(0,198,255,0.04));
-    border: 1px solid rgba(0,198,255,0.12);
-    border-radius: 20px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-}
-.qam-matchup-badges {
+    color: #64748b;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
     display: flex;
-    gap: 12px;
+    align-items: center;
     justify-content: center;
-    margin-top: 10px;
 }
-.qam-matchup-badge {
-    padding: 4px 14px;
-    border-radius: 12px;
-    font-size: 0.74rem;
-    font-weight: 700;
+.qam-mu-counts {
+    display: flex;
+    gap: 10px;
+}
+.qam-mu-count {
     font-family: 'JetBrains Mono', monospace;
-    letter-spacing: 0.03em;
-    transition: all 0.2s ease;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #94a3b8;
+    white-space: nowrap;
 }
-.qam-matchup-badge:hover {
-    transform: translateY(-1px);
-}
-.qam-matchup-badge-players {
-    background: rgba(0,255,157,0.10);
-    color: #00ff9d;
-    border: 1px solid rgba(0,255,157,0.15);
-}
-.qam-matchup-badge-props {
-    background: rgba(0,198,255,0.10);
-    color: #00C6FF;
-    border: 1px solid rgba(0,198,255,0.15);
+/* Mobile */
+@media (max-width: 600px) {
+    .qam-mu-side { padding: 10px 12px; gap: 8px; }
+    .qam-mu-logo { width: 32px; height: 32px; }
+    .qam-mu-abbrev { font-size: 0.88rem; }
+    .qam-mu-record { font-size: 0.64rem; }
+    .qam-mu-centre { padding: 8px 8px; }
+    .qam-mu-at { width: 24px; height: 24px; font-size: 0.68rem; }
+    .qam-mu-count { font-size: 0.60rem; }
 }
 
 /* ── Top Picks Summary Bar ─────────────────────────────────── */
@@ -9069,34 +9092,7 @@ QUANTUM_CARD_MATRIX_CSS = """
 }
 
 /* ── AI/Tech Theme Accents ─────────────────────────────────── */
-/* Neural-net radial mesh on game matchup cards */
-.qam-matchup-card {
-    position: relative;
-    overflow: hidden;
-}
-.qam-matchup-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    border-radius: 16px;
-    background: radial-gradient(circle at 15% 50%, rgba(0,198,255,0.04) 0%, transparent 45%),
-                radial-gradient(circle at 85% 50%, rgba(255,94,0,0.03) 0%, transparent 45%),
-                radial-gradient(circle at 50% 100%, rgba(0,198,255,0.02) 0%, transparent 30%);
-    opacity: 0.8;
-}
-/* Subtle top shimmer accent line */
-.qam-matchup-card::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 10%; right: 10%; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0,198,255,0.18), transparent);
-    pointer-events: none;
-    border-radius: 16px;
-}
+/* (matchup bar accents are built into .qam-mu-bar::before) */
 """
 
 
@@ -9117,285 +9113,251 @@ def get_quantum_card_matrix_css():
 
 UNIFIED_PLAYER_CARD_CSS = """
 /* ═══════════════════════════════════════════════════════════
-   UNIFIED PLAYER CARD — Expandable per-player card
-   Redesigned proportions with premium glassmorphism
+   UNIFIED PLAYER CARD — Compact accordion-style player rows
+   Clean sports-dashboard aesthetic
    ═══════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
 .upc-grid {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 10px 0;
+    gap: 6px;
+    padding: 8px 0;
     width: 100%;
-    /* AI accent: faint vertical data-line on left edge */
-    border-left: 2px solid transparent;
-    border-image: linear-gradient(180deg, rgba(0,240,255,0.18) 0%, transparent 60%) 1;
 }
 
 /* ── Expandable wrapper (<details>) ─────────────────────── */
 .upc-card {
-    background: rgba(11, 14, 26, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 16px;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.50), 0 0 18px rgba(0, 240, 255, 0.05);
-    transition: border-color 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s cubic-bezier(0.4,0,0.2,1), transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    background: rgba(15, 18, 30, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
     font-family: 'Inter', sans-serif;
     color: #e0eeff;
     overflow: visible;
-    /* AI accent: subtle top-edge gradient line */
-    border-top: 2px solid transparent;
-    border-image: linear-gradient(90deg, transparent 5%, rgba(0,240,255,0.20) 50%, transparent 95%) 1;
-    border-image-slice: 1;
-    position: relative;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.upc-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    border-radius: 16px;
-    background: radial-gradient(ellipse at 5% 50%, rgba(0,198,255,0.03) 0%, transparent 40%);
+.upc-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
 }
 .upc-card[open] {
-    border-color: rgba(0, 240, 255, 0.25);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 28px rgba(0, 240, 255, 0.12);
-    border-image: linear-gradient(90deg, transparent 2%, rgba(0,240,255,0.40) 50%, transparent 98%) 1;
-    border-image-slice: 1;
-    transform: translateY(-1px);
+    border-color: rgba(0, 198, 255, 0.25);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.40);
 }
 
-/* ── Summary (always-visible header) ────────────────────── */
+/* ── Summary (always-visible header strip) ──────────────── */
 .upc-card > summary {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 18px 22px;
+    gap: 14px;
+    padding: 10px 16px;
     cursor: pointer;
     list-style: none;
     user-select: none;
-    transition: background 0.2s ease;
-    position: relative;
-    z-index: 1;
+    transition: background 0.15s ease;
 }
 .upc-card > summary::-webkit-details-marker { display: none; }
 .upc-card > summary::marker { display: none; content: ''; }
 .upc-card > summary:hover {
-    background: rgba(0, 240, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
 }
 
-/* Headshot — proportioned to card height */
+/* Headshot — small circle */
 .upc-headshot {
-    width: 76px;
-    height: 76px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    border: 2.5px solid rgba(0, 198, 255, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.12);
     object-fit: cover;
     flex-shrink: 0;
-    box-shadow: 0 3px 12px rgba(0,0,0,0.40), 0 0 8px rgba(0,198,255,0.10);
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    background: #1a1d2e;
 }
 .upc-card[open] .upc-headshot {
-    border-color: rgba(0, 198, 255, 0.50);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.45), 0 0 14px rgba(0,198,255,0.18);
+    border-color: rgba(0, 198, 255, 0.40);
 }
 
-/* Identity block — proportioned flex */
+/* Identity block */
 .upc-identity {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
+}
+.upc-row-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .upc-player-name {
-    font-size: 1.08rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #ffffff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: 0.01em;
 }
-.upc-team-badge {
+.upc-team-pip {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 5px;
-    font-size: 0.66rem;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 0.60rem;
     font-weight: 700;
-    margin-left: 8px;
-    vertical-align: middle;
     color: #fff;
-    letter-spacing: 0.03em;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.30);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
 }
-.upc-subtitle {
+.upc-meta {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.74rem;
-    color: #94A3B8;
-    margin-top: 1px;
+    font-size: 0.70rem;
+    color: #8a9bb8;
     letter-spacing: 0.01em;
 }
 
-/* Stat pills row — evenly proportioned */
-.upc-stats {
+/* Stats column — three vertical mini cells */
+.upc-stats-col {
     display: flex;
-    gap: 8px;
-    margin-top: 5px;
-    flex-wrap: wrap;
+    gap: 12px;
+    flex-shrink: 0;
+    align-items: center;
 }
-.upc-stat-pill {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.68rem;
-    font-variant-numeric: tabular-nums;
-    color: #00C6FF;
-    background: rgba(0, 198, 255, 0.08);
-    border: 1px solid rgba(0, 198, 255, 0.20);
-    border-radius: 8px;
-    padding: 3px 10px;
-    font-weight: 600;
-    transition: all 0.2s ease;
-}
-.upc-stat-pill:hover {
-    background: rgba(0, 198, 255, 0.12);
-    border-color: rgba(0, 198, 255, 0.30);
-}
-
-/* Prop summary pills in collapsed header */
-.upc-prop-pills {
+.upc-stat-row {
     display: flex;
-    gap: 8px;
-    margin-top: 6px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
 }
-.upc-prop-pill {
+.upc-stat-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.66rem;
-    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    font-weight: 700;
     color: #e2e8f0;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid #3d4f65;
-    border-radius: 8px;
-    padding: 3px 10px;
-    white-space: nowrap;
-    font-weight: 600;
-    transition: all 0.2s ease;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
 }
-.upc-prop-pill:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: #506580;
+.upc-stat-lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.52rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
 }
 
-/* Right-side summary info — proportioned spacing */
+/* Tier summary dots */
+.upc-tier-summary {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    align-items: center;
+}
+.upc-tier-dot {
+    font-size: 0.64rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Right-side summary info */
 .upc-summary-right {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     flex-shrink: 0;
 }
 .upc-prop-count {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.74rem;
-    color: #00f0ff;
-    background: rgba(0, 240, 255, 0.08);
-    border: 1px solid rgba(0, 240, 255, 0.22);
-    border-radius: 8px;
-    padding: 5px 12px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-size: 0.70rem;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-weight: 600;
 }
 .upc-chevron {
-    font-size: 1.15rem;
-    color: #64748b;
-    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), color 0.25s ease;
+    font-size: 0.90rem;
+    color: #4a5568;
+    transition: transform 0.25s ease, color 0.2s ease;
     flex-shrink: 0;
 }
 .upc-card[open] .upc-chevron {
     transform: rotate(180deg);
-    color: #00f0ff;
+    color: #00C6FF;
 }
 
 /* ── Expanded body ──────────────────────────────────────── */
 .upc-body {
-    padding: 0 22px 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    position: relative;
+    padding: 0 16px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: visible;
 }
-.upc-body::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 5%; right: 5%; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0,240,255,0.10), transparent);
+.upc-body .qcm-grid-container {
+    overflow: visible;
 }
 .upc-body .qcm-grid {
-    padding-top: 16px;
+    overflow: visible;
+    padding-top: 12px;
 }
 
 /* ── Joseph M Smith avatar row inside expanded card ────── */
 .upc-joseph-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, rgba(255, 94, 0, 0.08), rgba(255, 158, 0, 0.04));
-    border: 1px solid rgba(255, 94, 0, 0.25);
-    border-radius: 12px;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: rgba(255, 94, 0, 0.05);
+    border: 1px solid rgba(255, 94, 0, 0.18);
+    border-radius: 10px;
     cursor: pointer;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .upc-joseph-row:hover {
-    border-color: rgba(255, 94, 0, 0.50);
-    box-shadow: 0 0 16px rgba(255, 94, 0, 0.14);
-    transform: translateY(-1px);
+    border-color: rgba(255, 94, 0, 0.40);
+    box-shadow: 0 0 12px rgba(255, 94, 0, 0.10);
 }
 .upc-joseph-avatar {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     border: 2px solid #ff5e00;
     object-fit: cover;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(255,94,0,0.20);
 }
 .upc-joseph-label {
     color: #ff9e00;
-    font-size: 0.84rem;
+    font-size: 0.80rem;
     font-weight: 700;
     font-family: 'Inter', sans-serif;
-    letter-spacing: 0.02em;
 }
 
 /* ── Joseph M Smith response panel (toggled on click) ──── */
 .upc-joseph-response {
-    margin-top: 12px;
-    padding: 16px 18px;
-    background: linear-gradient(135deg, rgba(255, 94, 0, 0.07), rgba(15, 23, 42, 0.92));
-    border: 1px solid rgba(255, 94, 0, 0.30);
-    border-radius: 12px;
-    animation: josephFadeIn 0.35s ease-out;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.30);
+    margin-top: 10px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, rgba(255, 94, 0, 0.06), rgba(15, 23, 42, 0.90));
+    border: 1px solid rgba(255, 94, 0, 0.22);
+    border-radius: 10px;
+    animation: josephFadeIn 0.3s ease-out;
 }
 @keyframes josephFadeIn {
-    from { opacity: 0; transform: translateY(-8px); }
+    from { opacity: 0; transform: translateY(-6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 .upc-joseph-resp-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 10px;
+    margin-bottom: 10px;
 }
 .upc-joseph-resp-avatar {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: 2.5px solid #ff5e00;
+    border: 2px solid #ff5e00;
     object-fit: cover;
     flex-shrink: 0;
-    box-shadow: 0 0 12px rgba(255, 94, 0, 0.30);
 }
 .upc-joseph-resp-title {
     display: flex;
@@ -9404,169 +9366,82 @@ UNIFIED_PLAYER_CARD_CSS = """
 }
 .upc-joseph-resp-name {
     color: #ff9e00;
-    font-size: 0.90rem;
+    font-size: 0.86rem;
     font-weight: 700;
     font-family: 'Orbitron', monospace, sans-serif;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
 }
 .upc-joseph-resp-role {
     color: #64748b;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 600;
 }
 .upc-joseph-resp-lock {
     color: #facc15;
-    font-size: 0.95rem;
+    font-size: 0.90rem;
     font-weight: 800;
     font-family: 'Orbitron', monospace, sans-serif;
-    letter-spacing: 0.08em;
-    margin-bottom: 10px;
-    text-shadow: 0 0 10px rgba(250, 204, 21, 0.30);
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
 }
 .upc-joseph-resp-rant {
     color: #e2e8f0;
-    font-size: 0.86rem;
-    line-height: 1.7;
-    font-family: 'Montserrat', 'Inter', sans-serif;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    font-family: 'Inter', sans-serif;
 }
 
-/* ── Responsive ─────────────────────────────────────────── */
-
-/* ── Desktop: ensure body expands fully ──────────────────── */
-.upc-body {
-    overflow: visible;
-}
-.upc-body .qcm-grid-container {
-    overflow: visible;
-}
-.upc-body .qcm-grid {
-    overflow: visible;
-}
-
-/* ── Mobile portrait (phones ≤ 768px) ────────────────────── */
+/* ── Responsive: tablets & phones ───────────────────────── */
 @media (max-width: 768px) {
     .upc-grid {
-        gap: 12px;
-        padding: 6px 0;
+        gap: 4px;
+        padding: 4px 0;
     }
     .upc-card {
-        border-radius: 12px;
-        overflow: visible;
+        border-radius: 10px;
     }
     .upc-card > summary {
         flex-wrap: wrap;
-        gap: 10px;
-        padding: 14px 14px;
+        gap: 8px;
+        padding: 10px 12px;
     }
     .upc-headshot {
-        width: 60px;
-        height: 60px;
-    }
-    .upc-identity {
-        min-width: 0;
-        flex: 1;
+        width: 40px;
+        height: 40px;
     }
     .upc-player-name {
-        font-size: 0.94rem;
+        font-size: 0.86rem;
         white-space: normal;
         word-break: break-word;
     }
-    .upc-subtitle {
-        font-size: 0.68rem;
+    .upc-meta {
+        font-size: 0.64rem;
     }
-    .upc-stats {
-        gap: 5px;
+    .upc-stats-col {
+        gap: 8px;
     }
-    .upc-stat-pill {
-        font-size: 0.62rem;
-        padding: 2px 7px;
+    .upc-stat-val {
+        font-size: 0.70rem;
+    }
+    .upc-stat-lbl {
+        font-size: 0.48rem;
+    }
+    .upc-tier-summary {
+        display: none;
     }
     .upc-summary-right {
         width: 100%;
         justify-content: flex-end;
     }
-    .upc-prop-pill {
-        font-size: 0.60rem;
-        padding: 2px 7px;
-    }
-    .upc-prop-pills {
-        gap: 5px;
-        margin-top: 4px;
-    }
     .upc-prop-count {
-        font-size: 0.68rem;
-        padding: 4px 10px;
+        font-size: 0.64rem;
+        padding: 3px 8px;
     }
     .upc-chevron {
-        font-size: 0.96rem;
-    }
-    .upc-body {
-        padding: 0 12px 16px;
-        overflow: visible;
-    }
-    .upc-body .qcm-grid-container,
-    .upc-body .qcm-grid {
-        overflow: visible;
-    }
-    .upc-joseph-row {
-        padding: 10px 12px;
-        gap: 10px;
-    }
-    .upc-joseph-avatar {
-        width: 34px;
-        height: 34px;
-    }
-    .upc-joseph-label {
-        font-size: 0.78rem;
-    }
-    .upc-joseph-response {
-        padding: 12px 14px;
-    }
-    .upc-joseph-resp-avatar {
-        width: 40px;
-        height: 40px;
-    }
-    .upc-joseph-resp-name {
-        font-size: 0.82rem;
-    }
-    .upc-joseph-resp-role {
-        font-size: 0.66rem;
-    }
-    .upc-joseph-resp-lock {
-        font-size: 0.84rem;
-    }
-    .upc-joseph-resp-rant {
         font-size: 0.80rem;
-        line-height: 1.6;
-    }
-}
-
-/* ── Extra-small phones (≤ 480px) ────────────────────────── */
-@media (max-width: 480px) {
-    .upc-card > summary {
-        gap: 8px;
-        padding: 12px 10px;
-    }
-    .upc-headshot {
-        width: 50px;
-        height: 50px;
-    }
-    .upc-player-name {
-        font-size: 0.86rem;
-    }
-    .upc-subtitle {
-        font-size: 0.62rem;
-    }
-    .upc-stat-pill {
-        font-size: 0.58rem;
-        padding: 2px 6px;
-    }
-    .upc-prop-pill {
-        font-size: 0.54rem;
-        padding: 2px 6px;
     }
     .upc-body {
-        padding: 0 8px 12px;
+        padding: 0 10px 12px;
         overflow: visible;
     }
     .upc-body .qcm-grid-container,
@@ -9578,36 +9453,93 @@ UNIFIED_PLAYER_CARD_CSS = """
         gap: 8px;
     }
     .upc-joseph-avatar {
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
     }
     .upc-joseph-label {
-        font-size: 0.72rem;
+        font-size: 0.74rem;
     }
     .upc-joseph-response {
         padding: 10px 12px;
     }
     .upc-joseph-resp-avatar {
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
     }
     .upc-joseph-resp-name {
-        font-size: 0.76rem;
-    }
-    .upc-joseph-resp-lock {
         font-size: 0.78rem;
     }
+    .upc-joseph-resp-role {
+        font-size: 0.62rem;
+    }
+    .upc-joseph-resp-lock {
+        font-size: 0.80rem;
+    }
     .upc-joseph-resp-rant {
-        font-size: 0.74rem;
+        font-size: 0.76rem;
         line-height: 1.55;
     }
 }
-/* NOTE: The 640px breakpoint that was here has been removed.
-   All its rules are already covered by the 768px breakpoint above,
-   and having it AFTER the 480px breakpoint was overriding the
-   smaller-phone sizes (e.g. headshot 48px was being reset to 60px
-   on screens ≤480px because 480 < 640, so both matched but 640px
-   came last and won). */
+
+/* ── Extra-small phones (≤ 480px) ────────────────────────── */
+@media (max-width: 480px) {
+    .upc-card > summary {
+        gap: 6px;
+        padding: 8px 10px;
+    }
+    .upc-headshot {
+        width: 36px;
+        height: 36px;
+    }
+    .upc-player-name {
+        font-size: 0.80rem;
+    }
+    .upc-meta {
+        font-size: 0.58rem;
+    }
+    .upc-stats-col {
+        gap: 6px;
+    }
+    .upc-stat-val {
+        font-size: 0.64rem;
+    }
+    .upc-body {
+        padding: 0 8px 10px;
+        overflow: visible;
+    }
+    .upc-body .qcm-grid-container,
+    .upc-body .qcm-grid {
+        overflow: visible;
+    }
+    .upc-joseph-row {
+        padding: 6px 8px;
+        gap: 6px;
+    }
+    .upc-joseph-avatar {
+        width: 26px;
+        height: 26px;
+    }
+    .upc-joseph-label {
+        font-size: 0.68rem;
+    }
+    .upc-joseph-response {
+        padding: 8px 10px;
+    }
+    .upc-joseph-resp-avatar {
+        width: 30px;
+        height: 30px;
+    }
+    .upc-joseph-resp-name {
+        font-size: 0.72rem;
+    }
+    .upc-joseph-resp-lock {
+        font-size: 0.74rem;
+    }
+    .upc-joseph-resp-rant {
+        font-size: 0.70rem;
+        line-height: 1.5;
+    }
+}
 """
 
 
