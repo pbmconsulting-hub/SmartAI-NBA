@@ -332,8 +332,21 @@ def get_player_career_stats(player_id: int) -> dict:
             _logger.warning("get_player_career_stats: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
+        # Only keep current + previous season (not full career history)
+        all_seasons = norm.get("SeasonTotalsRegularSeason", [])
+        _start_year = _current_season().split("-")[0]
+        _keep_ids = {f"2{_start_year}", f"2{int(_start_year) - 1}"}
+        filtered_seasons = [
+            s for s in all_seasons
+            if str(s.get("SEASON_ID", "")) in _keep_ids
+        ]
+        # Fallback: if the filter removed everything (e.g. season_id format
+        # mismatch), keep just the last 2 rows which are most recent.
+        if not filtered_seasons and all_seasons:
+            filtered_seasons = all_seasons[-2:]
+
         result = {
-            "season_totals_regular_season": norm.get("SeasonTotalsRegularSeason", []),
+            "season_totals_regular_season": filtered_seasons,
             "career_totals_regular_season": norm.get("CareerTotalsRegularSeason", []),
         }
 

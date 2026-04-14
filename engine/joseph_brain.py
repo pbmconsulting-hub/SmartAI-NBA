@@ -4005,11 +4005,9 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
                     f"The ceiling is high but the floor is LOW. Pick your spots CAREFULLY."
                 )
 
-        # Career context from DB
+        # Career context from DB (only current + prior season stored)
         career = db_intel.get("career_stats", [])
         career_context = ""
-        if career and len(career) >= 2:
-            career_context = f"{player_name} is in year {len(career)} of his career."
 
         # Estimated metrics insight
         est = db_intel.get("estimated_metrics", {})
