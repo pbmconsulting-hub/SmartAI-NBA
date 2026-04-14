@@ -10581,12 +10581,13 @@ def get_prop_card_html(
         f'<div class="ps-card-metric-val">{status_emoji} {_html.escape(player_status)}</div>'
         f'<div class="ps-card-metric-lbl">Status</div>'
         f'</div>'
-        + (f'<div class="ps-card-metric-box"><div class="ps-card-metric-val">{conf_badge}</div><div class="ps-card-metric-lbl">Confidence</div></div>' if conf_badge else '')
+        + (f'<div class="ps-card-metric-box"><div class="ps-card-metric-val">{conf_badge}</div>'
+           f'<div class="ps-card-metric-lbl">Confidence</div></div>' if conf_badge else '')
         + f'</div>'
-        f'<div class="ps-card-footer">'
-        f'{movement_html}'
-        f'</div>'
-        f'</div>'
+        + f'<div class="ps-card-footer">'
+        + f'{movement_html}'
+        + f'</div>'
+        + f'</div>'
     )
 
 
