@@ -8913,7 +8913,7 @@ QUANTUM_CARD_MATRIX_CSS = """
     padding: 4px 0;
 }
 
-/* ── QAM Matchup Banner (horizontal split-bar) ────────────── */
+/* ── QAM Matchup Banner (horizontal split-bar layout) ─────── */
 .qam-mu-bar {
     display: flex;
     align-items: center;
@@ -8932,7 +8932,7 @@ QUANTUM_CARD_MATRIX_CSS = """
     position: relative;
     font-family: 'Inter', sans-serif;
 }
-/* Gradient accent from each team colour (faint wash on each side) */
+/* Gradient accent from each team color (faint wash on each side) */
 .qam-mu-bar::before {
     content: '';
     position: absolute;

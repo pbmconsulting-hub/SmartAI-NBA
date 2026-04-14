@@ -1022,7 +1022,7 @@ def render_game_matchup_card_html(
     """Return an HTML matchup banner with team logos, colors, records,
     and prop/player counts for the QAM game group headers.
 
-    Uses a horizontal split-bar layout with team-colour gradient accents.
+    Uses a horizontal split-bar layout with team-color gradient accents.
     """
     away_color, _ = get_team_colors(away_team)
     home_color, _ = get_team_colors(home_team)
