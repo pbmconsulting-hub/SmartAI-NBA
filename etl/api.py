@@ -660,7 +660,7 @@ def get_player_career(player_id: int) -> dict:
     logger.info("GET /api/players/%d/career", player_id)
     result = _query_rows(
         "SELECT * FROM Player_Career_Stats WHERE player_id = ? "
-        "ORDER BY season_id DESC",
+        "ORDER BY season_id DESC LIMIT 2",
         (player_id,),
         label="get_player_career",
     )

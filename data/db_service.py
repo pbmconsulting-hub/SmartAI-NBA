@@ -1061,7 +1061,7 @@ def get_league_leaders_from_db(stat_category: str = "PTS", season: str | None = 
 
 
 def get_player_career_stats_from_db(player_id: int) -> list:
-    """Read Player_Career_Stats (year-over-year) for a player."""
+    """Read Player_Career_Stats for a player (current + previous season only)."""
     conn = _get_conn()
     if conn is None:
         return []
@@ -1071,6 +1071,7 @@ def get_player_career_stats_from_db(player_id: int) -> list:
             SELECT * FROM Player_Career_Stats
             WHERE player_id = ?
             ORDER BY season_id DESC
+            LIMIT 2
             """,
             (int(player_id),),
         ).fetchall()

@@ -1582,6 +1582,18 @@ def fetch_player_year_over_year(player_id: int) -> list[dict]:
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         rows = frames[1].to_dict("records") if len(frames) > 1 and not frames[1].empty else []
+
+        # Only keep current + previous season (not full career history)
+        _cur = _current_season()                        # e.g. "2025-26"
+        _start_year = int(_cur.split("-")[0])
+        _prev = f"{_start_year - 1}-{str(_start_year)[-2:]}"  # e.g. "2024-25"
+        _keep = {_cur, _prev}
+        filtered = [r for r in rows if r.get("GROUP_VALUE", "") in _keep]
+        # Fallback: keep the last 2 rows if the filter matched nothing
+        if not filtered and rows:
+            filtered = rows[-2:]
+        rows = filtered
+
         _cache_set(cache_key, rows)
         _logger.info(
             "fetch_player_year_over_year(%s): %d seasons in %.1f ms",
