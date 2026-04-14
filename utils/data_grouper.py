@@ -15,6 +15,9 @@ import logging as _logging
 
 _logger = _logging.getLogger(__name__)
 
+# Tier ranking for intra-player prop sorting (lower = better tier first)
+_TIER_RANK = {"Platinum": 0, "Gold": 1, "Silver": 2, "Bronze": 3}
+
 
 def group_props_by_player(
     analysis_results: list,
@@ -78,5 +81,14 @@ def group_props_by_player(
             aggregated[name] = {"vitals": vitals, "props": []}
 
         aggregated[name]["props"].append(result)
+
+    # Sort props within each player: highest confidence / best tier first
+    for data in aggregated.values():
+        data["props"].sort(
+            key=lambda p: (
+                _TIER_RANK.get(p.get("tier", "Bronze"), 3),
+                -(p.get("confidence_score", 0) or 0),
+            ),
+        )
 
     return aggregated

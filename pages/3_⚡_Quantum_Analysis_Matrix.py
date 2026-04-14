@@ -225,6 +225,8 @@ def _get_sim_cache() -> dict:
 
 _LAZY_CHUNK_SIZE = 50          # players per st.html() call — larger chunks = fewer DOM injections
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
+_MAX_TOP_PICKS = 8             # max props flagged as "Top Pick" in the summary bar
+_MAX_UNCERTAIN_NAMES = 6       # max player names shown in the uncertain-picks banner
 
 # Injury status confidence penalties (points deducted from SAFE Score)
 _DOUBTFUL_INJURY_PENALTY = 8.0      # Doubtful: ~75% chance of sitting
@@ -2706,30 +2708,36 @@ def _render_results_fragment():
                 )
 
     # ============================================================
-    # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
+    # SECTION B: Uncertain Picks — flagged inline in player cards
     # ============================================================
+    # Instead of a separate section that duplicates player entries,
+    # uncertain picks are now flagged with is_uncertain in their
+    # analysis result dict.  The unified player cards display a
+    # "⚠️ Uncertain" badge on the affected prop cards inline.
+    # A compact summary count is shown here for awareness.
     _uncertain_picks = [
         r for r in _frag_analysis_results
         if r.get("is_uncertain", False)
         and not r.get("player_is_out", False)
     ]
     if _uncertain_picks:
-        with st.expander(
-            f"⚠️ Uncertain Picks — Risk Flags ({len(_uncertain_picks)}) — Conflicting Signals, Use Caution",
-            expanded=False,
-        ):
-            st.markdown(
-                _render_uncertain_header_html(),
-                unsafe_allow_html=True,
-            )
-            for _up in _uncertain_picks:
-                st.markdown(
-                    _render_uncertain_pick_html(
-                        _up,
-                        inline_breakdown_html=_render_inline_breakdown(_up, accent_color="#ffc107"),
-                    ),
-                    unsafe_allow_html=True,
-                )
+        _unc_names = list(dict.fromkeys(
+            r.get("player_name", "Unknown") for r in _uncertain_picks
+        ))[:_MAX_UNCERTAIN_NAMES]
+        _unc_overflow = len(_uncertain_picks) - len(_unc_names)
+        _unc_summary = ", ".join(_html.escape(n) for n in _unc_names)
+        if _unc_overflow > 0:
+            _unc_summary += f" +{_unc_overflow} more"
+        st.markdown(
+            f'<div class="qam-uncertain-banner">'
+            f'<span class="qam-uncertain-icon">⚠️</span>'
+            f'<span class="qam-uncertain-text">'
+            f'{len(_uncertain_picks)} uncertain prop(s) with conflicting signals — '
+            f'{_unc_summary}'
+            f' — flagged inline below</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # ── ⚡ Quantum Edge Gap (standard-line, extreme-edge picks ≥ ±20%) ─────
     # Only pull bets from the Standard Line Type on the Prop Scanner.
@@ -2755,7 +2763,10 @@ def _render_results_fragment():
         )
         st.divider()
 
-    # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─
+    # ── 🏆 Best Single Bets — mark inline (no separate duplicate cards) ─
+    # Instead of rendering separate horizontal cards (which duplicates
+    # player entries), we flag the top picks with _is_best_pick so the
+    # unified player cards show a "⭐ Top Pick" badge inline.
     _single_bet_pool = [
         r for r in displayed_results
         if not r.get("should_avoid", False)
@@ -2766,34 +2777,66 @@ def _render_results_fragment():
         _single_bet_pool,
         key=lambda r: (r.get("confidence_score", 0), abs(r.get("edge_percentage", 0))),
         reverse=True,
-    )[:8]  # Show top 8
+    )[:_MAX_TOP_PICKS]  # Top picks get the badge
 
-    if _single_bet_pool:
-        # ── Gold tier banner (with Gold_Logo.png) ──────────────────────
-        _gold_pool = [r for r in _single_bet_pool if r.get("tier") in ("Gold", "Platinum")]
-        if _gold_pool:
-            _goldcol_logo, _goldcol_title = st.columns([1, 6])
-            with _goldcol_logo:
-                if os.path.exists(_GOLD_LOGO_PATH):
-                    st.image(_GOLD_LOGO_PATH, width=110)
-            with _goldcol_title:
-                st.markdown(
-                    _render_gold_tier_banner_html(),
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown(
-            _render_best_single_bets_header_html(),
-            unsafe_allow_html=True,
+    # Flag each top pick in the original results list
+    _best_pick_keys: set = set()
+    for _sb in _single_bet_pool:
+        _bk = (
+            _sb.get("player_name", ""),
+            (_sb.get("stat_type", "") or "").lower(),
+            _sb.get("prop_line", _sb.get("line", 0)),
         )
-        _TIER_COLORS = {"Platinum": "#c800ff", "Gold": "#ff5e00", "Silver": "#b0c0d8"}
-        # Inject the shared QCM CSS once for horizontal cards
-        st.markdown(_get_qcm_css(), unsafe_allow_html=True)
+        _best_pick_keys.add(_bk)
+    for _r in displayed_results:
+        _rk = (
+            _r.get("player_name", ""),
+            (_r.get("stat_type", "") or "").lower(),
+            _r.get("prop_line", _r.get("line", 0)),
+        )
+        if _rk in _best_pick_keys:
+            _r["_is_best_pick"] = True
+
+    # ── Compact Top Picks Summary (non-duplicating, zero-redundancy) ─
+    # Shows a lightweight, scannable summary bar above the game groups.
+    if _single_bet_pool:
+        _top_pills: list[str] = []
+        _seen_top_players: set = set()
         for _sb in _single_bet_pool:
+            _sbname = _sb.get("player_name", "Unknown")
+            if _sbname in _seen_top_players:
+                continue
+            _seen_top_players.add(_sbname)
+            _sb_stat = (_sb.get("stat_type", "") or "").replace("_", " ").title()
+            _sb_dir = "More" if (_sb.get("direction", "OVER")).upper() == "OVER" else "Less"
+            _sb_line = _sb.get("prop_line", _sb.get("line", 0))
+            try:
+                _sb_line_d = f"{float(_sb_line):g}"
+            except (ValueError, TypeError):
+                _sb_line_d = "—"
             _sb_tier = _sb.get("tier", "Bronze")
-            _sb_color = _TIER_COLORS.get(_sb_tier, "#b0c0d8")
-            _h_card_html = _build_h_card(_sb, accent_color=_sb_color)
-            st.markdown(_h_card_html, unsafe_allow_html=True)
+            _TIER_PILL_BG = {
+                "Platinum": "rgba(200,0,255,0.12)", "Gold": "rgba(255,94,0,0.12)",
+                "Silver": "rgba(176,192,216,0.10)", "Bronze": "rgba(100,116,139,0.10)",
+            }
+            _TIER_PILL_BORDER = {
+                "Platinum": "#c800ff", "Gold": "#ff5e00",
+                "Silver": "#b0c0d8", "Bronze": "#64748b",
+            }
+            _pill_bg = _TIER_PILL_BG.get(_sb_tier, "rgba(100,116,139,0.10)")
+            _pill_border = _TIER_PILL_BORDER.get(_sb_tier, "#64748b")
+            _top_pills.append(
+                f'<span class="qam-top-pill" style="background:{_pill_bg};border-color:{_pill_border};">'
+                f'⭐ {_html.escape(_sbname)} — {_sb_dir} {_sb_line_d} {_html.escape(_sb_stat)}</span>'
+            )
+        if _top_pills:
+            st.markdown(
+                '<div class="qam-top-picks-bar">'
+                '<span class="qam-top-picks-label">🏆 Top Picks</span>'
+                + "".join(_top_pills)
+                + '</div>',
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 
