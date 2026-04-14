@@ -23,6 +23,7 @@ def group_props_by_player(
     analysis_results: list,
     players_data: list | None = None,
     todays_games: list | None = None,
+    max_props_per_player: int | None = None,
 ) -> dict:
     """Group analysis results by player name.
 
@@ -40,6 +41,9 @@ def group_props_by_player(
         Full players dataset for enrichment.
     todays_games : list[dict] | None
         Today's games for opponent resolution.
+    max_props_per_player : int | None
+        When set, keep only the top *N* props per player (ranked by
+        tier then confidence).  ``None`` (default) keeps all props.
 
     Returns
     -------
@@ -90,5 +94,8 @@ def group_props_by_player(
                 -(p.get("confidence_score", 0) or 0),
             ),
         )
+        # Limit to top N props per player when requested
+        if max_props_per_player is not None and len(data["props"]) > max_props_per_player:
+            data["props"] = data["props"][:max_props_per_player]
 
     return aggregated

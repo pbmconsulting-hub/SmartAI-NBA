@@ -227,6 +227,7 @@ _LAZY_CHUNK_SIZE = 50          # players per st.html() call — larger chunks = 
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 _MAX_TOP_PICKS = 3             # max props flagged as "Top Pick" in the summary bar
 _MAX_UNCERTAIN_NAMES = 6       # max player names shown in the uncertain-picks banner
+_MAX_PROPS_PER_PLAYER = 5      # show at most 5 props per player in the QAM cards
 
 # Injury status confidence penalties (points deducted from SAFE Score)
 _DOUBTFUL_INJURY_PENALTY = 8.0      # Doubtful: ~75% chance of sitting
@@ -2979,7 +2980,7 @@ def _render_results_fragment():
     # normal page flow.  This eliminates iframe scroll-capture on
     # desktop and allows expanded cards to grow without cutoff.
     _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
-    _grouped = _group_props(_active_results, _frag_players_data, _frag_todays_games)
+    _grouped = _group_props(_active_results, _frag_players_data, _frag_todays_games, max_props_per_player=_MAX_PROPS_PER_PLAYER)
 
     if _grouped:
         st.markdown(
@@ -3084,7 +3085,7 @@ def _render_results_fragment():
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
     if _out_display:
-        _out_grouped = _group_props(_out_display, _frag_players_data, _frag_todays_games)
+        _out_grouped = _group_props(_out_display, _frag_players_data, _frag_todays_games, max_props_per_player=_MAX_PROPS_PER_PLAYER)
         if _out_grouped:
             st.markdown(
                 '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
