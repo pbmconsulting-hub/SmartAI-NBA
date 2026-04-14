@@ -602,8 +602,11 @@ def filter_qeg_picks(
        absent, which defaults to ``"standard"``).
     2. **Exclude goblins / demons** – any pick whose ``odds_type`` is
        ``"goblin"`` or ``"demon"`` is dropped.
-    3. **Edge threshold** – ``|edge_percentage| >= edge_threshold`` (defaults
-       to :data:`_QEG_EDGE_THRESHOLD`).
+    3. **Edge threshold** – the *uncapped* edge (derived from
+       ``probability_over``) must satisfy ``|edge| >= edge_threshold``.
+       ``edge_percentage`` in the result dict is capped at ±20 % by
+       ``calculate_edge_percentage``, so we re-derive the raw value here
+       to avoid the cap masking genuine high-conviction picks.
     4. **No other hiding** – picks with extreme deviations (line far above/
        below average) are *not* filtered out.  ``should_avoid`` and
        ``player_is_out`` are intentionally *not* checked here so that
@@ -623,7 +626,19 @@ def filter_qeg_picks(
         odds_type = str(r.get("odds_type", "standard")).strip().lower()
         if odds_type != "standard":
             continue
-        if abs(r.get("edge_percentage", 0)) < thr:
+        # Derive the uncapped edge from probability_over so the ±20 % cap
+        # in calculate_edge_percentage does not mask real high-edge picks.
+        # Falls back to the (capped) edge_percentage when probability_over
+        # is unavailable.
+        prob = r.get("probability_over")
+        if prob is not None:
+            try:
+                raw_edge = (float(prob) - 0.5) * 100.0
+            except (ValueError, TypeError):
+                raw_edge = float(r.get("edge_percentage", 0))
+        else:
+            raw_edge = float(r.get("edge_percentage", 0))
+        if abs(raw_edge) < thr:
             continue
         filtered.append(r)
     return filtered
