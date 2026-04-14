@@ -1019,8 +1019,10 @@ def render_game_matchup_card_html(
     n_players: int = 0,
     n_props: int = 0,
 ) -> str:
-    """Return an HTML matchup card with team logos, colors, records,
+    """Return an HTML matchup banner with team logos, colors, records,
     and prop/player counts for the QAM game group headers.
+
+    Uses a horizontal split-bar layout with team-colour gradient accents.
     """
     away_color, _ = get_team_colors(away_team)
     home_color, _ = get_team_colors(home_team)
@@ -1031,35 +1033,47 @@ def render_game_matchup_card_html(
     safe_away_rec = _html.escape(str(away_record)) if away_record else ""
     safe_home_rec = _html.escape(str(home_record)) if home_record else ""
 
-    props_badge = (
-        f'<div class="qam-matchup-badges">'
-        f'<span class="qam-matchup-badge qam-matchup-badge-players">'
-        f'{n_players} player{"s" if n_players != 1 else ""}</span>'
-        f'<span class="qam-matchup-badge qam-matchup-badge-props">'
-        f'{n_props} prop{"s" if n_props != 1 else ""}</span>'
-        f'</div>'
+    away_rec_html = (
+        f'<span class="qam-mu-record">{safe_away_rec}</span>'
+        if safe_away_rec else ""
+    )
+    home_rec_html = (
+        f'<span class="qam-mu-record">{safe_home_rec}</span>'
+        if safe_home_rec else ""
     )
 
     return (
-        f'<div class="qam-matchup-card">'
-        f'<div class="qam-matchup-teams">'
-        # Away team
-        f'<div class="qam-matchup-team">'
-        f'<img class="qam-matchup-logo" src="{away_logo}" alt="{safe_away}" '
+        f'<div class="qam-mu-bar" style="'
+        f'--away-clr:{away_color};--home-clr:{home_color};">'
+        # Away side
+        f'<div class="qam-mu-side qam-mu-away">'
+        f'<img class="qam-mu-logo" src="{away_logo}" alt="{safe_away}" '
         f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
-        f'<span class="qam-matchup-abbrev" style="color:{away_color};">{safe_away}</span>'
-        + (f'<span class="qam-matchup-record">{safe_away_rec}</span>' if safe_away_rec else "")
-        + f'</div>'
-        # VS divider
-        f'<div class="qam-matchup-vs">@</div>'
-        # Home team
-        f'<div class="qam-matchup-team">'
-        f'<img class="qam-matchup-logo" src="{home_logo}" alt="{safe_home}" '
-        f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
-        f'<span class="qam-matchup-abbrev" style="color:{home_color};">{safe_home}</span>'
-        + (f'<span class="qam-matchup-record">{safe_home_rec}</span>' if safe_home_rec else "")
-        + f'</div>'
+        f'<div class="qam-mu-team-info">'
+        f'<span class="qam-mu-abbrev" style="color:{away_color};">'
+        f'{safe_away}</span>'
+        f'{away_rec_html}'
         f'</div>'
-        + props_badge
-        + f'</div>'
+        f'</div>'
+        # Centre divider
+        f'<div class="qam-mu-centre">'
+        f'<span class="qam-mu-at">@</span>'
+        f'<div class="qam-mu-counts">'
+        f'<span class="qam-mu-count">'
+        f'👤 {n_players}</span>'
+        f'<span class="qam-mu-count">'
+        f'📋 {n_props}</span>'
+        f'</div>'
+        f'</div>'
+        # Home side
+        f'<div class="qam-mu-side qam-mu-home">'
+        f'<div class="qam-mu-team-info" style="text-align:right;">'
+        f'<span class="qam-mu-abbrev" style="color:{home_color};">'
+        f'{safe_home}</span>'
+        f'{home_rec_html}'
+        f'</div>'
+        f'<img class="qam-mu-logo" src="{home_logo}" alt="{safe_home}" '
+        f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+        f'</div>'
+        f'</div>'
     )
