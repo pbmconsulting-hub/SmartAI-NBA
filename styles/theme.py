@@ -6778,40 +6778,44 @@ def get_qa_card_html(row: dict, form_dots_html: str) -> str:
         streak_cls = "qa-streak-hot" if "Over" in streak else "qa-streak-cold"
         streak_html = f'<span class="qa-streak-pill {streak_cls}">{_h.escape(streak)}</span>'
 
-    return f"""<div class="qa-card {card_accent}">
-  <div class="qa-card-header">
-    <div>
-      <span class="qa-card-player">{player}</span>
-      <span class="qa-card-team">{team}</span>
-    </div>
-    {plat_html}
-  </div>
-  <div class="qa-card-stat-row">
-    <span class="qa-card-stat">{stat}</span>
-    <span class="qa-card-line">{line}</span>
-    {avg_html}
-  </div>
-  <div class="qa-card-metrics">
-    <div class="qa-card-metric-box">
-      <div class="qa-card-metric-val {edge_val_cls}">{edge_sign}{edge:.1f}%{dir_html}</div>
-      <div class="qa-card-metric-lbl">Edge</div>
-    </div>
-    <div class="qa-card-metric-box">
-      <div class="qa-card-metric-val" style="color:#e0eeff;">{hr_pct}%</div>
-      <div class="qa-hr-bar-bg"><div class="qa-hr-bar-fill {hr_bar_cls}" style="width:{hr_pct}%;"></div></div>
-      <div class="qa-card-metric-lbl">Hit Rate</div>
-    </div>
-  </div>
-  <div class="qa-card-footer">
-    <div class="qa-card-footer-left">
-      {form_dots_html}
-      {streak_html}
-    </div>
-    <div class="qa-card-footer-right">
-      {avail_html}
-    </div>
-  </div>
-</div>"""
+    # NOTE: No line may start with 4+ spaces — st.markdown() treats that as
+    # a Markdown code-block, causing raw HTML to render as text.
+    return (
+        f'<div class="qa-card {card_accent}">'
+        f'<div class="qa-card-header">'
+        f'<div>'
+        f'<span class="qa-card-player">{player}</span>'
+        f'<span class="qa-card-team">{team}</span>'
+        f'</div>'
+        f'{plat_html}'
+        f'</div>'
+        f'<div class="qa-card-stat-row">'
+        f'<span class="qa-card-stat">{stat}</span>'
+        f'<span class="qa-card-line">{line}</span>'
+        f'{avg_html}'
+        f'</div>'
+        f'<div class="qa-card-metrics">'
+        f'<div class="qa-card-metric-box">'
+        f'<div class="qa-card-metric-val {edge_val_cls}">{edge_sign}{edge:.1f}%{dir_html}</div>'
+        f'<div class="qa-card-metric-lbl">Edge</div>'
+        f'</div>'
+        f'<div class="qa-card-metric-box">'
+        f'<div class="qa-card-metric-val" style="color:#e0eeff;">{hr_pct}%</div>'
+        f'<div class="qa-hr-bar-bg"><div class="qa-hr-bar-fill {hr_bar_cls}" style="width:{hr_pct}%;"></div></div>'
+        f'<div class="qa-card-metric-lbl">Hit Rate</div>'
+        f'</div>'
+        f'</div>'
+        f'<div class="qa-card-footer">'
+        f'<div class="qa-card-footer-left">'
+        f'{form_dots_html}'
+        f'{streak_html}'
+        f'</div>'
+        f'<div class="qa-card-footer-right">'
+        f'{avail_html}'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
 
 
 # ============================================================
@@ -10639,38 +10643,43 @@ def get_prop_card_html(
 
     avg_html = f'<span class="ps-card-avg">avg {season_avg:.1f}</span>' if season_avg > 0 else ""
 
-    return f"""<div class="ps-card {accent}">
-  <div class="ps-card-header">
-    <div class="ps-card-player-wrap">
-      {headshot_html}
-      <div>
-        <div class="ps-card-player">{safe_player}</div>
-        <span class="ps-card-team">{safe_team}</span>
-      </div>
-    </div>
-    {plat_badge}
-  </div>
-  <div class="ps-card-stat-row">
-    <span class="ps-card-stat">{safe_stat}</span>
-    <span class="ps-card-line">{line:.1f}</span>
-    {avg_html}
-    {type_badge}
-  </div>
-  <div class="ps-card-metrics">
-    <div class="ps-card-metric-box">
-      {gauge}
-      <div class="ps-card-metric-lbl">Value</div>
-    </div>
-    <div class="ps-card-metric-box">
-      <div class="ps-card-metric-val">{status_emoji} {_html.escape(player_status)}</div>
-      <div class="ps-card-metric-lbl">Status</div>
-    </div>
-    {f'<div class="ps-card-metric-box"><div class="ps-card-metric-val">{conf_badge}</div><div class="ps-card-metric-lbl">Confidence</div></div>' if conf_badge else ''}
-  </div>
-  <div class="ps-card-footer">
-    {movement_html}
-  </div>
-</div>"""
+    # NOTE: No line may start with 4+ spaces — st.markdown() treats that as
+    # a Markdown code-block, causing raw HTML to render as text.
+    return (
+        f'<div class="ps-card {accent}">'
+        f'<div class="ps-card-header">'
+        f'<div class="ps-card-player-wrap">'
+        f'{headshot_html}'
+        f'<div>'
+        f'<div class="ps-card-player">{safe_player}</div>'
+        f'<span class="ps-card-team">{safe_team}</span>'
+        f'</div>'
+        f'</div>'
+        f'{plat_badge}'
+        f'</div>'
+        f'<div class="ps-card-stat-row">'
+        f'<span class="ps-card-stat">{safe_stat}</span>'
+        f'<span class="ps-card-line">{line:.1f}</span>'
+        f'{avg_html}'
+        f'{type_badge}'
+        f'</div>'
+        f'<div class="ps-card-metrics">'
+        f'<div class="ps-card-metric-box">'
+        f'{gauge}'
+        f'<div class="ps-card-metric-lbl">Value</div>'
+        f'</div>'
+        f'<div class="ps-card-metric-box">'
+        f'<div class="ps-card-metric-val">{status_emoji} {_html.escape(player_status)}</div>'
+        f'<div class="ps-card-metric-lbl">Status</div>'
+        f'</div>'
+        + (f'<div class="ps-card-metric-box"><div class="ps-card-metric-val">{conf_badge}</div>'
+           f'<div class="ps-card-metric-lbl">Confidence</div></div>' if conf_badge else '')
+        + f'</div>'
+        + f'<div class="ps-card-footer">'
+        + f'{movement_html}'
+        + f'</div>'
+        + f'</div>'
+    )
 
 
 # ============================================================

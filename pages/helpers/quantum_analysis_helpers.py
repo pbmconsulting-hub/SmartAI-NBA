@@ -294,9 +294,9 @@ def render_uncertain_pick_html(pick: dict, inline_breakdown_html: str = "") -> s
 
 # ── Quantum Edge Gap Banner ──────────────────────────────────────────────────
 
-_QEG_EDGE_THRESHOLD = 20.0  # Minimum absolute edge % to qualify (±20% and beyond)
+_QEG_LINE_DEVIATION_THRESHOLD = 20.0  # Minimum |line_vs_avg_pct| to qualify
 
-QEG_EDGE_THRESHOLD = _QEG_EDGE_THRESHOLD  # Public alias for page import
+QEG_EDGE_THRESHOLD = _QEG_LINE_DEVIATION_THRESHOLD  # Public alias for page import
 
 
 def render_quantum_edge_gap_banner_html(
@@ -307,24 +307,29 @@ def render_quantum_edge_gap_banner_html(
     Parameters
     ----------
     picks:
-        List of result dicts that qualified for the edge gap
-        (|edge_percentage| >= _QEG_EDGE_THRESHOLD).
+        List of result dicts that qualified for the edge gap (either
+        line_vs_avg_pct deviation or edge_percentage ≥ threshold).
     """
     total = len(picks)
     over_ct = sum(1 for p in picks if p.get("direction", "").upper() == "OVER")
     under_ct = total - over_ct
+    avg_dev = (
+        sum(abs(p.get("line_vs_avg_pct", 0)) for p in picks) / total
+        if total
+        else 0
+    )
+    max_dev = (
+        max(abs(p.get("line_vs_avg_pct", 0)) for p in picks)
+        if total
+        else 0
+    )
     avg_edge = (
         sum(abs(p.get("edge_percentage", 0)) for p in picks) / total
         if total
         else 0
     )
-    max_edge = (
-        max(abs(p.get("edge_percentage", 0)) for p in picks)
-        if total
-        else 0
-    )
 
-    _thr = int(_QEG_EDGE_THRESHOLD)
+    _thr = int(_QEG_LINE_DEVIATION_THRESHOLD)
 
     return (
         '<div class="qam-edge-gap-banner">'
@@ -336,9 +341,10 @@ def render_quantum_edge_gap_banner_html(
         f'<span>±{_thr}%&thinsp;&amp;&thinsp;BEYOND</span></h3>'
         '</div>'
         '<p>'
-        f'Standard-line picks where the model projects ≥&thinsp;+{_thr}% or '
-        f'≤&thinsp;-{_thr}% edge — high-conviction opportunities with the '
-        'largest separation between projection and market.'
+        f'Standard-line picks where the line deviates ≥&thinsp;{_thr}% from the '
+        f'season average (OVER: line {_thr}–100% below avg, '
+        f'UNDER: line {_thr}–100% above avg) or the model edge '
+        f'is ≥&thinsp;{_thr}%.'
         '</p>'
         '<div class="qeg-stats-row">'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{total}</span>'
@@ -347,10 +353,12 @@ def render_quantum_edge_gap_banner_html(
         f'<span class="qeg-stat-lbl">Over</span></div>'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{under_ct}</span>'
         f'<span class="qeg-stat-lbl">Under</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{avg_dev:.1f}%</span>'
+        f'<span class="qeg-stat-lbl">Avg Dev</span></div>'
+        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{max_dev:.1f}%</span>'
+        f'<span class="qeg-stat-lbl">Max Dev</span></div>'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{avg_edge:.1f}%</span>'
         f'<span class="qeg-stat-lbl">Avg Edge</span></div>'
-        f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{max_edge:.1f}%</span>'
-        f'<span class="qeg-stat-lbl">Max Edge</span></div>'
         '</div>'
         '</div>'
         '</div>'
@@ -586,9 +594,6 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
 
 # ── Quantum Edge Gap Filtering, Deduplication & Grouping ─────────────────────
 
-# Labels that must be excluded from the Quantum Edge Gap section.
-_QEG_EXCLUDED_ODDS_TYPES = frozenset({"goblin", "demon"})
-
 
 def filter_qeg_picks(
     results: list,
@@ -596,36 +601,53 @@ def filter_qeg_picks(
 ) -> list:
     """Return QEG-qualified picks from *results*.
 
-    Filtering rules (derived from the Prop Scanner's line-type taxonomy):
+    Filtering rules:
 
     1. **Standard lines only** – ``odds_type`` must be ``"standard"`` (or
        absent, which defaults to ``"standard"``).
     2. **Exclude goblins / demons** – any pick whose ``odds_type`` is
        ``"goblin"`` or ``"demon"`` is dropped.
-    3. **Edge threshold** – ``|edge_percentage| >= edge_threshold`` (defaults
-       to :data:`_QEG_EDGE_THRESHOLD`).
-    4. **No other hiding** – picks with extreme deviations (line far above/
-       below average) are *not* filtered out.  ``should_avoid`` and
-       ``player_is_out`` are intentionally *not* checked here so that
-       extreme-edge picks are always surfaced.
+    3. **Qualification** – a pick qualifies if it meets **either** criterion:
+
+       a. **Line deviation** – ``line_vs_avg_pct`` deviates ≥ *threshold* %
+          from the season average in the qualifying direction:
+          • **OVER**: ``line_vs_avg_pct <= -threshold`` (line 20–100 % below avg).
+          • **UNDER**: ``line_vs_avg_pct >= +threshold`` (line 20–100 % above avg).
+
+       b. **Edge percentage** – ``|edge_percentage| >= threshold``.
+
+    4. **No other hiding** – ``should_avoid`` and ``player_is_out`` are
+       intentionally *not* checked so extreme-deviation picks are surfaced.
 
     Parameters
     ----------
     results:
         Full list of analysis result dicts (e.g. ``displayed_results``).
     edge_threshold:
-        Minimum absolute edge %. Defaults to the module-level
-        ``_QEG_EDGE_THRESHOLD`` (20.0).
+        Minimum threshold %. Defaults to the module-level
+        ``_QEG_LINE_DEVIATION_THRESHOLD`` (20.0).
     """
-    thr = edge_threshold if edge_threshold is not None else _QEG_EDGE_THRESHOLD
+    thr = edge_threshold if edge_threshold is not None else _QEG_LINE_DEVIATION_THRESHOLD
     filtered: list = []
     for r in results:
         odds_type = str(r.get("odds_type", "standard")).strip().lower()
         if odds_type != "standard":
             continue
-        if abs(r.get("edge_percentage", 0)) < thr:
-            continue
-        filtered.append(r)
+
+        line_dev = float(r.get("line_vs_avg_pct", 0))
+        direction = str(r.get("direction", "")).upper()
+        edge_pct = abs(float(r.get("edge_percentage", 0)))
+
+        # Criterion A: line deviation in the qualifying direction
+        line_qualifies = (
+            (direction == "OVER" and line_dev <= -thr)
+            or (direction == "UNDER" and line_dev >= thr)
+        )
+        # Criterion B: edge percentage magnitude
+        edge_qualifies = edge_pct >= thr
+
+        if line_qualifies or edge_qualifies:
+            filtered.append(r)
     return filtered
 
 

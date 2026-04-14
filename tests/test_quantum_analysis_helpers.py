@@ -316,9 +316,9 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
 
     def test_banner_with_picks(self):
         picks = [
-            {"edge_percentage": 18.5, "direction": "OVER"},
-            {"edge_percentage": -16.2, "direction": "UNDER"},
-            {"edge_percentage": 20.0, "direction": "OVER"},
+            {"edge_percentage": 18.5, "direction": "OVER", "line_vs_avg_pct": -25.0},
+            {"edge_percentage": -16.2, "direction": "UNDER", "line_vs_avg_pct": 30.0},
+            {"edge_percentage": 20.0, "direction": "OVER", "line_vs_avg_pct": -22.0},
         ]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("Quantum Edge Gap", html)
@@ -328,8 +328,9 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
         self.assertIn("3", html)  # total picks
         self.assertIn("2", html)  # over count
         self.assertIn("1", html)  # under count
-        self.assertIn("18.2%", html)  # avg edge
-        self.assertIn("20.0%", html)  # max edge
+        self.assertIn("25.7%", html)  # avg dev: (25+30+22)/3
+        self.assertIn("30.0%", html)  # max dev
+        self.assertIn("Avg Edge", html)  # edge stat pill
 
     def test_banner_empty_picks(self):
         html = render_quantum_edge_gap_banner_html([])
@@ -339,8 +340,8 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
 
     def test_banner_all_over(self):
         picks = [
-            {"edge_percentage": 15.5, "direction": "OVER"},
-            {"edge_percentage": 17.0, "direction": "OVER"},
+            {"edge_percentage": 15.5, "direction": "OVER", "line_vs_avg_pct": -20.0},
+            {"edge_percentage": 17.0, "direction": "OVER", "line_vs_avg_pct": -30.0},
         ]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("qeg-stats-row", html)
@@ -348,10 +349,10 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
 
     def test_banner_all_under(self):
         picks = [
-            {"edge_percentage": -18.0, "direction": "UNDER"},
+            {"edge_percentage": -18.0, "direction": "UNDER", "line_vs_avg_pct": 35.0},
         ]
         html = render_quantum_edge_gap_banner_html(picks)
-        self.assertIn("18.0%", html)  # max and avg
+        self.assertIn("35.0%", html)  # max and avg dev
 
     def test_threshold_constant(self):
         """Ensure the exported threshold is 20.0."""
@@ -360,15 +361,15 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
     def test_boundary_at_threshold(self):
         """Picks exactly at the threshold boundary should render correctly."""
         picks = [
-            {"edge_percentage": 20.0, "direction": "OVER"},
-            {"edge_percentage": -20.0, "direction": "UNDER"},
+            {"edge_percentage": 20.0, "direction": "OVER", "line_vs_avg_pct": -20.0},
+            {"edge_percentage": -20.0, "direction": "UNDER", "line_vs_avg_pct": 20.0},
         ]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("2", html)  # both picks present
-        self.assertIn("20.0%", html)  # avg and max edge
+        self.assertIn("20.0%", html)  # avg and max dev
 
     def test_banner_header_structure(self):
-        picks = [{"edge_percentage": 22.0, "direction": "OVER"}]
+        picks = [{"edge_percentage": 22.0, "direction": "OVER", "line_vs_avg_pct": -25.0}]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("qam-edge-gap-banner-header", html)
         self.assertIn("BEYOND", html)  # threshold label in h3 span
@@ -719,83 +720,142 @@ class TestDeduplication(unittest.TestCase):
 
 
 class TestFilterQegPicks(unittest.TestCase):
-    """Verify QEG pick filtering by odds_type and edge threshold."""
+    """Verify QEG pick filtering by odds_type, line deviation, and edge %."""
 
-    def _pick(self, odds_type="standard", edge=25.0, **kw):
+    def _pick(self, odds_type="standard", line_dev=0.0, direction="OVER",
+              edge=5.0, **kw):
         base = {
             "player_name": "Test Player",
             "stat_type": "points",
             "line": 20.5,
             "edge_percentage": edge,
+            "line_vs_avg_pct": line_dev,
+            "direction": direction,
             "odds_type": odds_type,
         }
         base.update(kw)
         return base
 
-    def test_standard_included(self):
-        """Standard odds_type picks meeting the edge threshold pass."""
-        result = filter_qeg_picks([self._pick(odds_type="standard", edge=25.0)])
+    # ── Line deviation criterion ──────────────────────────────────────
+
+    def test_standard_over_below_avg_included(self):
+        """OVER pick with line 25% below avg passes via line deviation."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-25.0)])
         self.assertEqual(len(result), 1)
 
+    def test_standard_under_above_avg_included(self):
+        """UNDER pick with line 25% above avg passes via line deviation."""
+        result = filter_qeg_picks([self._pick(direction="UNDER", line_dev=25.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_over_above_avg_no_edge_excluded(self):
+        """OVER pick with line above avg and low edge is excluded."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=25.0, edge=5.0)])
+        self.assertEqual(len(result), 0)
+
+    def test_under_below_avg_no_edge_excluded(self):
+        """UNDER pick with line below avg and low edge is excluded."""
+        result = filter_qeg_picks([self._pick(direction="UNDER", line_dev=-25.0, edge=5.0)])
+        self.assertEqual(len(result), 0)
+
+    def test_exactly_at_threshold_included(self):
+        """OVER with line_vs_avg_pct exactly at -20 qualifies."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-20.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_under_exactly_at_threshold_included(self):
+        """UNDER with line_vs_avg_pct exactly at +20 qualifies."""
+        result = filter_qeg_picks([self._pick(direction="UNDER", line_dev=20.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_below_line_threshold_and_low_edge_excluded(self):
+        """Picks with line deviation below threshold and low edge excluded."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-15.0, edge=10.0)])
+        self.assertEqual(len(result), 0)
+
+    # ── Edge percentage criterion ─────────────────────────────────────
+
+    def test_high_edge_qualifies_even_without_line_dev(self):
+        """A pick with edge >= 20% qualifies even if line_dev is zero."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=0.0, edge=20.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_high_negative_edge_qualifies(self):
+        """A pick with edge_percentage = -22 (abs >= 20) qualifies."""
+        result = filter_qeg_picks([self._pick(direction="UNDER", line_dev=0.0, edge=-22.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_edge_below_threshold_and_no_line_dev_excluded(self):
+        """A pick with edge=15 and no qualifying line deviation excluded."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-5.0, edge=15.0)])
+        self.assertEqual(len(result), 0)
+
+    def test_over_wrong_direction_but_high_edge_qualifies(self):
+        """OVER pick with line above avg still qualifies via high edge."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=10.0, edge=25.0)])
+        self.assertEqual(len(result), 1)
+
+    # ── Odds type filtering ───────────────────────────────────────────
+
     def test_goblin_excluded(self):
-        """Goblin odds_type picks are excluded."""
-        result = filter_qeg_picks([self._pick(odds_type="goblin", edge=30.0)])
+        """Goblin odds_type picks are excluded regardless of edge/deviation."""
+        result = filter_qeg_picks([self._pick(odds_type="goblin", direction="OVER", line_dev=-30.0, edge=25.0)])
         self.assertEqual(len(result), 0)
 
     def test_demon_excluded(self):
-        """Demon odds_type picks are excluded."""
-        result = filter_qeg_picks([self._pick(odds_type="demon", edge=30.0)])
+        """Demon odds_type picks are excluded regardless of edge/deviation."""
+        result = filter_qeg_picks([self._pick(odds_type="demon", direction="UNDER", line_dev=30.0, edge=25.0)])
         self.assertEqual(len(result), 0)
 
     def test_missing_odds_type_defaults_to_standard(self):
         """Picks without odds_type default to 'standard' and pass."""
-        pick = self._pick(edge=25.0)
+        pick = self._pick(direction="OVER", line_dev=-25.0)
         del pick["odds_type"]
         result = filter_qeg_picks([pick])
         self.assertEqual(len(result), 1)
 
-    def test_below_edge_threshold_excluded(self):
-        """Picks below the edge threshold are excluded."""
-        result = filter_qeg_picks([self._pick(edge=15.0)])
-        self.assertEqual(len(result), 0)
-
-    def test_negative_edge_above_threshold_included(self):
-        """Negative edge with abs >= threshold is included (UNDER direction)."""
-        result = filter_qeg_picks([self._pick(edge=-25.0)])
+    def test_case_insensitive_odds_type(self):
+        """odds_type matching is case-insensitive."""
+        result = filter_qeg_picks([self._pick(odds_type="Standard", direction="OVER", line_dev=-25.0)])
         self.assertEqual(len(result), 1)
 
+    # ── Custom threshold / misc ───────────────────────────────────────
+
     def test_custom_threshold(self):
-        """Custom edge_threshold overrides the default."""
-        result = filter_qeg_picks([self._pick(edge=10.0)], edge_threshold=5.0)
+        """Custom edge_threshold overrides the default for both criteria."""
+        result = filter_qeg_picks(
+            [self._pick(direction="OVER", line_dev=-10.0, edge=8.0)],
+            edge_threshold=5.0,
+        )
         self.assertEqual(len(result), 1)
 
     def test_should_avoid_not_filtered(self):
-        """Picks with should_avoid=True are NOT filtered (extreme deviations shown)."""
-        result = filter_qeg_picks([self._pick(edge=30.0, should_avoid=True)])
+        """Picks with should_avoid=True are NOT filtered."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-30.0, should_avoid=True)])
         self.assertEqual(len(result), 1)
 
     def test_player_is_out_not_filtered(self):
         """Picks with player_is_out=True are NOT filtered out by QEG."""
-        result = filter_qeg_picks([self._pick(edge=30.0, player_is_out=True)])
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-30.0, player_is_out=True)])
         self.assertEqual(len(result), 1)
 
     def test_extreme_negative_deviation_shown(self):
-        """A prop with line value far below average (extreme -edge) is shown."""
-        result = filter_qeg_picks([self._pick(edge=-50.0)])
+        """OVER pick with line far below average is shown."""
+        result = filter_qeg_picks([self._pick(direction="OVER", line_dev=-50.0)])
         self.assertEqual(len(result), 1)
 
     def test_extreme_positive_deviation_shown(self):
-        """A prop with line value far above average (extreme +edge) is shown."""
-        result = filter_qeg_picks([self._pick(edge=60.0)])
+        """UNDER pick with line far above average is shown."""
+        result = filter_qeg_picks([self._pick(direction="UNDER", line_dev=60.0)])
         self.assertEqual(len(result), 1)
 
     def test_mixed_odds_types(self):
         """Only standard picks pass when mixed with goblin and demon."""
         picks = [
-            self._pick(odds_type="standard", edge=25.0),
-            self._pick(odds_type="goblin", edge=30.0),
-            self._pick(odds_type="demon", edge=35.0),
-            self._pick(odds_type="standard", edge=22.0),
+            self._pick(odds_type="standard", direction="OVER", line_dev=-25.0),
+            self._pick(odds_type="goblin", direction="OVER", line_dev=-30.0, edge=25.0),
+            self._pick(odds_type="demon", direction="UNDER", line_dev=35.0, edge=25.0),
+            self._pick(odds_type="standard", direction="UNDER", line_dev=22.0),
         ]
         result = filter_qeg_picks(picks)
         self.assertEqual(len(result), 2)
@@ -806,14 +866,9 @@ class TestFilterQegPicks(unittest.TestCase):
         """Empty input returns empty output."""
         self.assertEqual(filter_qeg_picks([]), [])
 
-    def test_case_insensitive_odds_type(self):
-        """odds_type matching is case-insensitive."""
-        result = filter_qeg_picks([self._pick(odds_type="Standard", edge=25.0)])
-        self.assertEqual(len(result), 1)
-
     def test_bet_type_field_ignored(self):
         """bet_type field is NOT used for filtering; only odds_type matters."""
-        pick = self._pick(odds_type="standard", edge=25.0)
+        pick = self._pick(odds_type="standard", direction="OVER", line_dev=-25.0)
         pick["bet_type"] = "some_other_type"
         result = filter_qeg_picks([pick])
         self.assertEqual(len(result), 1)
