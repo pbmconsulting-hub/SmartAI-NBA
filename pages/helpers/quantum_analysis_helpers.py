@@ -7,6 +7,7 @@
 import html as _html
 import re as _re
 
+from data.platform_mappings import display_stat_name as _display_stat_name
 from styles.theme import get_education_box_html, get_team_colors
 
 # ESPN CDN base for team logos (same as game_report_helpers)
@@ -372,9 +373,31 @@ _GAUGE_CIRCUMFERENCE = 157
 
 
 _STAT_AVG_KEYS = {
+    # Core stats
     "points": "season_pts_avg",
     "rebounds": "season_reb_avg",
     "assists": "season_ast_avg",
+    "threes": "season_threes_avg",
+    "steals": "season_stl_avg",
+    "blocks": "season_blk_avg",
+    "turnovers": "season_tov_avg",
+    "minutes": "season_minutes_avg",
+    # Shooting stats
+    "ftm": "season_ftm_avg",
+    "fga": "season_fga_avg",
+    "fgm": "season_fgm_avg",
+    "fta": "season_fta_avg",
+    # Rebound splits
+    "offensive_rebounds": "season_oreb_avg",
+    "defensive_rebounds": "season_dreb_avg",
+    # Other
+    "personal_fouls": "season_pf_avg",
+    # Combo stats (summed from components)
+    "points_rebounds": "season_pts_reb_avg",
+    "points_assists": "season_pts_ast_avg",
+    "rebounds_assists": "season_reb_ast_avg",
+    "points_rebounds_assists": "season_pra_avg",
+    "blocks_steals": "season_blk_stl_avg",
 }
 
 
@@ -506,7 +529,7 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     )
 
     # Stat type display label
-    stat_display = stat_type.replace("_", " ").title()
+    stat_display = _display_stat_name(stat_type)
 
     # Tier emoji
     tier_emoji_map = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
