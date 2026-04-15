@@ -1,0 +1,13 @@
+{
+    # Caddy enables HTTPS automatically when using a domain name.
+    # For local/dev usage with :80, set auto_https off temporarily.
+}
+
+:443, :80 {
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+    handle {
+        reverse_proxy app:8501
+    }
+}
