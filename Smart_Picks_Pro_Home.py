@@ -889,8 +889,11 @@ try:
     from utils.auth import is_premium_user as _is_premium, handle_checkout_redirect as _handle_checkout
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
     # Handle checkout redirects even on the home page
-    _handle_checkout()
+    _checkout_ok = _handle_checkout()
     _user_is_premium = _is_premium()
+    if _checkout_ok:
+        st.success("✅ Payment confirmed! Your premium subscription is now active.")
+        st.balloons()
 except Exception:
     _user_is_premium = True  # Fail open — don't block the home page
     _PREM_PATH = "/15_%F0%9F%92%8E_Subscription_Level"

@@ -137,8 +137,10 @@ def create_checkout_session(customer_email: str = "", price_lookup: str = "") ->
         # Build success and cancel URLs
         # success_url includes {CHECKOUT_SESSION_ID} which Stripe replaces
         # with the actual session ID after payment — so we can verify it.
-        success_url = f"{APP_URL}{_PREMIUM_PAGE_PATH}?session_id={{CHECKOUT_SESSION_ID}}"
-        cancel_url  = f"{APP_URL}{_PREMIUM_PAGE_PATH}?cancelled=true"
+        # Redirect to app root — Streamlit doesn't route URL-encoded page
+        # paths, and the home page already runs handle_checkout_redirect().
+        success_url = f"{APP_URL}/?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url  = f"{APP_URL}/"
 
         # Build session parameters
         session_params = {
@@ -524,7 +526,7 @@ def create_customer_portal_session(customer_id: str) -> dict:
         }
 
     try:
-        return_url = f"{APP_URL}{_PREMIUM_PAGE_PATH}"
+        return_url = f"{APP_URL}/"
         portal_session = _stripe.billing_portal.Session.create(
             customer=customer_id,
             return_url=return_url,
