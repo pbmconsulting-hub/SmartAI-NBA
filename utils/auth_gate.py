@@ -1919,177 +1919,6 @@ html, body, .stApp, .stApp * {
     font-weight: 600;
 }
 
-/* ── Bet Tracker mockup ───────────────────────────────────────── */
-.ag-tracker {
-    margin: 32px 0 0;
-    animation: agFadeUp 0.6s 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.ag-tracker-badge {
-    display: block; width: fit-content; margin: 0 auto 10px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.52rem; font-weight: 800;
-    color: #2D9EFF; background: rgba(45, 158, 255, 0.06);
-    border: 1px solid rgba(45, 158, 255, 0.12);
-    padding: 3px 10px; border-radius: 100px;
-    text-transform: uppercase; letter-spacing: 0.06em;
-}
-.ag-tracker-why {
-    background: rgba(45, 158, 255, 0.03);
-    border: 1px solid rgba(45, 158, 255, 0.08);
-    border-radius: 14px; padding: 16px 18px;
-    margin-bottom: 12px;
-}
-.ag-tracker-why-head {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.78rem; font-weight: 800;
-    color: rgba(255, 255, 255, 0.7);
-    margin: 0 0 8px;
-}
-.ag-tracker-why-list {
-    list-style: none; padding: 0; margin: 0;
-}
-.ag-tracker-why-item {
-    display: flex; align-items: flex-start; gap: 8px;
-    padding: 5px 0;
-    font-size: 0.66rem; color: rgba(255, 255, 255, 0.4);
-    line-height: 1.5;
-}
-.ag-tracker-why-ico {
-    flex-shrink: 0; font-size: 0.72rem; margin-top: 1px;
-}
-.ag-tracker-why-item strong { color: rgba(255, 255, 255, 0.65); }
-
-/* Bet Tracker mockup frame */
-.ag-bt-frame {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px; overflow: hidden;
-}
-.ag-bt-topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.03);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.ag-bt-topbar-title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.72rem; font-weight: 700;
-    color: rgba(255, 255, 255, 0.65);
-}
-.ag-bt-topbar-period {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.48rem; font-weight: 600;
-    color: rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.04);
-    padding: 2px 8px; border-radius: 100px;
-}
-
-/* Summary row */
-.ag-bt-summary {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.ag-bt-sum-item {
-    text-align: center; padding: 12px 6px;
-    border-right: 1px solid rgba(255, 255, 255, 0.03);
-}
-.ag-bt-sum-item:last-child { border-right: none; }
-.ag-bt-sum-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.92rem; font-weight: 800;
-    line-height: 1.1;
-}
-.ag-bt-sum-val.gr { color: #00D559; }
-.ag-bt-sum-val.bl { color: #2D9EFF; }
-.ag-bt-sum-val.gd { color: #F9C62B; }
-.ag-bt-sum-val.wh { color: rgba(255, 255, 255, 0.7); }
-.ag-bt-sum-lbl {
-    font-size: 0.46rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em;
-    color: rgba(255, 255, 255, 0.18);
-    margin-top: 2px;
-}
-
-/* Bet rows */
-.ag-bt-body { padding: 4px 0; }
-.ag-bt-row {
-    display: grid;
-    grid-template-columns: 2.5fr 1.2fr 0.8fr 0.8fr 0.6fr;
-    align-items: center; gap: 4px;
-    padding: 7px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-    transition: background 0.15s;
-}
-.ag-bt-row:hover { background: rgba(255, 255, 255, 0.015); }
-.ag-bt-row:last-child { border-bottom: none; }
-.ag-bt-hdr {
-    font-size: 0.42rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.15);
-    padding: 5px 12px;
-}
-.ag-bt-player {
-    font-size: 0.6rem; font-weight: 600;
-    color: rgba(255, 255, 255, 0.5);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ag-bt-prop {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.52rem; font-weight: 600;
-}
-.ag-bt-prop.ov { color: #00D559; }
-.ag-bt-prop.un { color: #2D9EFF; }
-.ag-bt-actual {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.55rem; font-weight: 700;
-    text-align: center;
-}
-.ag-bt-actual.hit { color: #00D559; }
-.ag-bt-actual.miss { color: rgba(242, 67, 54, 0.5); }
-.ag-bt-clv {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.5rem; font-weight: 700;
-    text-align: center;
-}
-.ag-bt-clv.pos { color: #F9C62B; }
-.ag-bt-clv.neg { color: rgba(255, 255, 255, 0.15); }
-.ag-bt-result-icon { text-align: center; font-size: 0.6rem; }
-.ag-bt-result-icon.w { color: #00D559; }
-.ag-bt-result-icon.l { color: rgba(242, 67, 54, 0.4); }
-
-/* Bankroll mini-chart */
-.ag-bt-bankroll {
-    padding: 10px 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
-}
-.ag-bt-bankroll-head {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 6px;
-}
-.ag-bt-bankroll-lbl {
-    font-size: 0.5rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em;
-    color: rgba(255, 255, 255, 0.2);
-}
-.ag-bt-bankroll-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem; font-weight: 800; color: #00D559;
-}
-.ag-bt-growth {
-    height: 28px; display: flex; align-items: flex-end;
-    gap: 2px; width: 100%;
-}
-.ag-bt-growth-bar {
-    flex: 1; border-radius: 2px 2px 0 0;
-    background: linear-gradient(180deg, rgba(0, 213, 89, 0.5), rgba(0, 213, 89, 0.15));
-}
-
-.ag-tracker-label {
-    text-align: center; margin-top: 10px;
-    font-size: 0.58rem; font-style: italic;
-    color: rgba(255, 255, 255, 0.18);
-}
-
 /* ── FAQ accordion ───────────────────────────────────────────── */
 .ag-faq {
     margin: 28px 0 0;
@@ -2752,80 +2581,548 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.7)}
 .em{color:#00D559}
-.sh{text-align:center;margin-bottom:18px;position:relative}
-.sh::before{content:'';display:block;width:40px;height:3px;margin:0 auto 14px;background:linear-gradient(90deg,#2D9EFF,#c084fc);border-radius:4px}
-.sh h3{font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;color:#fff;margin-bottom:8px;letter-spacing:-0.04em;text-transform:uppercase}
-.sh p{font-size:0.85rem;color:rgba(255,255,255,0.4);line-height:1.6}
-.bdg{display:block;width:fit-content;margin:0 auto 12px;font-family:'JetBrains Mono',monospace;font-size:.52rem;font-weight:800;color:#2D9EFF;background:rgba(45,158,255,0.06);border:1px solid rgba(45,158,255,0.12);padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em}
-.tw{background:linear-gradient(168deg,rgba(45,158,255,0.04),rgba(45,158,255,0.01));border:1px solid rgba(45,158,255,0.1);border-radius:20px;padding:22px 24px;margin-bottom:16px}
-.tw-h{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:800;color:rgba(255,255,255,0.8);margin:0 0 12px}
-.tw-l{list-style:none;padding:0;margin:0}
-.tw-i{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:.66rem;color:rgba(255,255,255,0.4);line-height:1.5}
-.tw-ic{flex-shrink:0;font-size:.72rem;margin-top:1px}
-.tw-i strong{color:rgba(255,255,255,0.65)}
-.bf{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden}
-.bt{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.04)}
-.bt-t{font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:700;color:rgba(255,255,255,0.65)}
-.bt-p{font-family:'JetBrains Mono',monospace;font-size:.48rem;font-weight:600;color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.04);padding:2px 8px;border-radius:100px}
-.sm{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid rgba(255,255,255,0.04)}
-.si{text-align:center;padding:12px 6px;border-right:1px solid rgba(255,255,255,0.03)}
-.si:last-child{border-right:none}
-.sv{font-family:'JetBrains Mono',monospace;font-size:.92rem;font-weight:800;line-height:1.1}
-.sv.gr{color:#00D559}.sv.bl{color:#2D9EFF}.sv.gd{color:#F9C62B}.sv.wh{color:rgba(255,255,255,0.7)}
-.sl{font-size:.46rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,0.18);margin-top:2px}
-.bd{padding:4px 0}
-.br{display:grid;grid-template-columns:2.5fr 1.2fr .8fr .8fr .6fr;align-items:center;gap:4px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.02);transition:background .15s}
-.br:hover{background:rgba(255,255,255,0.015)}.br:last-child{border-bottom:none}
-.bh{font-size:.42rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,0.15);padding:5px 12px}
-.bp{font-size:.6rem;font-weight:600;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bl2{font-family:'JetBrains Mono',monospace;font-size:.52rem;font-weight:600}
-.bl2.ov{color:#00D559}.bl2.un{color:#2D9EFF}
-.ba{font-family:'JetBrains Mono',monospace;font-size:.55rem;font-weight:700;text-align:center}
-.ba.hit{color:#00D559}.ba.miss{color:rgba(242,67,54,0.5)}
-.bc{font-family:'JetBrains Mono',monospace;font-size:.5rem;font-weight:700;text-align:center}
-.bc.pos{color:#F9C62B}.bc.neg{color:rgba(255,255,255,0.15)}
-.bi{text-align:center;font-size:.6rem}.bi.w{color:#00D559}.bi.l{color:rgba(242,67,54,0.4)}
-.bk{padding:10px 14px;border-top:1px solid rgba(255,255,255,0.04)}
-.bk-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.bk-l{font-size:.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,0.2)}
-.bk-v{font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:800;color:#00D559}
-.bg{height:28px;display:flex;align-items:flex-end;gap:2px;width:100%}
-.bg-b{flex:1;border-radius:2px 2px 0 0;background:linear-gradient(180deg,rgba(0,213,89,0.5),rgba(0,213,89,0.15))}
-.tl{text-align:center;margin-top:10px;font-size:.58rem;font-style:italic;color:rgba(255,255,255,0.18)}
+@keyframes btPulse{0%,100%{box-shadow:0 0 4px rgba(249,198,43,0.05)}50%{box-shadow:0 0 16px rgba(249,198,43,0.2)}}
+@keyframes btGlow{0%,100%{opacity:0.5}50%{opacity:1}}
+
+/* Section heading */
+.sh{text-align:center;margin-bottom:28px;position:relative}
+.sh::before{content:'';display:block;width:50px;height:3px;margin:0 auto 16px;background:linear-gradient(90deg,#2D9EFF,#c084fc);border-radius:4px}
+.sh h3{font-family:'Space Grotesk',sans-serif;font-size:2.4rem;font-weight:800;color:#fff;margin-bottom:10px;letter-spacing:-0.04em;text-transform:uppercase;line-height:1.1}
+.sh p{font-size:0.88rem;color:rgba(255,255,255,0.4);line-height:1.6}
+
+/* MOCK DATA banner — pulsing */
+.mock-banner{background:linear-gradient(135deg,rgba(249,198,43,0.14),rgba(249,198,43,0.04));border:2px dashed rgba(249,198,43,0.4);border-radius:16px;padding:16px 22px;text-align:center;margin-bottom:22px;position:relative;animation:btPulse 3s ease-in-out infinite}
+.mock-banner-pill{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.62rem;font-weight:800;color:#F9C62B;background:rgba(249,198,43,0.12);border:1px solid rgba(249,198,43,0.25);padding:4px 14px;border-radius:100px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.mock-banner-text{font-size:.76rem;color:rgba(255,255,255,0.45);line-height:1.6}
+.mock-banner-text strong{color:rgba(255,255,255,0.75)}
+
+/* App frame */
+.bt-app{background:linear-gradient(168deg,rgba(255,255,255,0.035),rgba(255,255,255,0.008));border:1px solid rgba(255,255,255,0.1);border-radius:24px;overflow:hidden;box-shadow:0 24px 72px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.03) inset}
+
+/* Title bar */
+.bt-title-bar{display:flex;align-items:center;gap:12px;padding:16px 22px;background:rgba(255,255,255,0.035);border-bottom:1px solid rgba(255,255,255,0.06)}
+.bt-title-ico{font-size:1.2rem}
+.bt-title-txt{font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:800;color:rgba(255,255,255,0.85)}
+.bt-title-sub{font-size:.62rem;color:rgba(255,255,255,0.25);margin-left:auto;font-style:italic}
+.bt-title-sub .live{color:#00D559;animation:btGlow 2s ease-in-out infinite}
+
+/* Tab bar */
+.bt-tabs{display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,0.04);overflow-x:auto;scrollbar-width:none}
+.bt-tabs::-webkit-scrollbar{display:none}
+.bt-tab{padding:11px 15px;font-family:'Space Grotesk',sans-serif;font-size:.62rem;font-weight:700;color:rgba(255,255,255,0.25);white-space:nowrap;cursor:default;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;position:relative;top:2px}
+.bt-tab.active{color:#00D559;border-bottom:2px solid #00D559}
+.bt-tab:hover{color:rgba(255,255,255,0.45)}
+
+/* Filter bar */
+.bt-filters{display:flex;gap:8px;padding:12px 18px;background:rgba(255,255,255,0.015);border-bottom:1px solid rgba(255,255,255,0.03);flex-wrap:wrap;align-items:center}
+.bt-filter{display:flex;align-items:center;gap:5px;font-size:.54rem;color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:6px 12px;transition:border-color .2s}
+.bt-filter:hover{border-color:rgba(255,255,255,0.12)}
+.bt-filter-label{font-weight:700;color:rgba(255,255,255,0.4)}
+.bt-filter-val{font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.2)}
+.bt-resolve-btn{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:.54rem;font-weight:700;color:#00D559;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.2);border-radius:10px;padding:6px 14px;cursor:default;transition:background .2s}
+.bt-resolve-btn:hover{background:rgba(0,213,89,0.12)}
+
+/* Summary cards — 8-col */
+.bt-summary{display:grid;grid-template-columns:repeat(8,1fr);gap:0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.bt-sum{text-align:center;padding:18px 4px;border-right:1px solid rgba(255,255,255,0.03);position:relative}
+.bt-sum:last-child{border-right:none}
+.bt-sum-val{font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:800;line-height:1.1}
+.bt-sum-val.gr{color:#00D559}.bt-sum-val.rd{color:#f24336}.bt-sum-val.bl{color:#2D9EFF}.bt-sum-val.gd{color:#F9C62B}.bt-sum-val.wh{color:rgba(255,255,255,0.7)}.bt-sum-val.pk{color:#c084fc}
+.bt-sum-lbl{font-size:.46rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,0.18);margin-top:4px}
+
+/* Filter chips row */
+.bt-chips{display:flex;gap:6px;padding:10px 18px;flex-wrap:wrap}
+.bt-chip{font-family:'JetBrains Mono',monospace;font-size:.48rem;font-weight:700;padding:4px 12px;border-radius:100px;border:1px solid;cursor:default;transition:transform .15s}
+.bt-chip:hover{transform:scale(1.05)}
+.bt-chip.all{color:rgba(255,255,255,0.5);border-color:rgba(255,255,255,0.15);background:rgba(255,255,255,0.04)}
+.bt-chip.wins{color:#00D559;border-color:rgba(0,213,89,0.2);background:rgba(0,213,89,0.05)}
+.bt-chip.losses{color:#f24336;border-color:rgba(242,67,54,0.2);background:rgba(242,67,54,0.05)}
+.bt-chip.pending{color:#F9C62B;border-color:rgba(249,198,43,0.2);background:rgba(249,198,43,0.05)}
+.bt-chip.plat{color:#c084fc;border-color:rgba(192,132,252,0.2);background:rgba(192,132,252,0.05)}
+.bt-chip.gold2{color:#F9C62B;border-color:rgba(249,198,43,0.2);background:rgba(249,198,43,0.05)}
+
+/* Tier breakdown */
+.bt-tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.bt-tier{text-align:center;padding:14px 6px;border-right:1px solid rgba(255,255,255,0.03)}
+.bt-tier:last-child{border-right:none}
+.bt-tier-name{font-family:'Space Grotesk',sans-serif;font-size:.54rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.bt-tier-name.pt{color:#c084fc}.bt-tier-name.gld{color:#F9C62B}.bt-tier-name.slv{color:#A0AABE}.bt-tier-name.brz{color:#CD7F32}
+.bt-tier-wr{font-family:'JetBrains Mono',monospace;font-size:.88rem;font-weight:800}
+.bt-tier-wr.pt{color:#c084fc}.bt-tier-wr.gld{color:#F9C62B}.bt-tier-wr.slv{color:#A0AABE}.bt-tier-wr.brz{color:#CD7F32}
+.bt-tier-detail{font-size:.44rem;color:rgba(255,255,255,0.15);margin-top:2px}
+/* Tier bar visualization */
+.bt-tier-bar{width:80%;height:6px;margin:6px auto 0;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden}
+.bt-tier-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.bt-tier-bar-fill.pt{background:linear-gradient(90deg,#c084fc,#e0b0ff)}.bt-tier-bar-fill.gld{background:linear-gradient(90deg,#F9C62B,#ffe066)}.bt-tier-bar-fill.slv{background:linear-gradient(90deg,#A0AABE,#c8cdd5)}.bt-tier-bar-fill.brz{background:linear-gradient(90deg,#CD7F32,#e8a860)}
+
+/* Model health section */
+.bt-health{padding:16px 18px;border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(45,158,255,0.015)}
+.bt-health-hdr{font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:800;color:rgba(255,255,255,0.55);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.bt-health-hdr .badge{font-family:'JetBrains Mono',monospace;font-size:.42rem;font-weight:700;color:#00D559;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);padding:2px 8px;border-radius:100px}
+/* Stat type grid */
+.bt-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.bt-stat-item{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:12px 10px;text-align:center}
+.bt-stat-item-name{font-family:'Space Grotesk',sans-serif;font-size:.52rem;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.bt-stat-item-wr{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:800}
+.bt-stat-item-wr.gr{color:#00D559}.bt-stat-item-wr.gd{color:#F9C62B}.bt-stat-item-wr.bl{color:#2D9EFF}
+.bt-stat-item-detail{font-size:.4rem;color:rgba(255,255,255,0.15);margin-top:2px}
+/* Platform breakdown */
+.bt-plat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.bt-plat-item{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:12px 10px;text-align:center}
+.bt-plat-item-name{font-family:'JetBrains Mono',monospace;font-size:.48rem;font-weight:700;padding:2px 8px;border-radius:6px;display:inline-block;margin-bottom:4px}
+.bt-plat-item-name.pp{color:#00D559;background:rgba(0,213,89,0.08)}
+.bt-plat-item-name.ud{color:#c084fc;background:rgba(192,132,252,0.08)}
+.bt-plat-item-name.dk{color:#2D9EFF;background:rgba(45,158,255,0.08)}
+.bt-plat-item-wr{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:800;color:#00D559}
+.bt-plat-item-detail{font-size:.4rem;color:rgba(255,255,255,0.15);margin-top:2px}
+
+/* Calendar heatmap */
+.bt-cal{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.bt-cal-hdr{font-family:'Space Grotesk',sans-serif;font-size:.62rem;font-weight:800;color:rgba(255,255,255,0.45);margin-bottom:10px}
+.bt-cal-grid{display:grid;grid-template-columns:repeat(14,1fr);gap:4px}
+.bt-cal-day{width:100%;aspect-ratio:1;border-radius:4px;position:relative}
+.bt-cal-day.green1{background:rgba(0,213,89,0.15)}.bt-cal-day.green2{background:rgba(0,213,89,0.3)}.bt-cal-day.green3{background:rgba(0,213,89,0.5)}.bt-cal-day.green4{background:rgba(0,213,89,0.7)}
+.bt-cal-day.red1{background:rgba(242,67,54,0.15)}.bt-cal-day.red2{background:rgba(242,67,54,0.35)}
+.bt-cal-day.empty{background:rgba(255,255,255,0.02)}
+.bt-cal-day.today{outline:2px solid #F9C62B;outline-offset:1px}
+.bt-cal-legend{display:flex;gap:6px;align-items:center;margin-top:8px;justify-content:center}
+.bt-cal-legend-item{font-size:.38rem;color:rgba(255,255,255,0.2);display:flex;align-items:center;gap:3px}
+.bt-cal-legend-swatch{width:10px;height:10px;border-radius:2px}
+
+/* SVG P&L chart */
+.bt-pnl{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.bt-pnl-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.bt-pnl-lbl{font-family:'Space Grotesk',sans-serif;font-size:.62rem;font-weight:800;color:rgba(255,255,255,0.45)}
+.bt-pnl-val{font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:800;color:#00D559}
+.bt-pnl svg{width:100%;height:60px;display:block}
+
+/* Date group header */
+.bt-date-hdr{display:flex;align-items:center;gap:8px;padding:10px 18px;background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.03)}
+.bt-date-label{font-family:'Space Grotesk',sans-serif;font-size:.66rem;font-weight:700;color:rgba(255,255,255,0.5)}
+.bt-date-stats{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:rgba(255,255,255,0.2);margin-left:auto}
+.bt-date-stats .w{color:#00D559}.bt-date-stats .l{color:#f24336}.bt-date-stats .p{color:#F9C62B}
+
+/* Bet cards */
+.bt-cards{padding:6px 14px}
+.bt-card{display:grid;grid-template-columns:auto 1fr auto auto auto auto;align-items:center;gap:10px;padding:11px 16px;margin:5px 0;border-radius:14px;border-left:3px solid;background:linear-gradient(135deg,rgba(255,255,255,0.028),rgba(255,255,255,0.008));transition:background .15s,transform .15s}
+.bt-card:hover{background:rgba(255,255,255,0.035);transform:translateX(3px)}
+.bt-card.win{border-color:#00D559;box-shadow:0 0 14px rgba(0,213,89,0.06)}
+.bt-card.loss{border-color:#f24336;box-shadow:0 0 14px rgba(242,67,54,0.06)}
+.bt-card.pend{border-color:#F9C62B;animation:btPulse 2.8s ease-in-out infinite}
+
+/* Card elements */
+.bt-card-tier{font-size:.75rem;width:26px;text-align:center}
+.bt-card-info{display:flex;flex-direction:column;gap:3px;min-width:0}
+.bt-card-player{font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:700;color:rgba(255,255,255,0.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-card-meta{display:flex;gap:6px;align-items:center}
+.bt-card-platform{font-family:'JetBrains Mono',monospace;font-size:.44rem;font-weight:700;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
+.bt-card-platform.pp{color:#00D559;background:rgba(0,213,89,0.08)}
+.bt-card-platform.ud{color:#c084fc;background:rgba(192,132,252,0.08)}
+.bt-card-platform.dk{color:#2D9EFF;background:rgba(45,158,255,0.08)}
+.bt-card-safe{font-family:'JetBrains Mono',monospace;font-size:.44rem;font-weight:700;color:rgba(255,255,255,0.2)}
+.bt-card-safe .sc{color:#00D559}
+
+.bt-card-line{font-family:'JetBrains Mono',monospace;font-size:.64rem;font-weight:700;text-align:center;min-width:54px}
+.bt-card-line.ov{color:#00D559}.bt-card-line.un{color:#2D9EFF}
+
+.bt-card-actual{font-family:'JetBrains Mono',monospace;font-size:.66rem;font-weight:800;text-align:center;min-width:34px}
+.bt-card-actual.hit{color:#00D559}.bt-card-actual.miss{color:rgba(242,67,54,0.6)}.bt-card-actual.tbd{color:rgba(255,255,255,0.15)}
+
+.bt-card-clv{font-family:'JetBrains Mono',monospace;font-size:.5rem;font-weight:700;text-align:center;min-width:42px}
+.bt-card-clv.pos{color:#F9C62B}.bt-card-clv.neg{color:rgba(255,255,255,0.12)}
+
+.bt-card-result{font-size:.78rem;text-align:center;min-width:22px}
+.bt-card-result.w{color:#00D559}.bt-card-result.l{color:rgba(242,67,54,0.5)}.bt-card-result.pending{color:#F9C62B}
+
+/* Bankroll section */
+.bt-bankroll{padding:16px 18px;border-top:1px solid rgba(255,255,255,0.04);background:rgba(0,213,89,0.015)}
+.bt-bankroll-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.bt-bankroll-lbl{font-family:'Space Grotesk',sans-serif;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,0.25)}
+.bt-bankroll-val{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:800;color:#00D559}
+.bt-bankroll-sub{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:rgba(255,255,255,0.15);margin-left:8px}
+.bt-growth{height:42px;display:flex;align-items:flex-end;gap:2px;width:100%}
+.bt-growth-bar{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,rgba(0,213,89,0.55),rgba(0,213,89,0.12));transition:height .3s}
+.bt-growth-bar.red{background:linear-gradient(180deg,rgba(242,67,54,0.45),rgba(242,67,54,0.1))}
+
+/* Pagination */
+.bt-pag{display:flex;align-items:center;justify-content:center;gap:4px;padding:12px 0;border-top:1px solid rgba(255,255,255,0.03)}
+.bt-pag-btn{font-family:'JetBrains Mono',monospace;font-size:.5rem;font-weight:700;color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:4px 10px;cursor:default;transition:background .15s}
+.bt-pag-btn.active{color:#00D559;border-color:rgba(0,213,89,0.2);background:rgba(0,213,89,0.06)}
+.bt-pag-info{font-size:.46rem;color:rgba(255,255,255,0.15);margin:0 8px}
+
+/* How it works */
+.bt-how{background:linear-gradient(168deg,rgba(45,158,255,0.05),rgba(45,158,255,0.01));border:1px solid rgba(45,158,255,0.12);border-radius:18px;padding:22px 24px;margin-top:20px}
+.bt-how-hdr{font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:800;color:rgba(255,255,255,0.8);margin:0 0 12px}
+.bt-how-list{list-style:none;padding:0;margin:0}
+.bt-how-item{display:flex;align-items:flex-start;gap:10px;padding:7px 0;font-size:.68rem;color:rgba(255,255,255,0.4);line-height:1.55}
+.bt-how-ico{flex-shrink:0;font-size:.78rem;margin-top:1px}
+.bt-how-item strong{color:rgba(255,255,255,0.65)}
+
+/* Footer note */
+.bt-footer{text-align:center;margin-top:16px;font-size:.58rem;font-style:italic;color:rgba(255,255,255,0.18);padding:8px 0}
+
+/* Responsive */
+@media(max-width:768px){
+.bt-summary{grid-template-columns:repeat(4,1fr)}
+.bt-tiers{grid-template-columns:repeat(2,1fr)}
+.bt-card{grid-template-columns:auto 1fr auto auto;gap:6px;padding:8px 10px}
+.bt-card-clv,.bt-card-safe{display:none}
+.bt-tabs{gap:0}.bt-tab{padding:8px 10px;font-size:.52rem}
+.bt-stat-grid,.bt-plat-grid{grid-template-columns:repeat(2,1fr)}
+.bt-cal-grid{grid-template-columns:repeat(7,1fr)}
+.bt-health{padding:12px 14px}
+}
+@media(max-width:520px){
+.bt-summary{grid-template-columns:repeat(2,1fr)}
+.bt-card{grid-template-columns:auto 1fr auto;gap:4px}
+.bt-card-actual{display:none}
+.bt-filters{flex-direction:column;gap:4px}
+.sh h3{font-size:1.6rem}
+.bt-stat-grid,.bt-plat-grid{grid-template-columns:1fr 1fr}
+.bt-cal-grid{grid-template-columns:repeat(7,1fr)}
+}
 </style>
-<div class="sh"><h3>We Don&rsquo;t Hide Results. <span class="em">We Track Every Pick.</span></h3><p>Full transparency &mdash; every AI pick is logged, graded, and visible in your Bet Tracker</p></div>
-<div class="bdg">&#x1F4C8; BUILT-IN BET TRACKER &mdash; SHARP IQ+</div>
-<div class="tw"><div class="tw-h">How the Bet Tracker Works</div><ul class="tw-l">
-<li class="tw-i"><span class="tw-ic">&#x1F4DD;</span><span><strong>Log every bet</strong> &mdash; record your picks with one click from the QAM or Entry Builder. Platform, stake, odds, and SAFE Score saved automatically.</span></li>
-<li class="tw-i"><span class="tw-ic">&#x1F4CA;</span><span><strong>Auto-grade results</strong> &mdash; the system checks final box scores and marks every prop as HIT or MISS. No manual entry needed.</span></li>
-<li class="tw-i"><span class="tw-ic">&#x1F4B0;</span><span><strong>Track your bankroll</strong> &mdash; see ROI, win rate, CLV capture, profit/loss, and bankroll growth over time with real charts.</span></li>
-<li class="tw-i"><span class="tw-ic">&#x1F50D;</span><span><strong>Find what works</strong> &mdash; filter by platform, stat type, SAFE Score range, or time period to see which strategies actually make money.</span></li>
-<li class="tw-i"><span class="tw-ic">&#x1F6E1;&#xFE0F;</span><span><strong>No fake screenshots</strong> &mdash; unlike tout services, your Bet Tracker is YOUR data. Every win and loss, verifiable and auditable.</span></li>
-</ul></div>
-<div class="bf">
-<div class="bt"><div class="bt-t">&#x1F4C8; Bet Tracker &mdash; Your Performance</div><div class="bt-p">Last 30 Days</div></div>
-<div class="sm">
-<div class="si"><div class="sv gr">62.4%</div><div class="sl">Win Rate</div></div>
-<div class="si"><div class="sv gd">+$847</div><div class="sl">Net Profit</div></div>
-<div class="si"><div class="sv bl">+18.3%</div><div class="sl">ROI</div></div>
-<div class="si"><div class="sv wh">92%</div><div class="sl">CLV Capture</div></div>
+
+<!-- ── HEADING ── -->
+<div class="sh"><h3>We Don&rsquo;t Hide Results. <span class="em">We Track Every Pick.</span></h3><p>Full transparency &mdash; every AI pick is logged, graded, and visible in your Bet Tracker. This is what the real page looks like.</p></div>
+
+<!-- ── MOCK DATA BANNER ── -->
+<div class="mock-banner">
+<div class="mock-banner-pill">&#x26A0;&#xFE0F; Demo Preview &mdash; Sample Data Below</div>
+<div class="mock-banner-text">Everything below is a <strong>live preview</strong> of the real Bet Tracker using <strong>mock data</strong>. When you sign up, this becomes <strong>your personal dashboard</strong> &mdash; with real picks, real results, real bankroll tracking, and real-time auto-grading.</div>
 </div>
-<div class="bd">
-<div class="br bh"><div>Player / Prop</div><div>Line</div><div style="text-align:center">Actual</div><div style="text-align:center">CLV</div><div style="text-align:center"></div></div>
-<div class="br"><div class="bp">&#x1F525; Luka Donci&#x107; PTS</div><div class="bl2 ov">O 28.5</div><div class="ba hit">34</div><div class="bc pos">+3.2%</div><div class="bi w">&#x2713;</div></div>
-<div class="br"><div class="bp">&#x1F3AF; Jayson Tatum REB</div><div class="bl2 ov">O 8.5</div><div class="ba hit">11</div><div class="bc pos">+2.1%</div><div class="bi w">&#x2713;</div></div>
-<div class="br"><div class="bp">&#x26A1; Ant Edwards PTS</div><div class="bl2 un">U 26.5</div><div class="ba hit">21</div><div class="bc pos">+4.7%</div><div class="bi w">&#x2713;</div></div>
-<div class="br"><div class="bp">&#x1F9E0; Nikola Joki&#x107; AST</div><div class="bl2 ov">O 9.5</div><div class="ba miss">8</div><div class="bc neg">&minus;1.4%</div><div class="bi l">&#x2717;</div></div>
-<div class="br"><div class="bp">&#x1F4CA; Tyrese Maxey AST</div><div class="bl2 ov">O 5.5</div><div class="ba hit">7</div><div class="bc pos">+1.8%</div><div class="bi w">&#x2713;</div></div>
-<div class="br"><div class="bp">&#x1F525; SGA PTS</div><div class="bl2 ov">O 30.5</div><div class="ba hit">36</div><div class="bc pos">+5.3%</div><div class="bi w">&#x2713;</div></div>
-<div class="br"><div class="bp">&#x1F451; LeBron James PTS</div><div class="bl2 ov">O 25.5</div><div class="ba hit">31</div><div class="bc pos">+3.1%</div><div class="bi w">&#x2713;</div></div>
-<div class="br"><div class="bp">&#x26A1; Steph Curry 3PM</div><div class="bl2 ov">O 4.5</div><div class="ba miss">3</div><div class="bc neg">&minus;0.8%</div><div class="bi l">&#x2717;</div></div>
+
+<!-- ── APP FRAME ── -->
+<div class="bt-app">
+
+<!-- Title bar -->
+<div class="bt-title-bar">
+<div class="bt-title-ico">&#x1F4C8;</div>
+<div class="bt-title-txt">Bet Tracker &amp; Model Health</div>
+<div class="bt-title-sub"><span class="live">&#x1F7E2;</span> Auto-resolve active</div>
 </div>
-<div class="bk"><div class="bk-h"><div class="bk-l">Bankroll Growth (30d)</div><div class="bk-v">$1,000 &#x2192; $1,847</div></div>
-<div class="bg"><div class="bg-b" style="height:20%"></div><div class="bg-b" style="height:25%"></div><div class="bg-b" style="height:22%"></div><div class="bg-b" style="height:30%"></div><div class="bg-b" style="height:28%"></div><div class="bg-b" style="height:35%"></div><div class="bg-b" style="height:32%"></div><div class="bg-b" style="height:40%"></div><div class="bg-b" style="height:38%"></div><div class="bg-b" style="height:45%"></div><div class="bg-b" style="height:42%"></div><div class="bg-b" style="height:50%"></div><div class="bg-b" style="height:48%"></div><div class="bg-b" style="height:55%"></div><div class="bg-b" style="height:52%"></div><div class="bg-b" style="height:58%"></div><div class="bg-b" style="height:60%"></div><div class="bg-b" style="height:56%"></div><div class="bg-b" style="height:62%"></div><div class="bg-b" style="height:65%"></div><div class="bg-b" style="height:68%"></div><div class="bg-b" style="height:72%"></div><div class="bg-b" style="height:70%"></div><div class="bg-b" style="height:75%"></div><div class="bg-b" style="height:78%"></div><div class="bg-b" style="height:80%"></div><div class="bg-b" style="height:82%"></div><div class="bg-b" style="height:85%"></div><div class="bg-b" style="height:88%"></div><div class="bg-b" style="height:92%"></div></div>
+
+<!-- Tab bar — matches real page -->
+<div class="bt-tabs">
+<div class="bt-tab">&#x1F4CA; Health</div>
+<div class="bt-tab">&#x1F916; Platform Picks</div>
+<div class="bt-tab active">&#x1F4CB; All Picks</div>
+<div class="bt-tab">&#x1F3D9;&#xFE0F; Joseph</div>
+<div class="bt-tab">&#x26A1; Resolve</div>
+<div class="bt-tab">&#x1F4CB; My Bets</div>
+<div class="bt-tab">&#x2795; Log Bet</div>
+<div class="bt-tab">&#x1F3B0; Parlays</div>
+<div class="bt-tab">&#x1F52E; Predict</div>
+<div class="bt-tab">&#x1F4C5; History</div>
+<div class="bt-tab">&#x1F3C6; Awards</div>
+</div>
+
+<!-- Filter bar — matches real page -->
+<div class="bt-filters">
+<div class="bt-filter"><span class="bt-filter-label">Platform:</span><span class="bt-filter-val">All</span></div>
+<div class="bt-filter"><span class="bt-filter-label">&#x1F50D; Player:</span><span class="bt-filter-val">Search...</span></div>
+<div class="bt-filter"><span class="bt-filter-label">&#x1F4C5; Range:</span><span class="bt-filter-val">Last 30 Days</span></div>
+<div class="bt-filter"><span class="bt-filter-label">Direction:</span><span class="bt-filter-val">All</span></div>
+<div class="bt-resolve-btn">&#x1F504; Check Results Now</div>
+</div>
+
+<!-- Summary cards — 8 columns like real page -->
+<div class="bt-summary">
+<div class="bt-sum"><div class="bt-sum-val wh">127</div><div class="bt-sum-lbl">Total Picks</div></div>
+<div class="bt-sum"><div class="bt-sum-val gr">79</div><div class="bt-sum-lbl">Wins</div></div>
+<div class="bt-sum"><div class="bt-sum-val rd">41</div><div class="bt-sum-lbl">Losses</div></div>
+<div class="bt-sum"><div class="bt-sum-val wh">0</div><div class="bt-sum-lbl">Evens</div></div>
+<div class="bt-sum"><div class="bt-sum-val gd">7</div><div class="bt-sum-lbl">Pending</div></div>
+<div class="bt-sum"><div class="bt-sum-val gr">65.8%</div><div class="bt-sum-lbl">Win Rate</div></div>
+<div class="bt-sum"><div class="bt-sum-val bl">&#x1F525; 5W</div><div class="bt-sum-lbl">Streak</div></div>
+<div class="bt-sum"><div class="bt-sum-val pk">PrizePicks</div><div class="bt-sum-lbl">Best Platform</div></div>
+</div>
+
+<!-- Filter chips -->
+<div class="bt-chips">
+<div class="bt-chip all">All 127</div>
+<div class="bt-chip wins">&#x2713; Wins 79</div>
+<div class="bt-chip losses">&#x2717; Losses 41</div>
+<div class="bt-chip pending">&#x23F3; Pending 7</div>
+<div class="bt-chip plat">&#x1F48E; Platinum</div>
+<div class="bt-chip gold2">&#x1F947; Gold</div>
+</div>
+
+<!-- Tier performance breakdown with bar visualization -->
+<div class="bt-tiers">
+<div class="bt-tier"><div class="bt-tier-name pt">&#x1F48E; Platinum</div><div class="bt-tier-wr pt">72.4%</div><div class="bt-tier-detail">21W / 8L</div><div class="bt-tier-bar"><div class="bt-tier-bar-fill pt" style="width:72.4%"></div></div></div>
+<div class="bt-tier"><div class="bt-tier-name gld">&#x1F947; Gold</div><div class="bt-tier-wr gld">66.7%</div><div class="bt-tier-detail">28W / 14L</div><div class="bt-tier-bar"><div class="bt-tier-bar-fill gld" style="width:66.7%"></div></div></div>
+<div class="bt-tier"><div class="bt-tier-name slv">&#x1F948; Silver</div><div class="bt-tier-wr slv">61.5%</div><div class="bt-tier-detail">24W / 15L</div><div class="bt-tier-bar"><div class="bt-tier-bar-fill slv" style="width:61.5%"></div></div></div>
+<div class="bt-tier"><div class="bt-tier-name brz">&#x1F949; Bronze</div><div class="bt-tier-wr brz">60.0%</div><div class="bt-tier-detail">6W / 4L</div><div class="bt-tier-bar"><div class="bt-tier-bar-fill brz" style="width:60%"></div></div></div>
+</div>
+
+<!-- MODEL HEALTH SECTION — stat type + platform breakdown -->
+<div class="bt-health">
+<div class="bt-health-hdr">&#x1F4CA; Model Health Dashboard <span class="badge">CALIBRATED</span></div>
+
+<!-- Win rate by stat type -->
+<div class="bt-stat-grid">
+<div class="bt-stat-item"><div class="bt-stat-item-name">Points</div><div class="bt-stat-item-wr gr">68.3%</div><div class="bt-stat-item-detail">28W / 13L</div></div>
+<div class="bt-stat-item"><div class="bt-stat-item-name">Rebounds</div><div class="bt-stat-item-wr gr">66.7%</div><div class="bt-stat-item-detail">18W / 9L</div></div>
+<div class="bt-stat-item"><div class="bt-stat-item-name">Assists</div><div class="bt-stat-item-wr gd">63.0%</div><div class="bt-stat-item-detail">17W / 10L</div></div>
+<div class="bt-stat-item"><div class="bt-stat-item-name">3-Pointers</div><div class="bt-stat-item-wr bl">61.5%</div><div class="bt-stat-item-detail">8W / 5L</div></div>
+<div class="bt-stat-item"><div class="bt-stat-item-name">Steals</div><div class="bt-stat-item-wr gr">70.0%</div><div class="bt-stat-item-detail">7W / 3L</div></div>
+<div class="bt-stat-item"><div class="bt-stat-item-name">Blocks</div><div class="bt-stat-item-wr gd">66.7%</div><div class="bt-stat-item-detail">4W / 2L</div></div>
+</div>
+
+<!-- Win rate by platform -->
+<div class="bt-plat-grid">
+<div class="bt-plat-item"><div class="bt-plat-item-name pp">PrizePicks</div><div class="bt-plat-item-wr">68.2%</div><div class="bt-plat-item-detail">30W / 14L &middot; Best</div></div>
+<div class="bt-plat-item"><div class="bt-plat-item-name ud">Underdog</div><div class="bt-plat-item-wr">63.6%</div><div class="bt-plat-item-detail">28W / 16L</div></div>
+<div class="bt-plat-item"><div class="bt-plat-item-name dk">DK Pick6</div><div class="bt-plat-item-wr">65.6%</div><div class="bt-plat-item-detail">21W / 11L</div></div>
 </div>
 </div>
-<div class="tl">&#x2191; Every pick tracked. Every result graded. No hiding.</div>
+
+<!-- CALENDAR HEATMAP — 2 weeks -->
+<div class="bt-cal">
+<div class="bt-cal-hdr">&#x1F7E9; Win Rate Heatmap &mdash; Last 14 Days</div>
+<div class="bt-cal-grid">
+<div class="bt-cal-day green2" title="Apr 6: 60%"></div>
+<div class="bt-cal-day green3" title="Apr 7: 71%"></div>
+<div class="bt-cal-day red1" title="Apr 8: 40%"></div>
+<div class="bt-cal-day green2" title="Apr 9: 57%"></div>
+<div class="bt-cal-day green4" title="Apr 10: 80%"></div>
+<div class="bt-cal-day green3" title="Apr 11: 67%"></div>
+<div class="bt-cal-day green2" title="Apr 12: 62%"></div>
+<div class="bt-cal-day red2" title="Apr 13: 33%"></div>
+<div class="bt-cal-day green3" title="Apr 14: 71%"></div>
+<div class="bt-cal-day green4" title="Apr 15: 83%"></div>
+<div class="bt-cal-day green2" title="Apr 16: 60%"></div>
+<div class="bt-cal-day green3" title="Apr 17: 67%"></div>
+<div class="bt-cal-day green4" title="Apr 18: 75%"></div>
+<div class="bt-cal-day today green3" title="Apr 19: 71% (today)"></div>
+</div>
+<div class="bt-cal-legend">
+<div class="bt-cal-legend-item"><div class="bt-cal-legend-swatch" style="background:rgba(242,67,54,0.35)"></div>0-50%</div>
+<div class="bt-cal-legend-item"><div class="bt-cal-legend-swatch" style="background:rgba(0,213,89,0.15)"></div>50-60%</div>
+<div class="bt-cal-legend-item"><div class="bt-cal-legend-swatch" style="background:rgba(0,213,89,0.3)"></div>60-70%</div>
+<div class="bt-cal-legend-item"><div class="bt-cal-legend-swatch" style="background:rgba(0,213,89,0.5)"></div>70-80%</div>
+<div class="bt-cal-legend-item"><div class="bt-cal-legend-swatch" style="background:rgba(0,213,89,0.7)"></div>80%+</div>
+</div>
+</div>
+
+<!-- CUMULATIVE P&L CHART (SVG) -->
+<div class="bt-pnl">
+<div class="bt-pnl-hdr">
+<div class="bt-pnl-lbl">&#x1F4C8; Cumulative P&amp;L Curve</div>
+<div class="bt-pnl-val">+$847 &middot; +84.7% ROI</div>
+</div>
+<svg viewBox="0 0 400 60" preserveAspectRatio="none">
+<defs><linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00D559" stop-opacity="0.3"/><stop offset="1" stop-color="#00D559" stop-opacity="0"/></linearGradient></defs>
+<path d="M0,55 L14,52 L28,50 L42,48 L56,51 L70,46 L84,43 L98,44 L112,40 L126,37 L140,38 L154,34 L168,30 L182,32 L196,28 L210,25 L224,23 L238,26 L252,22 L266,19 L280,16 L294,17 L308,14 L322,11 L336,9 L350,8 L364,6 L378,5 L392,3 L400,2 L400,60 L0,60 Z" fill="url(#pnlGrad)"/>
+<path d="M0,55 L14,52 L28,50 L42,48 L56,51 L70,46 L84,43 L98,44 L112,40 L126,37 L140,38 L154,34 L168,30 L182,32 L196,28 L210,25 L224,23 L238,26 L252,22 L266,19 L280,16 L294,17 L308,14 L322,11 L336,9 L350,8 L364,6 L378,5 L392,3 L400,2" fill="none" stroke="#00D559" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="0" y1="55" x2="400" y2="55" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+<circle cx="400" cy="2" r="3" fill="#00D559" opacity="0.8"/>
+</svg>
+</div>
+
+<!-- DATE GROUP: Today -->
+<div class="bt-date-hdr">
+<div class="bt-date-label">&#x1F4C5; Today &mdash; Apr 19, 2026</div>
+<div class="bt-date-stats">7 bets &middot; <span class="w">5W</span> &middot; <span class="l">0L</span> &middot; <span class="p">2 pending</span></div>
+</div>
+<div class="bt-cards">
+<div class="bt-card pend">
+  <div class="bt-card-tier">&#x1F48E;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Luka Don&#x10D;i&#x107; &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform pp">PrizePicks</span><span class="bt-card-safe">SAFE <span class="sc">87</span></span></div></div>
+  <div class="bt-card-line ov">O 28.5</div>
+  <div class="bt-card-actual tbd">&mdash;</div>
+  <div class="bt-card-clv neg">&mdash;</div>
+  <div class="bt-card-result pending">&#x23F3;</div>
+</div>
+<div class="bt-card pend">
+  <div class="bt-card-tier">&#x1F947;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Jayson Tatum &mdash; Rebounds</div><div class="bt-card-meta"><span class="bt-card-platform dk">DK Pick6</span><span class="bt-card-safe">SAFE <span class="sc">79</span></span></div></div>
+  <div class="bt-card-line ov">O 8.5</div>
+  <div class="bt-card-actual tbd">&mdash;</div>
+  <div class="bt-card-clv neg">&mdash;</div>
+  <div class="bt-card-result pending">&#x23F3;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F48E;</div>
+  <div class="bt-card-info"><div class="bt-card-player">SGA &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform pp">PrizePicks</span><span class="bt-card-safe">SAFE <span class="sc">91</span></span></div></div>
+  <div class="bt-card-line ov">O 30.5</div>
+  <div class="bt-card-actual hit">36</div>
+  <div class="bt-card-clv pos">+5.3%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F947;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Ant Edwards &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform ud">Underdog</span><span class="bt-card-safe">SAFE <span class="sc">82</span></span></div></div>
+  <div class="bt-card-line un">U 26.5</div>
+  <div class="bt-card-actual hit">21</div>
+  <div class="bt-card-clv pos">+4.7%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F48E;</div>
+  <div class="bt-card-info"><div class="bt-card-player">LeBron James &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform pp">PrizePicks</span><span class="bt-card-safe">SAFE <span class="sc">85</span></span></div></div>
+  <div class="bt-card-line ov">O 25.5</div>
+  <div class="bt-card-actual hit">31</div>
+  <div class="bt-card-clv pos">+3.1%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F948;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Tyrese Maxey &mdash; Assists</div><div class="bt-card-meta"><span class="bt-card-platform dk">DK Pick6</span><span class="bt-card-safe">SAFE <span class="sc">74</span></span></div></div>
+  <div class="bt-card-line ov">O 5.5</div>
+  <div class="bt-card-actual hit">7</div>
+  <div class="bt-card-clv pos">+1.8%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F947;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Nikola Joki&#x107; &mdash; Assists</div><div class="bt-card-meta"><span class="bt-card-platform ud">Underdog</span><span class="bt-card-safe">SAFE <span class="sc">80</span></span></div></div>
+  <div class="bt-card-line ov">O 9.5</div>
+  <div class="bt-card-actual hit">12</div>
+  <div class="bt-card-clv pos">+2.9%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+</div>
+
+<!-- DATE GROUP: Yesterday -->
+<div class="bt-date-hdr">
+<div class="bt-date-label">&#x1F4C5; Apr 18, 2026</div>
+<div class="bt-date-stats">8 bets &middot; <span class="w">6W</span> &middot; <span class="l">2L</span></div>
+</div>
+<div class="bt-cards">
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F48E;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Steph Curry &mdash; 3PM</div><div class="bt-card-meta"><span class="bt-card-platform pp">PrizePicks</span><span class="bt-card-safe">SAFE <span class="sc">88</span></span></div></div>
+  <div class="bt-card-line ov">O 4.5</div>
+  <div class="bt-card-actual hit">6</div>
+  <div class="bt-card-clv pos">+6.1%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card loss">
+  <div class="bt-card-tier">&#x1F948;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Trae Young &mdash; Assists</div><div class="bt-card-meta"><span class="bt-card-platform ud">Underdog</span><span class="bt-card-safe">SAFE <span class="sc">71</span></span></div></div>
+  <div class="bt-card-line ov">O 10.5</div>
+  <div class="bt-card-actual miss">8</div>
+  <div class="bt-card-clv neg">&minus;1.4%</div>
+  <div class="bt-card-result l">&#x2717;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F947;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Ja Morant &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform dk">DK Pick6</span><span class="bt-card-safe">SAFE <span class="sc">83</span></span></div></div>
+  <div class="bt-card-line ov">O 24.5</div>
+  <div class="bt-card-actual hit">29</div>
+  <div class="bt-card-clv pos">+3.8%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F48E;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Giannis &mdash; Rebounds</div><div class="bt-card-meta"><span class="bt-card-platform pp">PrizePicks</span><span class="bt-card-safe">SAFE <span class="sc">90</span></span></div></div>
+  <div class="bt-card-line ov">O 11.5</div>
+  <div class="bt-card-actual hit">14</div>
+  <div class="bt-card-clv pos">+4.2%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card loss">
+  <div class="bt-card-tier">&#x1F949;</div>
+  <div class="bt-card-info"><div class="bt-card-player">D&rsquo;Angelo Russell &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform ud">Underdog</span><span class="bt-card-safe">SAFE <span class="sc">63</span></span></div></div>
+  <div class="bt-card-line ov">O 18.5</div>
+  <div class="bt-card-actual miss">14</div>
+  <div class="bt-card-clv neg">&minus;0.8%</div>
+  <div class="bt-card-result l">&#x2717;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F947;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Kevin Durant &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform dk">DK Pick6</span><span class="bt-card-safe">SAFE <span class="sc">84</span></span></div></div>
+  <div class="bt-card-line ov">O 27.5</div>
+  <div class="bt-card-actual hit">32</div>
+  <div class="bt-card-clv pos">+2.6%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F48E;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Cade Cunningham &mdash; Assists</div><div class="bt-card-meta"><span class="bt-card-platform pp">PrizePicks</span><span class="bt-card-safe">SAFE <span class="sc">86</span></span></div></div>
+  <div class="bt-card-line ov">O 7.5</div>
+  <div class="bt-card-actual hit">10</div>
+  <div class="bt-card-clv pos">+3.5%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+<div class="bt-card win">
+  <div class="bt-card-tier">&#x1F948;</div>
+  <div class="bt-card-info"><div class="bt-card-player">Devin Booker &mdash; Points</div><div class="bt-card-meta"><span class="bt-card-platform ud">Underdog</span><span class="bt-card-safe">SAFE <span class="sc">76</span></span></div></div>
+  <div class="bt-card-line un">U 28.5</div>
+  <div class="bt-card-actual hit">22</div>
+  <div class="bt-card-clv pos">+1.9%</div>
+  <div class="bt-card-result w">&#x2713;</div>
+</div>
+</div>
+
+<!-- Pagination -->
+<div class="bt-pag">
+<div class="bt-pag-btn active">1</div>
+<div class="bt-pag-btn">2</div>
+<div class="bt-pag-btn">3</div>
+<div class="bt-pag-btn">4</div>
+<div class="bt-pag-btn">5</div>
+<div class="bt-pag-info">Showing 1&ndash;15 of 127 bets</div>
+</div>
+
+<!-- Bankroll growth -->
+<div class="bt-bankroll">
+<div class="bt-bankroll-hdr">
+<div class="bt-bankroll-lbl">&#x1F4B0; Bankroll Growth (30d)</div>
+<div><span class="bt-bankroll-val">$1,000 &#x2192; $1,847</span><span class="bt-bankroll-sub">+84.7% ROI</span></div>
+</div>
+<div class="bt-growth">
+<div class="bt-growth-bar" style="height:18%"></div>
+<div class="bt-growth-bar" style="height:22%"></div>
+<div class="bt-growth-bar" style="height:20%"></div>
+<div class="bt-growth-bar" style="height:28%"></div>
+<div class="bt-growth-bar" style="height:25%"></div>
+<div class="bt-growth-bar red" style="height:22%"></div>
+<div class="bt-growth-bar" style="height:30%"></div>
+<div class="bt-growth-bar" style="height:35%"></div>
+<div class="bt-growth-bar" style="height:33%"></div>
+<div class="bt-growth-bar" style="height:38%"></div>
+<div class="bt-growth-bar red" style="height:35%"></div>
+<div class="bt-growth-bar" style="height:40%"></div>
+<div class="bt-growth-bar" style="height:42%"></div>
+<div class="bt-growth-bar" style="height:45%"></div>
+<div class="bt-growth-bar" style="height:48%"></div>
+<div class="bt-growth-bar red" style="height:44%"></div>
+<div class="bt-growth-bar" style="height:50%"></div>
+<div class="bt-growth-bar" style="height:55%"></div>
+<div class="bt-growth-bar" style="height:52%"></div>
+<div class="bt-growth-bar" style="height:58%"></div>
+<div class="bt-growth-bar" style="height:62%"></div>
+<div class="bt-growth-bar" style="height:60%"></div>
+<div class="bt-growth-bar" style="height:65%"></div>
+<div class="bt-growth-bar red" style="height:62%"></div>
+<div class="bt-growth-bar" style="height:68%"></div>
+<div class="bt-growth-bar" style="height:72%"></div>
+<div class="bt-growth-bar" style="height:75%"></div>
+<div class="bt-growth-bar" style="height:78%"></div>
+<div class="bt-growth-bar" style="height:82%"></div>
+<div class="bt-growth-bar" style="height:88%"></div>
+</div>
+</div>
+
+</div><!-- /bt-app -->
+
+<!-- How it works -->
+<div class="bt-how">
+<div class="bt-how-hdr">&#x1F4D6; How the Bet Tracker Works</div>
+<ul class="bt-how-list">
+<li class="bt-how-item"><span class="bt-how-ico">&#x1F4DD;</span><span><strong>Log every bet</strong> &mdash; record picks with one click from analysis. Platform, stake, odds, SAFE Score saved automatically.</span></li>
+<li class="bt-how-item"><span class="bt-how-ico">&#x1F4CA;</span><span><strong>Auto-grade results</strong> &mdash; checks final box scores and marks every prop as HIT or MISS. No manual entry needed.</span></li>
+<li class="bt-how-item"><span class="bt-how-ico">&#x1F4B0;</span><span><strong>Track your bankroll</strong> &mdash; ROI, win rate, CLV capture, profit/loss, and bankroll growth visualized with real charts.</span></li>
+<li class="bt-how-item"><span class="bt-how-ico">&#x1F50D;</span><span><strong>Filter by anything</strong> &mdash; platform, stat type, SAFE Score range, tier, date, or direction. Export to CSV anytime.</span></li>
+<li class="bt-how-item"><span class="bt-how-ico">&#x1F6E1;&#xFE0F;</span><span><strong>No fake screenshots</strong> &mdash; your Bet Tracker is YOUR data. Every win and loss, verifiable and auditable.</span></li>
+<li class="bt-how-item"><span class="bt-how-ico">&#x1F3C6;</span><span><strong>Achievements &amp; streaks</strong> &mdash; earn badges for win streaks, ROI milestones, and volume. Track your progress over time.</span></li>
+</ul>
+</div>
+
+<div class="bt-footer">&#x2191; This is a demo preview with sample data. Sign up free to get your own live Bet Tracker.</div>
 """)
 
     # ── Below-fold: Pricing tiers, FAQ, CTA ──────────────────
