@@ -316,10 +316,29 @@ def verify_checkout_session(session_id: str) -> dict:
                     plan_name = product.get("name", "Premium")
             except Exception:
                 pass  # Use default plan name
+        else:
+            # One-time payment (e.g. Insider Circle) — no subscription
+            # object.  Resolve plan_name from the checkout line items.
+            try:
+                line_items = _stripe.checkout.Session.list_line_items(session_id, limit=1)
+                if line_items and line_items.data:
+                    _price_id = line_items.data[0].price.id if line_items.data[0].price else ""
+                    if _price_id and _price_id in _PRICE_ID_TO_PLAN_NAME:
+                        plan_name = _PRICE_ID_TO_PLAN_NAME[_price_id]
+                    elif line_items.data[0].description:
+                        plan_name = line_items.data[0].description
+            except Exception:
+                pass
+            # One-time purchases are perpetual — no expiry
+            status = "active"
+
+        # For one-time payments, use the checkout session ID as a
+        # synthetic subscription_id so the record can be persisted.
+        sub_id = subscription.id if subscription else f"otp_{session.id}"
 
         return {
             "success": True,
-            "subscription_id": subscription.id if subscription else "",
+            "subscription_id": sub_id,
             "customer_id": customer.id if customer else "",
             "customer_email": customer_email,
             "status": status,

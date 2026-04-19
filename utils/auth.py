@@ -322,6 +322,20 @@ def is_premium_user() -> bool:
     if subscription_id:
         db_row = _load_subscription_from_db(subscription_id)
         if db_row and db_row.get("status") in ("active", "trialing"):
+            # One-time payments (Insider Circle) use a synthetic ID
+            # prefixed with "otp_" — these are perpetual and don't
+            # need Stripe re-verification.
+            if subscription_id.startswith("otp_"):
+                _store_premium_in_session({
+                    "subscription_id": subscription_id,
+                    "customer_id": db_row.get("customer_id", ""),
+                    "customer_email": db_row.get("customer_email", ""),
+                    "plan_name": db_row.get("plan_name", "Insider Circle"),
+                    "period_end": "",
+                    "status": "active",
+                })
+                return True
+
             # Re-verify with Stripe if cache is stale
             result = get_subscription_by_id(subscription_id)
             if result.get("is_active"):
@@ -395,6 +409,17 @@ def restore_subscription_by_email(email: str) -> bool:
     db_row = _load_subscription_by_email_from_db(email)
     if db_row and db_row.get("status") in ("active", "trialing"):
         subscription_id = db_row.get("subscription_id", "")
+        # One-time payments (otp_ prefix) are perpetual — skip Stripe check
+        if subscription_id.startswith("otp_"):
+            _store_premium_in_session({
+                "subscription_id": subscription_id,
+                "customer_id": db_row.get("customer_id", ""),
+                "customer_email": email,
+                "plan_name": db_row.get("plan_name", "Insider Circle"),
+                "period_end": "",
+                "status": "active",
+            })
+            return True
         # Re-verify with Stripe to ensure still active
         if is_stripe_configured() and subscription_id:
             result = get_subscription_by_id(subscription_id)
