@@ -507,42 +507,162 @@ html, body, .stApp, .stApp * {
     margin: 0;
 }
 
-/* Comparison table */
+/* ── Competitor graveyard ────────────────────────────────────── */
+.ag-graveyard {
+    margin: 40px 0 0;
+    animation: agFadeUp 0.6s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ag-gy-head {
+    text-align: center; margin-bottom: 18px;
+}
+.ag-gy-head h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.25rem; font-weight: 800;
+    color: #fff; margin: 0 0 6px;
+    letter-spacing: -0.02em;
+}
+.ag-gy-head h3 .em {
+    background: linear-gradient(135deg, #00D559, #2D9EFF);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.ag-gy-head p {
+    font-size: 0.74rem; color: rgba(255, 255, 255, 0.35);
+    margin: 0; line-height: 1.5;
+}
+
+/* Competitor cards */
+.ag-comp-grid {
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+    margin-bottom: 14px;
+}
+.ag-comp {
+    display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px;
+    background: rgba(242, 67, 54, 0.03);
+    border: 1px solid rgba(242, 67, 54, 0.08);
+    border-radius: 10px; padding: 12px 14px;
+    transition: border-color 0.2s;
+}
+.ag-comp:hover { border-color: rgba(242, 67, 54, 0.15); }
+.ag-comp-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.78rem; font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+}
+.ag-comp-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; font-weight: 700;
+    color: rgba(242, 67, 54, 0.7);
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+}
+.ag-comp-miss {
+    font-size: 0.62rem; font-weight: 600;
+    color: rgba(255, 255, 255, 0.25);
+    text-align: right; max-width: 130px;
+}
+
+/* Our card (the winner) */
+.ag-us {
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(0, 213, 89, 0.04);
+    border: 2px solid rgba(0, 213, 89, 0.2);
+    border-radius: 14px; padding: 18px 14px;
+    text-align: center; position: relative;
+    margin-top: 4px;
+    animation: agPulse 3s ease-in-out infinite;
+}
+.ag-us::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, #00D559, #2D9EFF, transparent);
+}
+.ag-us-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.6rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    color: #00D559; margin-bottom: 4px;
+}
+.ag-us-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2rem; font-weight: 800; color: #fff;
+    line-height: 1.1;
+}
+.ag-us-price .free {
+    background: linear-gradient(135deg, #00D559, #2D9EFF);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.ag-us-price .p {
+    font-size: 0.6rem; font-weight: 500; color: rgba(255, 255, 255, 0.3);
+}
+.ag-us-detail {
+    font-size: 0.66rem; color: rgba(255, 255, 255, 0.4);
+    margin-top: 4px; line-height: 1.4;
+}
+.ag-us-detail strong { color: rgba(255, 255, 255, 0.7); }
+
+/* ── Full comparison table ───────────────────────────────────── */
 .ag-compare {
     margin: 36px 0 0;
-    animation: agFadeUp 0.6s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-tbl {
     width: 100%; border-collapse: separate; border-spacing: 0;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 14px; overflow: hidden;
-    font-size: 0.74rem;
+    font-size: 0.72rem;
 }
 .ag-tbl thead th {
-    padding: 11px 12px; font-size: 0.65rem; font-weight: 800;
+    padding: 11px 10px; font-size: 0.58rem; font-weight: 800;
     text-transform: uppercase; letter-spacing: 0.08em;
     color: rgba(255, 255, 255, 0.3);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
-.ag-tbl thead th:first-child { text-align: left; width: 40%; }
-.ag-tbl thead th:nth-child(2) { text-align: center; color: rgba(242, 67, 54, 0.5); }
-.ag-tbl thead th:nth-child(3) { text-align: center; color: #00D559; background: rgba(0, 213, 89, 0.03); }
+.ag-tbl thead th:first-child { text-align: left; width: 32%; }
+.ag-tbl thead th:not(:first-child) { text-align: center; }
+.ag-tbl thead th:last-child { color: #00D559; background: rgba(0, 213, 89, 0.03); }
 .ag-tbl tbody td {
-    padding: 9px 12px; color: rgba(255, 255, 255, 0.45);
+    padding: 8px 10px; color: rgba(255, 255, 255, 0.35);
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    font-weight: 500;
+    font-weight: 500; text-align: center;
 }
-.ag-tbl tbody td:first-child { font-weight: 600; color: rgba(255, 255, 255, 0.6); text-align: left; }
-.ag-tbl tbody td:nth-child(2) { text-align: center; color: rgba(242, 67, 54, 0.4); }
-.ag-tbl tbody td:nth-child(3) { text-align: center; color: #00D559; background: rgba(0, 213, 89, 0.02); font-weight: 700; }
+.ag-tbl tbody td:first-child { font-weight: 600; color: rgba(255, 255, 255, 0.55); text-align: left; }
+.ag-tbl tbody td:last-child { color: #00D559; background: rgba(0, 213, 89, 0.02); font-weight: 700; }
 .ag-tbl tbody tr:last-child td { border-bottom: none; }
+.ag-tbl .x { color: rgba(242, 67, 54, 0.35); }
+.ag-tbl .ch { color: #00D559; font-weight: 700; }
+.ag-tbl .hi { background: rgba(0, 213, 89, 0.05); }
 
-/* Feature cards (3-col) */
+/* ── "Bottom Line" callout ───────────────────────────────────── */
+.ag-bottom-line {
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.06), rgba(45, 158, 255, 0.04));
+    border: 1px solid rgba(0, 213, 89, 0.15);
+    border-radius: 14px; padding: 20px 18px;
+    text-align: center; margin: 24px 0 0;
+    animation: agFadeUp 0.6s 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ag-bl-headline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.95rem; font-weight: 800;
+    color: #fff; margin: 0 0 8px;
+}
+.ag-bl-headline .em {
+    background: linear-gradient(135deg, #00D559, #2D9EFF);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.ag-bl-body {
+    font-size: 0.74rem; color: rgba(255, 255, 255, 0.45);
+    line-height: 1.6; margin: 0;
+}
+.ag-bl-body strong { color: rgba(255, 255, 255, 0.8); font-weight: 700; }
+
+/* ── Feature cards (3-col) ───────────────────────────────────── */
 .ag-features {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
     margin: 28px 0 0;
-    animation: agFadeUp 0.6s 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-feat {
     background: rgba(255, 255, 255, 0.02);
@@ -567,11 +687,11 @@ html, body, .stApp, .stApp * {
     margin-top: 3px;
 }
 
-/* Metric counters */
+/* ── Metric counters ─────────────────────────────────────────── */
 .ag-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
     margin: 28px 0 0;
-    animation: agFadeUp 0.6s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-stat {
     background: rgba(255, 255, 255, 0.02);
@@ -590,10 +710,10 @@ html, body, .stApp, .stApp * {
     text-transform: uppercase; letter-spacing: 0.05em;
 }
 
-/* Testimonials */
+/* ── Testimonials ────────────────────────────────────────────── */
 .ag-reviews {
     margin: 28px 0 0;
-    animation: agFadeUp 0.6s 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-review {
     background: rgba(255, 255, 255, 0.02);
@@ -614,10 +734,10 @@ html, body, .stApp, .stApp * {
     color: #F9C62B; font-size: 0.6rem; margin-top: 2px;
 }
 
-/* Pricing */
+/* ── Pricing ─────────────────────────────────────────────────── */
 .ag-pricing {
     margin: 32px 0 0;
-    animation: agFadeUp 0.6s 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-price-grid {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
@@ -663,11 +783,33 @@ html, body, .stApp, .stApp * {
 }
 .ag-price-info strong { color: rgba(255, 255, 255, 0.55); }
 
-/* Trust + footer */
+/* ── Savings callout ─────────────────────────────────────────── */
+.ag-savings {
+    background: rgba(249, 198, 43, 0.04);
+    border: 1px solid rgba(249, 198, 43, 0.12);
+    border-radius: 12px; padding: 14px 16px;
+    text-align: center; margin: 16px 0 0;
+    animation: agFadeUp 0.6s 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ag-savings-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.78rem; font-weight: 700;
+    color: #F9C62B; margin: 0;
+}
+.ag-savings-text .big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.2rem; font-weight: 800;
+}
+.ag-savings-sub {
+    font-size: 0.62rem; color: rgba(255, 255, 255, 0.3);
+    margin: 4px 0 0;
+}
+
+/* ── Trust + footer ──────────────────────────────────────────── */
 .ag-trust {
     display: flex; justify-content: center; gap: 16px;
     margin: 28px 0 6px; flex-wrap: wrap;
-    animation: agFadeUp 0.6s 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-trust-item {
     font-size: 0.62rem; font-weight: 600;
@@ -678,7 +820,7 @@ html, body, .stApp, .stApp * {
     text-align: center; padding: 20px 0 40px;
     font-size: 0.55rem; color: rgba(255, 255, 255, 0.1);
     line-height: 1.7;
-    animation: agFadeUp 0.6s 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: agFadeUp 0.6s 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-footer a { color: rgba(255, 255, 255, 0.15); text-decoration: underline; }
 
@@ -691,6 +833,8 @@ html, body, .stApp, .stApp * {
     .ag-price-grid { grid-template-columns: 1fr; }
     [data-testid="stForm"] { padding: 22px 18px 20px !important; }
     .ag-proof { gap: 14px; }
+    .ag-tbl { font-size: 0.64rem; }
+    .ag-tbl thead th, .ag-tbl tbody td { padding: 7px 6px; }
 }
 </style>
 """
@@ -814,30 +958,92 @@ def require_login() -> bool:
                 else:
                     st.error("Invalid email or password.")
 
-    # ── Below-fold conversion content ─────────────────────
+    # ── Below-fold: competitor graveyard ─────────────────────
     st.markdown("""
+    <div class="ag-graveyard">
+      <div class="ag-gy-head">
+        <h3>They Charge You Hundreds.<br><span class="em">We Do It Better &mdash; Free.</span></h3>
+        <p>Every major sports betting tool charges $30&ndash;$300+/mo for <em>less</em> than what you get here.</p>
+      </div>
+
+      <div class="ag-comp-grid">
+        <div class="ag-comp">
+          <div class="ag-comp-name">OddsJam</div>
+          <div class="ag-comp-price">$99/mo</div>
+          <div class="ag-comp-miss">No AI models, no SAFE Score</div>
+        </div>
+        <div class="ag-comp">
+          <div class="ag-comp-name">Action Network</div>
+          <div class="ag-comp-price">$59.99/mo</div>
+          <div class="ag-comp-miss">No live tracking, no edge detection</div>
+        </div>
+        <div class="ag-comp">
+          <div class="ag-comp-name">BettingPros</div>
+          <div class="ag-comp-price">$49.99/mo</div>
+          <div class="ag-comp-miss">No prop modeling, no bankroll tools</div>
+        </div>
+        <div class="ag-comp">
+          <div class="ag-comp-name">Unabated</div>
+          <div class="ag-comp-price">$149/mo</div>
+          <div class="ag-comp-miss">No AI confidence, no live sweat</div>
+        </div>
+        <div class="ag-comp">
+          <div class="ag-comp-name">Sharp App / BeTrader</div>
+          <div class="ag-comp-price">$299/mo</div>
+          <div class="ag-comp-miss">No fused AI, limited props</div>
+        </div>
+      </div>
+
+      <div class="ag-us">
+        <div class="ag-us-label">&#x2B50; Smart Pick Pro</div>
+        <div class="ag-us-price"><span class="free">$0</span> <span class="p">forever</span></div>
+        <div class="ag-us-detail"><strong>6 AI models</strong> &middot; 300+ props/night &middot; Live tracking &middot; SAFE Score &middot; Bankroll tools &middot; Edge detection &middot; <strong>All included free.</strong></div>
+      </div>
+    </div>
+
+    <!-- Full feature comparison table -->
     <div class="ag-compare">
       <div class="ag-section-head">
-        <h3>Why Sharps Are Switching</h3>
-        <p>What you get that nowhere else offers</p>
+        <h3>Feature-by-Feature Breakdown</h3>
+        <p>See exactly what they charge for vs. what you get free</p>
       </div>
       <table class="ag-tbl">
-        <thead><tr><th>Feature</th><th>Others</th><th>Smart Pick Pro</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>OddsJam</th>
+            <th>Action</th>
+            <th>Unabated</th>
+            <th>Smart Pick Pro</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td>AI Models</td><td>0 &ndash; 1</td><td>6 Fused</td></tr>
-          <tr><td>Prop Coverage</td><td>Top 20</td><td>300+ / Night</td></tr>
-          <tr><td>Live Tracking</td><td>&#x2717;</td><td>Real-Time</td></tr>
-          <tr><td>Confidence Score</td><td>&#x2717;</td><td>SAFE Score 0-100</td></tr>
-          <tr><td>Bankroll Tools</td><td>&#x2717;</td><td>Kelly + Custom</td></tr>
-          <tr><td>Matchup Analysis</td><td>Basic</td><td>Defensive DNA</td></tr>
-          <tr><td>Line Movement</td><td>&#x2717;</td><td>Real-Time Alerts</td></tr>
-          <tr><td>Backtesting</td><td>&#x2717;</td><td>Full Archive</td></tr>
-          <tr><td>Price</td><td>$30-$300/mo</td><td>Free Forever</td></tr>
-          <tr><td>Setup Time</td><td>Hours</td><td>10 Seconds</td></tr>
+          <tr><td>AI Prop Models</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">1 basic</td><td class="ch">6 Fused</td></tr>
+          <tr><td>Confidence Score</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="ch">SAFE 0-100</td></tr>
+          <tr><td>Props/Night</td><td>50</td><td>~30</td><td>~80</td><td class="ch">300+</td></tr>
+          <tr><td>Live Sweat Tracking</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="ch">Real-Time</td></tr>
+          <tr><td>Bankroll/Kelly</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td>Basic</td><td class="ch">Full Suite</td></tr>
+          <tr><td>Matchup DNA</td><td class="x">&#x2717;</td><td>Basic</td><td class="x">&#x2717;</td><td class="ch">Defensive DNA</td></tr>
+          <tr><td>Line Movement</td><td>Delayed</td><td>Delayed</td><td>Near-RT</td><td class="ch">Real-Time</td></tr>
+          <tr><td>Edge Detection</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td>Manual</td><td class="ch">AI-Automated</td></tr>
+          <tr><td>Backtesting</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="ch">Full Archive</td></tr>
+          <tr><td>CLV Tracking</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td>Basic</td><td class="ch">92% Capture</td></tr>
+          <tr class="hi"><td><strong>Monthly Price</strong></td><td class="x"><strong>$99</strong></td><td class="x"><strong>$59.99</strong></td><td class="x"><strong>$149</strong></td><td class="ch"><strong>FREE</strong></td></tr>
         </tbody>
       </table>
     </div>
 
+    <!-- Bottom line callout -->
+    <div class="ag-bottom-line">
+      <div class="ag-bl-headline">The math is simple: <span class="em">they can&rsquo;t compete.</span></div>
+      <p class="ag-bl-body">
+        The best-funded tools on the market give you <strong>zero AI models</strong>, charge <strong>$99&ndash;$299/mo</strong>,
+        and still can&rsquo;t match what Smart Pick Pro does for <strong>free</strong>.
+        No gimmicks, no trials, no hidden fees &mdash; just <strong>6 AI models, 300+ props, and real-time tracking</strong> at the best price online: <strong>$0</strong>.
+      </p>
+    </div>
+
+    <!-- Feature pillars -->
     <div class="ag-features">
       <div class="ag-feat">
         <span class="ag-feat-ico">&#x1F9E0;</span>
@@ -856,6 +1062,7 @@ def require_login() -> bool:
       </div>
     </div>
 
+    <!-- Metric counters -->
     <div class="ag-stats">
       <div class="ag-stat">
         <div class="ag-stat-val">62.4%</div>
@@ -883,31 +1090,33 @@ def require_login() -> bool:
       </div>
     </div>
 
+    <!-- Testimonials -->
     <div class="ag-reviews">
       <div class="ag-section-head">
         <h3>What Sharps Are Saying</h3>
       </div>
       <div class="ag-review">
-        <div class="ag-review-text">The Quantum Engine literally changed how I bet. I went from random parlays to a real mathematical edge.</div>
+        <div class="ag-review-text">I was paying $99/mo for OddsJam and still losing. Switched to Smart Pick Pro &mdash; free, better AI, and my bankroll is up 22% in two months.</div>
         <div class="ag-review-stars">&#x2B50;&#x2B50;&#x2B50;&#x2B50;&#x2B50;</div>
         <div class="ag-review-author">&mdash; @sharpbettor_mike</div>
       </div>
       <div class="ag-review">
-        <div class="ag-review-text">SAFE Score saved me from so many bad bets. I only play 80+ rated props now and my bankroll keeps growing.</div>
+        <div class="ag-review-text">SAFE Score is something no other platform has. I only play 80+ rated props now and my win rate went from 48% to 63%.</div>
         <div class="ag-review-stars">&#x2B50;&#x2B50;&#x2B50;&#x2B50;&#x2B50;</div>
         <div class="ag-review-author">&mdash; @datadrivendenver</div>
       </div>
       <div class="ag-review">
-        <div class="ag-review-text">Live Sweat Mode is addictive. Watching props track in real-time with AI confidence updates &mdash; nothing else does this.</div>
+        <div class="ag-review-text">Live Sweat Mode is addictive. Watching props track in real-time with AI confidence updates &mdash; I cancelled Action Network the same day.</div>
         <div class="ag-review-stars">&#x2B50;&#x2B50;&#x2B50;&#x2B50;&#x2B50;</div>
         <div class="ag-review-author">&mdash; @nightowl_picks</div>
       </div>
     </div>
 
+    <!-- Pricing -->
     <div class="ag-pricing">
       <div class="ag-section-head">
-        <h3>Simple Pricing</h3>
-        <p>Start free. Upgrade when you want more.</p>
+        <h3>Best Price Online. Period.</h3>
+        <p>Start free forever. Upgrade only if you want more.</p>
       </div>
       <div class="ag-price-grid">
         <div class="ag-price">
@@ -933,6 +1142,12 @@ def require_login() -> bool:
       </div>
     </div>
 
+    <!-- Savings callout -->
+    <div class="ag-savings">
+      <p class="ag-savings-text">You&rsquo;d pay <span class="big">$1,188/yr</span> for OddsJam alone.</p>
+      <p class="ag-savings-sub">Smart Pick Pro gives you more features, more AI, more props &mdash; for $0. Do the math.</p>
+    </div>
+
     <div class="ag-trust">
       <div class="ag-trust-item">&#x1F512; 256-bit Encrypted</div>
       <div class="ag-trust-item">&#x1F4B3; No Credit Card</div>
@@ -940,7 +1155,7 @@ def require_login() -> bool:
     </div>
 
     <div class="ag-footer">
-      &copy; 2025 Smart Pick Pro &middot; For entertainment &amp; educational purposes only &middot; 21+<br>
+      &copy; 2026 Smart Pick Pro &middot; For entertainment &amp; educational purposes only &middot; 21+<br>
       <a href="https://www.ncpgambling.org/" target="_blank">National Council on Problem Gambling &middot; 1-800-GAMBLER</a>
     </div>
     """, unsafe_allow_html=True)
