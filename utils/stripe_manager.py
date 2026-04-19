@@ -70,6 +70,29 @@ APP_URL = APP_URL.rstrip("/")
 # Used in redirect URLs passed to Stripe.
 _PREMIUM_PAGE_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
 
+# ── Helpers for Stripe API version differences ────────────────
+def _get_period_end(sub) -> int | None:
+    """Get current_period_end from subscription or its first item."""
+    val = getattr(sub, "current_period_end", None)
+    if val:
+        return val
+    try:
+        return sub["items"]["data"][0]["current_period_end"]
+    except Exception:
+        return None
+
+
+def _get_period_start(sub) -> int | None:
+    """Get current_period_start from subscription or its first item."""
+    val = getattr(sub, "current_period_start", None)
+    if val:
+        return val
+    try:
+        return sub["items"]["data"][0]["current_period_start"]
+    except Exception:
+        return None
+
+
 # ── Configure Stripe SDK with our secret key ─────────────────
 # This must be done before any Stripe API calls.
 def _configure_stripe():
@@ -263,14 +286,12 @@ def verify_checkout_session(session_id: str) -> dict:
 
         if subscription:
             status = subscription.status
-            if subscription.current_period_start:
-                period_start = datetime.datetime.fromtimestamp(
-                    subscription.current_period_start
-                ).isoformat()
-            if subscription.current_period_end:
-                period_end = datetime.datetime.fromtimestamp(
-                    subscription.current_period_end
-                ).isoformat()
+            _ps = _get_period_start(subscription)
+            if _ps:
+                period_start = datetime.datetime.fromtimestamp(_ps).isoformat()
+            _pe = _get_period_end(subscription)
+            if _pe:
+                period_end = datetime.datetime.fromtimestamp(_pe).isoformat()
             # Try to get plan name from the subscription's price
             try:
                 price = subscription["items"]["data"][0]["price"]
@@ -355,10 +376,9 @@ def get_subscription_by_id(subscription_id: str) -> dict:
         is_active = subscription.status in ("active", "trialing")
 
         period_end = ""
-        if subscription.current_period_end:
-            period_end = datetime.datetime.fromtimestamp(
-                subscription.current_period_end
-            ).isoformat()
+        _pe = _get_period_end(subscription)
+        if _pe:
+            period_end = datetime.datetime.fromtimestamp(_pe).isoformat()
 
         return {
             "success": True,
@@ -464,10 +484,9 @@ def get_subscription_by_email(customer_email: str) -> dict:
 
         sub = subscriptions.data[0]
         period_end = ""
-        if sub.current_period_end:
-            period_end = datetime.datetime.fromtimestamp(
-                sub.current_period_end
-            ).isoformat()
+        _pe = _get_period_end(sub)
+        if _pe:
+            period_end = datetime.datetime.fromtimestamp(_pe).isoformat()
 
         return {
             "success": True,
