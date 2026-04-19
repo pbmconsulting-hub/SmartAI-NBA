@@ -467,6 +467,8 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         str(result.get("player_team", result.get("team", "")))
     )
     platform = _html.escape(str(result.get("platform", "")))
+    if platform == "PrizePicks":
+        platform = "Smart Pick"
     tier = _html.escape(str(result.get("tier", "Bronze")))
     tier_lower = tier.lower()
 
@@ -1551,7 +1553,10 @@ def render_platform_picks_html(picks: list) -> str:
     for idx, r in enumerate(picks):
         name = _html.escape(r.get("player_name", "Unknown"))
         team = _html.escape((r.get("player_team", "") or "").upper())
-        platform = _html.escape(r.get("platform", "Platform") or "Platform")
+        _raw_platform = r.get("platform", "Platform") or "Platform"
+        if _raw_platform == "PrizePicks":
+            _raw_platform = "Smart Pick"
+        platform = _html.escape(_raw_platform)
         opp = r.get("opponent", "")
         is_home = r.get("is_home")
         if opp:

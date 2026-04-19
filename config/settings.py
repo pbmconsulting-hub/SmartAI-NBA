@@ -71,6 +71,9 @@ class _Settings:
     STRIPE_SECRET_KEY: str = os.environ.get("STRIPE_SECRET_KEY", "")
     STRIPE_PUBLISHABLE_KEY: str = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
     STRIPE_PRICE_ID: str = os.environ.get("STRIPE_PRICE_ID", "")
+    STRIPE_PRICE_SHARP_IQ: str = os.environ.get("STRIPE_PRICE_SHARP_IQ", "")
+    STRIPE_PRICE_SMART_MONEY: str = os.environ.get("STRIPE_PRICE_SMART_MONEY", "")
+    STRIPE_PRICE_INSIDER_CIRCLE: str = os.environ.get("STRIPE_PRICE_INSIDER_CIRCLE", "")
     STRIPE_WEBHOOK_SECRET: str = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
     APP_URL: str = os.environ.get("APP_URL", "http://localhost:8501")
 

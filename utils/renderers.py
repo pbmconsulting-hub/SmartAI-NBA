@@ -193,6 +193,8 @@ def _build_single_card_html(result, index=0, compact=False):
     stat_type = _escape(result.get("stat_type", ""))
     team = _escape(result.get("player_team", result.get("team", "")))
     platform = _escape(result.get("platform", ""))
+    if platform == "PrizePicks":
+        platform = "Smart Pick"
     tier = result.get("tier", "Bronze")
     if result.get("should_avoid", False):
         tier = "Avoid"
@@ -641,6 +643,8 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
     stat_type = _escape(result.get("stat_type", ""))
     team = _escape(result.get("player_team", result.get("team", "")))
     platform = _escape(result.get("platform", ""))
+    if platform == "PrizePicks":
+        platform = "Smart Pick"
     tier = result.get("tier", "Bronze")
     if result.get("should_avoid", False):
         tier = "Avoid"

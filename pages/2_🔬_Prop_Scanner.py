@@ -105,7 +105,7 @@ st.markdown(get_education_box_html(
     Example: "LeBron James Points OVER 24.5" — you win if LeBron scores 25 or more points.<br><br>
     <strong>How to read a prop line</strong>: The number (24.5) is the threshold.
     Always bet OVER or UNDER — never equal (that's a push/tie).<br><br>
-    <strong>Platforms</strong>: PrizePicks, Underdog Fantasy, DraftKings Pick6 — each platform may have different line values.
+    <strong>Platforms</strong>: SPP, Underdog Fantasy, DraftKings Pick6 — each platform may have different line values.
     """
 ), unsafe_allow_html=True)
 
@@ -132,7 +132,7 @@ valid_stat_types = (
     + ["double_double", "triple_double"]
 )
 valid_platforms = [
-    "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
+    "SPP", "Underdog Fantasy", "DraftKings Pick6",
 ]
 
 # ── Import platform service (optional — app works without it) ──
@@ -524,7 +524,7 @@ with tab_load:
         # Platform checkboxes
         plat_col_pp, plat_col_ud, plat_col_dk = st.columns(3)
         with plat_col_pp:
-            pp_on = st.checkbox("🟢 PrizePicks", value=True, key="scanner_pp_checkbox")
+            pp_on = st.checkbox("🟢 SPP", value=True, key="scanner_pp_checkbox")
         with plat_col_ud:
             ud_on = st.checkbox("🟡 Underdog Fantasy", value=True, key="scanner_ud_checkbox")
         with plat_col_dk:
@@ -538,7 +538,7 @@ with tab_load:
 
         enabled_platforms = []
         if pp_on:
-            enabled_platforms.append("PrizePicks")
+            enabled_platforms.append("SPP")
         if ud_on:
             enabled_platforms.append("Underdog Fantasy")
         if dk_on:
@@ -710,7 +710,7 @@ with tab_load:
         st.markdown("**Required CSV format:**")
         st.code(
             "player_name,team,stat_type,line,platform,game_date\n"
-            "LeBron James,LAL,points,24.5,PrizePicks,2026-03-05\n"
+            "LeBron James,LAL,points,24.5,SPP,2026-03-05\n"
             "Stephen Curry,GSW,threes,3.5,DraftKings Pick6,2026-03-05",
             language="csv",
         )
@@ -792,7 +792,7 @@ with tab_load:
 
     quick_add_text = st.text_area(
         "Paste CSV data here",
-        placeholder="player_name,team,stat_type,line,platform\nLeBron James,LAL,points,24.5,PrizePicks\nStephen Curry,GSW,threes,3.5,DraftKings Pick6",
+        placeholder="player_name,team,stat_type,line,platform\nLeBron James,LAL,points,24.5,SPP\nStephen Curry,GSW,threes,3.5,DraftKings Pick6",
         height=150,
     )
 

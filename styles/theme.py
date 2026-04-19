@@ -1592,7 +1592,7 @@ def get_player_card_html(result):
     dir_class = "dir-over" if direction == "OVER" else "dir-under"
 
     platform_colors = {
-        "PrizePicks": "rgba(39,103,73,0.9)",
+        "Smart Pick": "rgba(39,103,73,0.9)",
         "Underdog Fantasy": "rgba(85,60,154,0.9)",
         "DraftKings Pick6": "rgba(43,108,176,0.9)",
         # Backward-compat aliases

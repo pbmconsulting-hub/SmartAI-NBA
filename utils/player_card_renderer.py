@@ -518,6 +518,8 @@ def _build_prop_card(result, player_info=None):
     prob_over = float(r.get("probability_over") or 0.5)
     edge = float(r.get("edge_percentage") or 0)
     platform = _e(str(r.get("platform") or ""))
+    if platform == "PrizePicks":
+        platform = "Smart Pick"
 
     direction = (r.get("direction") or "").upper()
     if not direction:

@@ -204,7 +204,7 @@ def premium_gate(feature_name: str) -> bool:
             use_container_width=True,
             key=f"_gate_upgrade_{feature_name.replace(' ', '_')}",
         ):
-            st.switch_page("pages/14_💎_Subscription_Level.py")
+            st.switch_page("pages/15_💎_Subscription_Level.py")
 
     st.markdown(
         f'<p class="gate-disclaimer" style="text-align:center;">'

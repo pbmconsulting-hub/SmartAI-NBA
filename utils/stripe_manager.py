@@ -46,9 +46,22 @@ except ImportError:
 # Read environment variables (never hard-code keys in source code!)
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
-STRIPE_PRICE_ID        = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_PRICE_ID        = os.environ.get("STRIPE_PRICE_ID", "")  # legacy fallback
 STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 APP_URL                = os.environ.get("APP_URL", "http://localhost:8501")
+
+# ── Per-tier Price IDs (new 4-tier model) ─────────────────────
+STRIPE_PRICE_SHARP_IQ      = os.environ.get("STRIPE_PRICE_SHARP_IQ", "")
+STRIPE_PRICE_SMART_MONEY   = os.environ.get("STRIPE_PRICE_SMART_MONEY", "")
+STRIPE_PRICE_INSIDER_CIRCLE = os.environ.get("STRIPE_PRICE_INSIDER_CIRCLE", "")
+
+# Map lookup keys → (price_id, checkout_mode)
+# "subscription" for recurring, "payment" for one-time.
+_PRICE_MAP = {
+    "sharp_iq":       (STRIPE_PRICE_SHARP_IQ,      "subscription"),
+    "smart_money":    (STRIPE_PRICE_SMART_MONEY,    "subscription"),
+    "insider_circle": (STRIPE_PRICE_INSIDER_CIRCLE, "payment"),
+}
 
 # Remove trailing slash from APP_URL so URL construction is clean
 APP_URL = APP_URL.rstrip("/")
@@ -78,7 +91,7 @@ def _configure_stripe():
 # SECTION: Checkout Session
 # ============================================================
 
-def create_checkout_session(customer_email: str = "") -> dict:
+def create_checkout_session(customer_email: str = "", price_lookup: str = "") -> dict:
     """
     Create a Stripe Checkout Session for a new subscription.
 
@@ -105,12 +118,19 @@ def create_checkout_session(customer_email: str = "") -> dict:
             "error": "Stripe is not configured. Please set STRIPE_SECRET_KEY.",
         }
 
-    if not STRIPE_PRICE_ID:
+    # ── Resolve price ID from lookup key or fall back to legacy ──
+    price_id = ""
+    checkout_mode = "subscription"
+    if price_lookup and price_lookup in _PRICE_MAP:
+        price_id, checkout_mode = _PRICE_MAP[price_lookup]
+    if not price_id:
+        price_id = STRIPE_PRICE_ID  # legacy single-price fallback
+    if not price_id:
         return {
             "success": False,
             "url": "",
             "session_id": "",
-            "error": "Stripe Price ID not configured. Please set STRIPE_PRICE_ID.",
+            "error": "Stripe Price ID not configured for this tier.",
         }
 
     try:
@@ -122,10 +142,10 @@ def create_checkout_session(customer_email: str = "") -> dict:
 
         # Build session parameters
         session_params = {
-            "mode": "subscription",
+            "mode": checkout_mode,
             "line_items": [
                 {
-                    "price": STRIPE_PRICE_ID,
+                    "price": price_id,
                     "quantity": 1,
                 }
             ],

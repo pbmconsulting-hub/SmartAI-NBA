@@ -1743,7 +1743,7 @@ st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 # ============================================================
 
 st.markdown("""
-<div class="section-header lp-anim lp-anim-d2">🗺️ Your Toolkit — 15 Pages of Analysis</div>
+<div class="section-header lp-anim lp-anim-d2">🗺️ Your Toolkit — 16 Pages of Analysis</div>
 <div class="section-subheader">Every tool you need, from data loading to bet tracking.</div>
 """, unsafe_allow_html=True)
 
@@ -1754,7 +1754,7 @@ _nav_row1 = [
     ("📡", "Live Games", "Load tonight's slate in one click", "pages/1_📡_Live_Games.py"),
     ("🔬", "Prop Scanner", "Enter props manually or pull live lines", "pages/2_🔬_Prop_Scanner.py"),
     ("⚡", "Quantum Analysis", "Run the Quantum Matrix Engine", "pages/3_⚡_Quantum_Analysis_Matrix.py"),
-    ("🧬", "Entry Builder", "Build EV-optimized parlays", "pages/6_🧬_Entry_Builder.py"),
+    ("🧬", "Entry Builder", "Build EV-optimized parlays", "pages/8_🧬_Entry_Builder.py"),
 ]
 for i, (icon, name, desc, page) in enumerate(_nav_row1):
     with _nav_r1[i]:
@@ -1771,11 +1771,11 @@ for i, (icon, name, desc, page) in enumerate(_nav_row1):
 st.markdown('<div class="nav-row-label analysis">🔬 Deep Analysis</div>', unsafe_allow_html=True)
 _nav_r2 = st.columns(5)
 _nav_row2 = [
-    ("📋", "Game Report", "Full game breakdowns", "pages/4_📋_Game_Report.py"),
-    ("🔮", "Player Simulator", "What-if scenarios", "pages/5_🔮_Player_Simulator.py"),
-    ("🗺️", "Correlation Matrix", "Find correlated props", "pages/10_🗺️_Correlation_Matrix.py"),
-    ("🛡️", "Risk Shield", "See what to avoid + why", "pages/8_🛡️_Risk_Shield.py"),
-    ("🎙️", "The Studio", "Joseph's AI analysis room", "pages/7_🎙️_The_Studio.py"),
+    ("📋", "Game Report", "Full game breakdowns", "pages/6_📋_Game_Report.py"),
+    ("🔮", "Player Simulator", "What-if scenarios", "pages/7_🔮_Player_Simulator.py"),
+    ("🗺️", "Correlation Matrix", "Find correlated props", "pages/11_🗺️_Correlation_Matrix.py"),
+    ("🛡️", "Risk Shield", "See what to avoid + why", "pages/9_🛡️_Risk_Shield.py"),
+    ("🎙️", "The Studio", "Joseph's AI analysis room", "pages/5_🎙️_The_Studio.py"),
 ]
 for i, (icon, name, desc, page) in enumerate(_nav_row2):
     with _nav_r2[i]:
@@ -1793,11 +1793,11 @@ st.markdown('<div class="nav-row-label manage">📊 Track &amp; Manage</div>', u
 _nav_r3 = st.columns(6)
 _nav_row3 = [
     ("💦", "Live Sweat", "Track bets in real-time", "pages/0_💦_Live_Sweat.py"),
-    ("📈", "Bet Tracker", "Log results, track ROI", "pages/11_📈_Bet_Tracker.py"),
-    ("📊", "Proving Grounds", "Validate model accuracy", "pages/12_📊_Proving_Grounds.py"),
-    ("📡", "Smart NBA Data", "Player stats, standings & more", "pages/9_📡_Smart_NBA_Data.py"),
-    ("⚙️", "Settings", "Tune engine parameters", "pages/13_⚙️_Settings.py"),
-    ("💎", "Premium", "Unlock everything", "pages/14_💎_Subscription_Level.py"),
+    ("📈", "Bet Tracker", "Log results, track ROI", "pages/12_📈_Bet_Tracker.py"),
+    ("📊", "Proving Grounds", "Validate model accuracy", "pages/13_📊_Proving_Grounds.py"),
+    ("📡", "Smart NBA Data", "Player stats, standings & more", "pages/10_📡_Smart_NBA_Data.py"),
+    ("⚙️", "Settings", "Tune engine parameters", "pages/14_⚙️_Settings.py"),
+    ("💎", "Premium", "Unlock everything", "pages/15_💎_Subscription_Level.py"),
 ]
 for i, (icon, name, desc, page) in enumerate(_nav_row3):
     with _nav_r3[i]:
