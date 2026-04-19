@@ -241,7 +241,8 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .pv-metric-label{font-family:'JetBrains Mono',monospace;font-size:.36rem;font-weight:700;color:rgba(255,255,255,.2);text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
 /* hint */
 .pv-hint{text-align:center;margin-top:10px;font-size:.55rem;color:rgba(0,213,89,.25);font-style:normal;font-family:'JetBrains Mono',monospace;letter-spacing:.05em}
-@media(max-width:520px){.pv-card{width:180px}.pv-line{font-size:1.3rem}.pv-name{font-size:.7rem}.pv-headshot{width:64px;height:64px}.pv-hs-wrap::before{width:72px;height:72px}}
+@media(max-width:520px){.pv-card{width:180px}.pv-line{font-size:1.3rem}.pv-name{font-size:.7rem}.pv-headshot{width:64px;height:64px}.pv-hs-wrap::before{width:72px;height:72px}.pv-header{padding:10px 12px 8px}.pv-title{font-size:.72rem}}
+@media(max-width:380px){.pv-card{width:155px}.pv-line{font-size:1.1rem}.pv-name{font-size:.62rem}.pv-headshot{width:54px;height:54px}.pv-hs-wrap::before{width:62px;height:62px}.pv-metrics{padding:6px 4px}.pv-metric-val{font-size:.55rem}.pv-dir span{font-size:.52rem;padding:4px 12px}.pv-header{padding:8px 10px 6px}.pv-title{font-size:.65rem}.pv-scroll{padding:4px 10px 12px}}
 </style>"""
 
     # ── Build cards ──
@@ -820,7 +821,7 @@ footer { display: none !important; }
 }
 
 .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
-    padding: 0 !important;
+    padding: 100px 0 0 0 !important;
     max-width: 100% !important;
     margin: 0 auto !important;
     position: relative;
@@ -835,15 +836,18 @@ html, body, .stApp, .stApp * {
 .ag-section {
     width: 100%; max-width: 780px; margin: 0 auto;
     padding-left: 28px; padding-right: 28px;
+    box-sizing: border-box;
 }
 .ag-full-bleed {
     width: 100vw; position: relative;
     left: 50%; transform: translateX(-50%);
     padding: 48px 0;
+    overflow-x: hidden;
 }
 .ag-full-bleed .ag-section {
     max-width: 780px; margin: 0 auto;
     padding-left: 28px; padding-right: 28px;
+    box-sizing: border-box;
 }
 
 /* ── Keyframes ───────────────────────────────────────────────── */
@@ -885,11 +889,6 @@ html, body, .stApp, .stApp * {
 @keyframes agHexFloat {
     0%, 100% { opacity: 0.03; transform: rotate(0deg); }
     50%      { opacity: 0.07; transform: rotate(3deg); }
-}
-@keyframes agShimmer {
-    0%   { left: -100%; }
-    50%  { left: 150%; }
-    100% { left: 150%; }
 }
 @keyframes agBarSlide {
     0%   { background-position: -200% 0; }
@@ -1706,195 +1705,118 @@ html, body, .stApp, .stApp * {
 .ag-us-detail strong { color: #fff; }
 
 /* ── Full comparison table ───────────────────────────────────── */
+/* ── AI Feature Grid (replaces old comparison table) ──────────── */
 .ag-compare {
     margin: 56px 0 0;
     animation: agFadeUp 0.6s 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.ag-tbl {
-    width: 100%; border-collapse: separate; border-spacing: 0;
-    background: linear-gradient(168deg, rgba(10,16,32,0.95), rgba(8,12,24,0.98));
-    border: 1px solid rgba(0,213,89,0.08);
-    border-radius: 20px; overflow: hidden;
-    font-size: 0.85rem;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,213,89,0.03) inset;
+.ag-fgrid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
 }
-.ag-tbl thead th {
-    padding: 20px 14px; font-size: 0.62rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: rgba(255,255,255,0.3);
-    border-bottom: 2px solid rgba(255,255,255,0.06);
-    font-family: 'Space Grotesk', sans-serif;
-    background: rgba(255,255,255,0.02);
-}
-.ag-tbl thead th:first-child { text-align: left; width: 26%; padding-left: 24px; }
-.ag-tbl thead th:not(:first-child) { text-align: center; width: 18.5%; }
-.ag-tbl thead th:last-child {
-    color: #00D559; background: linear-gradient(180deg, rgba(0,213,89,0.1), rgba(0,213,89,0.03));
-    position: relative; width: 22%;
-    text-shadow: 0 0 20px rgba(0,213,89,0.3);
-}
-.ag-tbl thead th:last-child::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #00D559, #2D9EFF);
-}
-/* Glowing column borders */
-.ag-tbl tbody td:last-child::before,
-.ag-tbl thead th:last-child::after {
-    content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 1px;
-    background: linear-gradient(180deg, rgba(0,213,89,0.3), rgba(0,213,89,0.05));
-}
-.ag-tbl tbody td {
-    padding: 16px 14px; color: rgba(255,255,255,0.3);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-weight: 600; text-align: center;
-    transition: background 0.3s, transform 0.2s;
-    position: relative;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-}
-.ag-tbl tbody td:first-child {
-    font-weight: 700; color: rgba(255,255,255,0.7); text-align: left; padding-left: 24px;
-    font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem;
-}
-.ag-tbl tbody td:first-child .ft-ico {
-    display: inline-block; width: 22px; text-align: center; margin-right: 8px;
-    font-size: 0.82rem; vertical-align: middle;
-}
-.ag-tbl tbody td:last-child {
-    color: #00D559; background: rgba(0,213,89,0.04);
-    font-weight: 800; font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem; position: relative;
-}
-.ag-tbl tbody tr { transition: background 0.2s; }
-.ag-tbl tbody tr:last-child td { border-bottom: none; }
-.ag-tbl tbody tr:hover td { background: rgba(255,255,255,0.025); }
-.ag-tbl tbody tr:hover td:last-child { background: rgba(0,213,89,0.08); }
-/* X marks — dim red with subtle glow */
-.ag-tbl .x {
-    color: rgba(242,67,54,0.45); font-weight: 700;
-    font-size: 0.9rem;
-}
-/* Checkmarks — bright green */
-.ag-tbl .ch {
-    color: #00D559; font-weight: 800;
-    text-shadow: 0 0 12px rgba(0,213,89,0.15);
-}
-/* Partial/limited — muted amber */
-.ag-tbl .pt { color: rgba(249,198,43,0.5); font-weight: 600; }
-/* Price highlight row */
-.ag-tbl .hi {
-    background: linear-gradient(90deg, rgba(0,213,89,0.06), rgba(0,213,89,0.12));
-    border-top: 2px solid rgba(0,213,89,0.25);
-}
-.ag-tbl .hi td {
-    font-size: 0.95rem; padding: 20px 14px;
-    font-family: 'Space Grotesk', sans-serif;
-}
-.ag-tbl .hi td:first-child { padding-left: 24px; font-size: 0.95rem; }
-.ag-tbl .hi td:last-child {
-    font-size: 1.3rem; color: #00D559;
-    text-shadow: 0 0 30px rgba(0,213,89,0.3), 0 0 60px rgba(0,213,89,0.1);
-    letter-spacing: 0.04em;
-}
-.ag-tbl .hi td.x {
-    color: rgba(242,67,54,0.6); font-size: 0.92rem;
-    text-decoration: line-through; text-decoration-color: rgba(242,67,54,0.3);
-}
-/* Row animation */
-@keyframes agRowSlide { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
-.ag-tbl tbody tr { animation: agRowSlide 0.4s cubic-bezier(0.22,1,0.36,1) both; }
-.ag-tbl tbody tr:nth-child(1) { animation-delay: 0.05s; }
-.ag-tbl tbody tr:nth-child(2) { animation-delay: 0.08s; }
-.ag-tbl tbody tr:nth-child(3) { animation-delay: 0.11s; }
-.ag-tbl tbody tr:nth-child(4) { animation-delay: 0.14s; }
-.ag-tbl tbody tr:nth-child(5) { animation-delay: 0.17s; }
-.ag-tbl tbody tr:nth-child(6) { animation-delay: 0.20s; }
-.ag-tbl tbody tr:nth-child(7) { animation-delay: 0.23s; }
-.ag-tbl tbody tr:nth-child(8) { animation-delay: 0.26s; }
-.ag-tbl tbody tr:nth-child(9) { animation-delay: 0.29s; }
-.ag-tbl tbody tr:nth-child(10) { animation-delay: 0.32s; }
-.ag-tbl tbody tr:nth-child(11) { animation-delay: 0.35s; }
-
-/* ── "Bottom Line" callout ───────────────────────────────────── */
-.ag-bottom-line {
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.08), rgba(10, 16, 32, 0.95), rgba(8, 12, 24, 0.98));
-    border: 2px solid rgba(0, 213, 89, 0.2);
-    border-radius: 24px; padding: 48px 32px;
-    text-align: center; margin: 48px 0 0;
-    animation: agFadeUp 0.6s 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+.ag-fcard {
+    background: linear-gradient(168deg, rgba(8,14,28,0.97), rgba(5,9,16,0.99));
+    border: 1.5px solid rgba(255,255,255,0.04);
+    border-radius: 20px; padding: 28px 22px 24px;
     position: relative; overflow: hidden;
-    box-shadow: 0 0 60px rgba(0, 213, 89, 0.06), 0 20px 60px rgba(0, 0, 0, 0.45);
-}
-.ag-bottom-line::before {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(0, 213, 89, 0.1) 0%, transparent 55%);
-    pointer-events: none;
-}
-.ag-bl-headline {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 2.2rem; font-weight: 800;
-    color: #fff; margin: 0 0 18px;
-    text-transform: uppercase; letter-spacing: -0.03em;
-    line-height: 1.1; position: relative;
-}
-.ag-bl-headline .em {
-    background: linear-gradient(135deg, #00D559, #2D9EFF, #c084fc);
-    background-size: 300% 300%;
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: agGradientShift 4s ease infinite;
-}
-.ag-bl-body {
-    font-size: 0.95rem; color: rgba(255, 255, 255, 0.5);
-    line-height: 1.75; margin: 0;
-    max-width: 620px; margin-left: auto; margin-right: auto;
-    position: relative;
-}
-.ag-bl-body strong { color: #fff; font-weight: 700; }
-
-/* ── Feature cards (3-col) ───────────────────────────────────── */
-.ag-features {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
-    margin: 56px 0 0;
-    animation: agFadeUp 0.6s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.ag-feat {
-    background: linear-gradient(168deg, rgba(8, 14, 28, 0.97), rgba(5, 9, 16, 0.99));
-    border: 1px solid rgba(0, 213, 89, 0.1);
-    border-radius: 20px; padding: 36px 20px 28px;
-    text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.4s, transform 0.4s, box-shadow 0.4s;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.02);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
 }
-.ag-feat::before {
+.ag-fcard::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #00D559, #2D9EFF, #c084fc);
-    opacity: 0.6; transition: opacity 0.4s;
+    border-radius: 3px 3px 0 0; transition: opacity 0.4s;
 }
-.ag-feat:hover {
-    border-color: rgba(0, 213, 89, 0.45);
-    transform: translateY(-8px);
-    box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5), 0 0 50px rgba(0, 213, 89, 0.12);
+.ag-fcard::after {
+    content: ''; position: absolute; inset: 0; border-radius: 20px;
+    opacity: 0; transition: opacity 0.4s; pointer-events: none;
 }
-.ag-feat:hover::before { opacity: 1; }
-.ag-feat-ico {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 72px; height: 72px; border-radius: 18px;
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.15), rgba(45, 158, 255, 0.1));
-    border: 1px solid rgba(0, 213, 89, 0.2);
-    font-size: 2.2rem; margin-bottom: 16px;
-    box-shadow: 0 8px 24px rgba(0, 213, 89, 0.08), 0 0 20px rgba(0, 213, 89, 0.04);
+.ag-fcard:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 40px var(--fc-glow, rgba(0,213,89,0.08));
 }
-.ag-feat-name {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.1rem; font-weight: 800;
-    color: #fff; text-transform: uppercase;
-    letter-spacing: -0.02em; line-height: 1.2;
+.ag-fcard:hover::after { opacity: 1; }
+/* Color variants */
+.ag-fcard.fc-grn { --fc-glow: rgba(0,213,89,0.1); }
+.ag-fcard.fc-grn::before { background: linear-gradient(90deg, #00D559, #00B74D); }
+.ag-fcard.fc-grn::after { background: radial-gradient(ellipse at 50% 0%, rgba(0,213,89,0.06), transparent 65%); }
+.ag-fcard.fc-grn:hover { border-color: rgba(0,213,89,0.25); }
+.ag-fcard.fc-blu { --fc-glow: rgba(45,158,255,0.1); }
+.ag-fcard.fc-blu::before { background: linear-gradient(90deg, #2D9EFF, #1a7ad9); }
+.ag-fcard.fc-blu::after { background: radial-gradient(ellipse at 50% 0%, rgba(45,158,255,0.06), transparent 65%); }
+.ag-fcard.fc-blu:hover { border-color: rgba(45,158,255,0.25); }
+.ag-fcard.fc-pur { --fc-glow: rgba(192,132,252,0.1); }
+.ag-fcard.fc-pur::before { background: linear-gradient(90deg, #c084fc, #9333ea); }
+.ag-fcard.fc-pur::after { background: radial-gradient(ellipse at 50% 0%, rgba(192,132,252,0.06), transparent 65%); }
+.ag-fcard.fc-pur:hover { border-color: rgba(192,132,252,0.25); }
+.ag-fcard.fc-amb { --fc-glow: rgba(249,198,43,0.1); }
+.ag-fcard.fc-amb::before { background: linear-gradient(90deg, #F9C62B, #ff8c00); }
+.ag-fcard.fc-amb::after { background: radial-gradient(ellipse at 50% 0%, rgba(249,198,43,0.06), transparent 65%); }
+.ag-fcard.fc-amb:hover { border-color: rgba(249,198,43,0.25); }
+.ag-fcard.fc-cyn { --fc-glow: rgba(34,211,238,0.1); }
+.ag-fcard.fc-cyn::before { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+.ag-fcard.fc-cyn::after { background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,0.06), transparent 65%); }
+.ag-fcard.fc-cyn:hover { border-color: rgba(34,211,238,0.25); }
+.ag-fcard.fc-red { --fc-glow: rgba(248,113,113,0.1); }
+.ag-fcard.fc-red::before { background: linear-gradient(90deg, #f87171, #dc2626); }
+.ag-fcard.fc-red::after { background: radial-gradient(ellipse at 50% 0%, rgba(248,113,113,0.06), transparent 65%); }
+.ag-fcard.fc-red:hover { border-color: rgba(248,113,113,0.25); }
+/* Card internals */
+.ag-fc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.ag-fc-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.42rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 3px 10px; border-radius: 100px;
+    display: inline-flex; align-items: center; gap: 5px;
 }
-.ag-feat-desc {
-    font-size: 0.82rem; color: rgba(255, 255, 255, 0.42);
-    margin-top: 8px; line-height: 1.55;
+.ag-fc-badge .dot { width: 5px; height: 5px; border-radius: 50%; animation: agPulse 2s ease infinite; }
+.fc-grn .ag-fc-badge { color: #00D559; background: rgba(0,213,89,0.08); border: 1px solid rgba(0,213,89,0.15); }
+.fc-grn .ag-fc-badge .dot { background: #00D559; }
+.fc-blu .ag-fc-badge { color: #2D9EFF; background: rgba(45,158,255,0.08); border: 1px solid rgba(45,158,255,0.15); }
+.fc-blu .ag-fc-badge .dot { background: #2D9EFF; }
+.fc-pur .ag-fc-badge { color: #c084fc; background: rgba(192,132,252,0.08); border: 1px solid rgba(192,132,252,0.15); }
+.fc-pur .ag-fc-badge .dot { background: #c084fc; }
+.fc-amb .ag-fc-badge { color: #F9C62B; background: rgba(249,198,43,0.08); border: 1px solid rgba(249,198,43,0.15); }
+.fc-amb .ag-fc-badge .dot { background: #F9C62B; }
+.fc-cyn .ag-fc-badge { color: #22d3ee; background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.15); }
+.fc-cyn .ag-fc-badge .dot { background: #22d3ee; }
+.fc-red .ag-fc-badge { color: #f87171; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.15); }
+.fc-red .ag-fc-badge .dot { background: #f87171; }
+.ag-fc-metric {
+    font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 800;
+    letter-spacing: -0.03em; line-height: 1;
 }
+.fc-grn .ag-fc-metric { color: #00D559; text-shadow: 0 0 20px rgba(0,213,89,0.2); }
+.fc-blu .ag-fc-metric { color: #2D9EFF; text-shadow: 0 0 20px rgba(45,158,255,0.2); }
+.fc-pur .ag-fc-metric { color: #c084fc; text-shadow: 0 0 20px rgba(192,132,252,0.2); }
+.fc-amb .ag-fc-metric { color: #F9C62B; text-shadow: 0 0 20px rgba(249,198,43,0.2); }
+.fc-cyn .ag-fc-metric { color: #22d3ee; text-shadow: 0 0 20px rgba(34,211,238,0.2); }
+.fc-red .ag-fc-metric { color: #f87171; text-shadow: 0 0 20px rgba(248,113,113,0.2); }
+.ag-fc-name {
+    font-family: 'Space Grotesk', sans-serif; font-size: 1.05rem; font-weight: 800;
+    color: #fff; margin-bottom: 6px; letter-spacing: -0.02em;
+}
+.ag-fc-desc {
+    font-size: 0.72rem; color: rgba(255,255,255,0.38); line-height: 1.6; margin-bottom: 14px;
+}
+.ag-fc-specs {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto;
+}
+.ag-fc-spec {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.44rem; font-weight: 700;
+    color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.04); padding: 3px 8px; border-radius: 6px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+}
+/* Staggered entry */
+.ag-fcard:nth-child(1) { animation: agFadeUp 0.5s 0.1s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-fcard:nth-child(2) { animation: agFadeUp 0.5s 0.15s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-fcard:nth-child(3) { animation: agFadeUp 0.5s 0.2s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-fcard:nth-child(4) { animation: agFadeUp 0.5s 0.25s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-fcard:nth-child(5) { animation: agFadeUp 0.5s 0.3s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-fcard:nth-child(6) { animation: agFadeUp 0.5s 0.35s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes agPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Feature cards (3-col) — legacy kept for backward compat ── */
+.ag-features { display: none; }
 
 /* ── Metric counters ─── full-bleed stats strip ──────────────── */
 .ag-stats-strip {
@@ -2748,69 +2670,133 @@ html, body, .stApp, .stApp * {
 
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
+    .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
+        padding: 90px 0 0 0 !important;
+    }
+    .ag-section { padding-left: 18px; padding-right: 18px; }
+    .ag-full-bleed .ag-section { padding-left: 18px; padding-right: 18px; }
+    .ag-full-bleed { padding: 36px 0; }
     .ag-hero h1 { font-size: 3.2rem; }
     .ag-section-head h3, .ag-gy-head h3 { font-size: 1.8rem; }
     .ag-proof-big { font-size: 2.4rem; }
     .ag-proof-inner { grid-template-columns: repeat(2, 1fr); gap: 12px; }
     .ag-proof-stat { padding: 22px 14px 18px; }
     .ag-inside-grid { grid-template-columns: 1fr; }
+    .ag-fgrid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .ag-fcard { padding: 22px 18px 20px; }
+    .ag-fc-metric { font-size: 1.3rem; }
+    .ag-fc-name { font-size: 0.95rem; }
+    .ag-fc-desc { font-size: 0.68rem; }
+    .ag-fc-spec { font-size: 0.4rem; }
     .ag-how-steps { grid-template-columns: 1fr; gap: 12px; }
     .ag-how-arrow { display: none; }
-    .ag-bl-headline { font-size: 1.6rem; }
     .ag-us-price { font-size: 3.5rem; }
     .ag-stat-val { font-size: 2rem; }
     .ag-stats { grid-template-columns: repeat(3, 1fr); }
-    .ag-stats-strip { margin: 48px -20px 0; padding: 0 20px; }
+    .ag-stats-strip { margin: 48px -18px 0; padding: 0 18px; }
     .ag-comp { grid-template-columns: auto 1fr auto; }
     .ag-comp-miss { display: none; }
-    .ag-tbl { font-size: 0.75rem; }
-    .ag-tbl thead th, .ag-tbl tbody td { padding: 12px 8px; }
-    .ag-tbl tbody td:first-child .ft-ico { font-size: 0.72rem; margin-right: 5px; }
     .ag-review-text { font-size: 0.92rem; }
     .ag-review-avatar { width: 32px; height: 32px; font-size: 0.78rem; }
     .ag-review-body { padding: 24px 20px 18px; }
     .ag-review-footer { padding: 14px 20px; }
     .ag-review-stat { margin-top: 10px; font-size: 0.65rem; }
     .ag-review-stat .stat-num { font-size: 0.95rem; }
+    .ag-features { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 520px) {
-    .ag-hero h1 { font-size: 2.4rem; }
+    .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
+        padding: 84px 0 0 0 !important;
+    }
+    .ag-section { padding-left: 14px; padding-right: 14px; }
+    .ag-full-bleed .ag-section { padding-left: 14px; padding-right: 14px; }
+    .ag-full-bleed { padding: 28px 0; }
+    .ag-hero h1 { font-size: 2.2rem; line-height: 1.1; }
+    .ag-hero p { font-size: 0.82rem; padding: 0 8px; }
     .ag-section-head h3, .ag-gy-head h3 { font-size: 1.4rem; }
-    .ag-logo-img { width: 170px; }
-    .ag-logo-ring { width: 200px; height: 200px; }
-    .ag-hero-badges { gap: 6px; }
+    .ag-section-head p { font-size: 0.78rem; padding: 0 4px; }
+    .ag-logo-img { width: 160px; }
+    .ag-logo-ring { width: 190px; height: 190px; }
+    .ag-logo-section { padding-top: 40px; }
+    .ag-hero-badges { gap: 6px; flex-wrap: wrap; justify-content: center; }
     .ag-hero-badge { padding: 6px 12px; font-size: 0.58rem; }
-    .ag-proof-inner { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .ag-proof-big { font-size: 1.9rem; }
-    .ag-proof-stat { padding: 18px 12px 16px; border-radius: 16px; }
-    .ag-proof-label { font-size: 0.6rem; }
-    .ag-features { grid-template-columns: 1fr 1fr; }
-    .ag-stats { grid-template-columns: repeat(3, 1fr); gap: 0; }
-    .ag-stats-strip { margin: 40px -12px 0; padding: 0 12px; }
-    .ag-stat-val { font-size: 1.5rem; }
-    .ag-price-grid { grid-template-columns: 1fr; }
-    [data-testid="stForm"] { padding: 22px 18px 20px !important; }
+    .ag-hero-ai-badge { font-size: 0.5rem; padding: 5px 14px; letter-spacing: 0.1em; }
+    .ag-proof-inner { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .ag-proof-big { font-size: 1.8rem; }
-    .ag-proof-label { font-size: 0.6rem; }
-    .ag-tbl { font-size: 0.6rem; }
-    .ag-tbl thead th, .ag-tbl tbody td { padding: 9px 5px; }
-    .ag-tbl thead th:first-child, .ag-tbl tbody td:first-child { padding-left: 10px; }
-    .ag-tbl tbody td:first-child .ft-ico { display: none; }
-    .ag-tbl .hi td { padding: 14px 5px; }
-    .ag-tbl .hi td:last-child { font-size: 1rem; }
+    .ag-proof-stat { padding: 16px 10px 14px; border-radius: 14px; }
+    .ag-proof-label { font-size: 0.58rem; }
+    .ag-features { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ag-feat { padding: 22px 12px 18px; border-radius: 16px; }
+    .ag-fgrid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .ag-fcard { padding: 18px 14px 16px; border-radius: 16px; }
+    .ag-fc-metric { font-size: 1.1rem; }
+    .ag-fc-name { font-size: 0.88rem; }
+    .ag-fc-desc { font-size: 0.64rem; }
+    .ag-fc-badge { font-size: 0.38rem; padding: 2px 8px; }
+    .ag-fc-spec { font-size: 0.38rem; padding: 2px 6px; }
+    .ag-feat-ico { width: 48px; height: 48px; font-size: 1.4rem; border-radius: 14px; }
+    .ag-feat-name { font-size: 0.95rem; }
+    .ag-feat-desc { font-size: 0.75rem; }
+    .ag-stats { grid-template-columns: repeat(2, 1fr); gap: 0; }
+    .ag-stats-strip { margin: 36px -14px 0; padding: 0 14px; }
+    .ag-stat-val { font-size: 1.5rem; }
+    .ag-stat-label { font-size: 0.55rem; }
+    .ag-price-grid { grid-template-columns: 1fr; }
     .ag-cta2-head { font-size: 1.4rem; }
     .ag-pick-card { width: 152px; }
     .ag-pc-line { font-size: 1.2rem; }
     .ag-pc-player { font-size: 0.7rem; }
-    .ag-bl-headline { font-size: 1.2rem; }
-    .ag-us-price { font-size: 3rem; }
-    .ag-feat-ico { width: 52px; height: 52px; font-size: 1.5rem; }
-    .ag-feat { padding: 24px 14px 20px; border-radius: 20px; }
+    .ag-us-price { font-size: 2.8rem; }
+    .ag-us { padding: 32px 18px 28px; border-radius: 20px; }
     .ag-review::before { font-size: 3rem; }
-    .ag-review { padding: 24px 20px 20px; }
-    .ag-bottom-line { padding: 28px 18px; border-radius: 20px; }
+    .ag-review-body { padding: 20px 16px 14px; }
+    .ag-review-footer { padding: 12px 16px; }
     .ag-review-verified { display: none; }
     .ag-comp-x { width: 24px; height: 24px; font-size: 0.65rem; }
+    .ag-comp { padding: 12px 14px; border-radius: 12px; gap: 10px; }
+    .ag-comp-name { font-size: 0.82rem; }
+    .ag-comp-price { font-size: 0.95rem; }
+    .ag-how-step { padding: 22px 14px 18px; border-radius: 16px; }
+    .ag-how-num { width: 38px; height: 38px; font-size: 0.95rem; }
+    .ag-divider { margin: 28px 14px; }
+    .ag-ticker { height: 34px; }
+    .ag-ticker-item { padding: 0 14px; font-size: 0.56rem; }
+    .ag-ticker-live { font-size: 0.56rem; padding: 2px 8px; }
+    .ag-inside-card { padding: 18px 14px 16px; border-radius: 14px; }
+}
+@media (max-width: 380px) {
+    .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
+        padding: 78px 0 0 0 !important;
+    }
+    .ag-section { padding-left: 10px; padding-right: 10px; }
+    .ag-full-bleed .ag-section { padding-left: 10px; padding-right: 10px; }
+    .ag-hero h1 { font-size: 1.8rem; }
+    .ag-hero p { font-size: 0.78rem; }
+    .ag-logo-img { width: 140px; }
+    .ag-logo-ring { width: 170px; height: 170px; }
+    .ag-section-head h3, .ag-gy-head h3 { font-size: 1.2rem; }
+    .ag-proof-inner { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .ag-proof-big { font-size: 1.5rem; }
+    .ag-proof-stat { padding: 14px 8px 12px; }
+    .ag-features { grid-template-columns: 1fr; }
+    .ag-fgrid { grid-template-columns: 1fr; gap: 8px; }
+    .ag-fcard { padding: 16px 12px 14px; border-radius: 14px; }
+    .ag-fc-top { margin-bottom: 10px; }
+    .ag-fc-metric { font-size: 1rem; }
+    .ag-fc-name { font-size: 0.82rem; }
+    .ag-fc-desc { font-size: 0.62rem; margin-bottom: 10px; }
+    .ag-fc-badge { font-size: 0.36rem; padding: 2px 7px; }
+    .ag-fc-spec { font-size: 0.36rem; padding: 2px 5px; }
+    .ag-stats { grid-template-columns: repeat(2, 1fr); }
+    .ag-us-price { font-size: 2.4rem; }
+    .ag-us { padding: 28px 14px 24px; }
+    .ag-comp { grid-template-columns: auto 1fr; gap: 8px; }
+    .ag-comp-price { display: none; }
+    .ag-hero-badges { gap: 4px; }
+    .ag-hero-badge { padding: 5px 10px; font-size: 0.52rem; }
+    .ag-hero-ai-badge { font-size: 0.46rem; padding: 4px 10px; }
+    .ag-ticker { height: 30px; }
+    .ag-ticker-item { padding: 0 10px; font-size: 0.5rem; }
 }
 </style>
 """
@@ -3183,8 +3169,8 @@ def require_login() -> bool:
 }}
 @media(max-width:768px){{
   .spp-nav-dock{{
-    top:46px;padding:5px 6px 5px 8px;gap:2px;
-    max-width:96vw;border-radius:20px;
+    top:42px;padding:4px 6px 4px 8px;gap:2px;
+    max-width:97vw;border-radius:18px;
   }}
   .spp-nav-pill{{font-size:0.58rem;padding:5px 10px}}
   .spp-nav-wordmark{{display:none}}
@@ -3194,10 +3180,29 @@ def require_login() -> bool:
   .spp-nav-cta{{font-size:0.56rem;padding:5px 12px}}
   .spp-btt{{width:38px;height:38px;bottom:16px;right:12px;font-size:0.9rem;border-radius:12px}}
 }}
-@media(max-width:480px){{
+@media(max-width:520px){{
+  .spp-nav-dock{{
+    top:38px;padding:3px 4px 3px 6px;gap:1px;
+    max-width:98vw;border-radius:16px;
+  }}
   .spp-nav-pill .ni{{display:none}}
-  .spp-nav-pill{{padding:5px 8px;font-size:0.54rem}}
-  .spp-nav-cta{{padding:5px 10px;font-size:0.52rem}}
+  .spp-nav-pill{{padding:4px 8px;font-size:0.52rem}}
+  .spp-nav-cta{{padding:4px 10px;font-size:0.5rem}}
+  .spp-nav-brand{{padding:1px 4px 1px 1px;margin-right:1px;border-right:none}}
+  .spp-nav-logo-wrap{{width:24px;height:24px;border-radius:7px}}
+  .spp-nav-logo{{width:16px;height:16px}}
+  .spp-btt{{width:36px;height:36px;bottom:14px;right:10px;font-size:0.85rem;border-radius:10px}}
+}}
+@media(max-width:380px){{
+  .spp-nav-dock{{
+    top:34px;padding:2px 3px 2px 4px;gap:0px;
+    max-width:99vw;border-radius:14px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+  }}
+  .spp-nav-pill{{padding:3px 6px;font-size:0.48rem;letter-spacing:-0.01em}}
+  .spp-nav-cta{{padding:3px 8px;font-size:0.46rem;margin-left:2px}}
+  .spp-nav-logo-wrap{{width:22px;height:22px;border-radius:6px}}
+  .spp-nav-logo{{width:14px;height:14px}}
 }}
 </style>
 <nav class="spp-nav-dock" id="spp-nav-dock">
@@ -3275,8 +3280,6 @@ def require_login() -> bool:
     }
     pwin.addEventListener('scroll',onScroll,{passive:true});
     onScroll();
-    var mb=pdoc.querySelector('section.main .block-container');
-    if(mb){mb.style.paddingTop='100px';}
   },200);
 })();
 </script>""")
@@ -3491,7 +3494,8 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .sf .lb{color:rgba(255,255,255,0.2)}.sf .vl{color:#00D559;background:rgba(0,213,89,0.1);padding:1px 5px;border-radius:4px}
 .ac{font-family:'JetBrains Mono',monospace;font-size:.48rem;font-weight:700;color:#00D559}
 .hi{text-align:center;margin-top:8px;font-size:.55rem;color:rgba(255,255,255,0.18);font-style:italic}
-@media(max-width:520px){.cd{width:152px}.ln{font-size:1.2rem}.pl{font-size:.7rem}}
+@media(max-width:520px){.cd{width:152px}.ln{font-size:1.2rem}.pl{font-size:.7rem}.sh h3{font-size:1.1rem}.sh p{font-size:.68rem}}
+@media(max-width:380px){.cd{width:132px}.ln{font-size:1rem}.pl{font-size:.62rem}.ch{padding:8px 8px 0}.cb{padding:8px 8px 6px}.cf{padding:4px 8px 8px}.sh h3{font-size:.95rem}}
 </style>
 <div class="sh"><h3>Our AI Picks <span class="em">Actually Win.</span></h3><p>Real picks from Smart Pick Pro &mdash; verified results, not hypotheticals</p></div>
 <div class="badge"><span class="pulse"></span> PLATFORM PICKS &mdash; TOP AI SELECTIONS THAT HIT</div>
@@ -3564,64 +3568,98 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       </div>
     </div>
 
-    <!-- ── FEATURE-BY-FEATURE TABLE ── -->
+    <!-- ── AI SYSTEMS BREAKDOWN ── -->
     <div class="ag-compare">
       <div class="ag-section-head">
-        <h3>Feature-by-Feature <span class="em">Breakdown</span></h3>
-        <p>See exactly what they charge for vs. what you get free</p>
+        <h3>AI Systems <span class="em">Breakdown</span></h3>
+        <p>Six autonomous engines working in parallel to find your edge</p>
       </div>
-      <table class="ag-tbl">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th>OddsJam</th>
-            <th>Action</th>
-            <th>Unabated</th>
-            <th>&#x2B50; Smart&nbsp;Pick&nbsp;Pro</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td><span class="ft-ico">&#x1F9E0;</span>AI Prop Models</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="pt">1 basic</td><td class="ch">&#x2713; 6 Fused</td></tr>
-          <tr><td><span class="ft-ico">&#x1F3AF;</span>Confidence Score</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="ch">&#x2713; SAFE 0-100</td></tr>
-          <tr><td><span class="ft-ico">&#x1F4CA;</span>Props/Night</td><td class="pt">50</td><td class="pt">~30</td><td class="pt">~80</td><td class="ch">&#x2713; 300+</td></tr>
-          <tr><td><span class="ft-ico">&#x1F4E1;</span>Live Sweat Tracking</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="ch">&#x2713; Real-Time</td></tr>
-          <tr><td><span class="ft-ico">&#x1F4B0;</span>Bankroll/Kelly</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="pt">Basic</td><td class="ch">&#x2713; Full Suite</td></tr>
-          <tr><td><span class="ft-ico">&#x1F9EC;</span>Matchup DNA</td><td class="x">&#x2717;</td><td class="pt">Basic</td><td class="x">&#x2717;</td><td class="ch">&#x2713; Defensive DNA</td></tr>
-          <tr><td><span class="ft-ico">&#x1F4C8;</span>Line Movement</td><td class="pt">Delayed</td><td class="pt">Delayed</td><td class="pt">Near-RT</td><td class="ch">&#x2713; Real-Time</td></tr>
-          <tr><td><span class="ft-ico">&#x26A1;</span>Edge Detection</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="pt">Manual</td><td class="ch">&#x2713; AI-Automated</td></tr>
-          <tr><td><span class="ft-ico">&#x1F4DA;</span>Backtesting</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="ch">&#x2713; Full Archive</td></tr>
-          <tr><td><span class="ft-ico">&#x1F4C9;</span>CLV Tracking</td><td class="x">&#x2717;</td><td class="x">&#x2717;</td><td class="pt">Basic</td><td class="ch">&#x2713; 92% Capture</td></tr>
-          <tr class="hi"><td><span class="ft-ico">&#x1F4B5;</span><strong>Monthly Price</strong></td><td class="x"><strong>$99</strong></td><td class="x"><strong>$59.99</strong></td><td class="x"><strong>$149</strong></td><td class="ch"><strong>FREE</strong></td></tr>
-        </tbody>
-      </table>
-    </div>
+      <div class="ag-fgrid">
 
-    <!-- ── BOTTOM LINE CALLOUT ── -->
-    <div class="ag-bottom-line">
-      <div class="ag-bl-headline">The math is simple:<br><span class="em">they can&rsquo;t compete.</span></div>
-      <p class="ag-bl-body">
-        The best-funded tools on the market give you <strong>zero AI models</strong>, charge <strong>$99&ndash;$299/mo</strong>,
-        and still can&rsquo;t match what Smart Pick Pro does for <strong>free</strong>.
-        No gimmicks, no trials, no hidden fees &mdash; just <strong>6 AI models, 300+ props, and real-time tracking</strong> at the best price online: <strong>$0</strong>.
-      </p>
-    </div>
+        <div class="ag-fcard fc-grn">
+          <div class="ag-fc-top">
+            <span class="ag-fc-badge"><span class="dot"></span>CORE ENGINE</span>
+            <span class="ag-fc-metric">6</span>
+          </div>
+          <div class="ag-fc-name">Quantum Ensemble</div>
+          <div class="ag-fc-desc">Six neural networks &mdash; XGBoost, LightGBM, Ridge, Bayesian, LSTM, and Random Forest &mdash; fused into a single weighted signal. Each model specializes in a different statistical dimension.</div>
+          <div class="ag-fc-specs">
+            <span class="ag-fc-spec">Multi-Model Fusion</span>
+            <span class="ag-fc-spec">Auto-Calibrated</span>
+            <span class="ag-fc-spec">300+ Features</span>
+          </div>
+        </div>
 
-    <!-- ── FEATURE PILLARS ── -->
-    <div class="ag-features">
-      <div class="ag-feat">
-        <span class="ag-feat-ico">&#x1F9E0;</span>
-        <div class="ag-feat-name">Quantum Engine</div>
-        <div class="ag-feat-desc">6 AI models fused into one signal</div>
-      </div>
-      <div class="ag-feat">
-        <span class="ag-feat-ico">&#x1F3AF;</span>
-        <div class="ag-feat-name">SAFE Score</div>
-        <div class="ag-feat-desc">0-100 confidence on every prop</div>
-      </div>
-      <div class="ag-feat">
-        <span class="ag-feat-ico">&#x1F4E1;</span>
-        <div class="ag-feat-name">Live Sweat</div>
-        <div class="ag-feat-desc">Real-time in-game tracking</div>
+        <div class="ag-fcard fc-blu">
+          <div class="ag-fc-top">
+            <span class="ag-fc-badge"><span class="dot"></span>INTELLIGENCE</span>
+            <span class="ag-fc-metric">0&ndash;100</span>
+          </div>
+          <div class="ag-fc-name">SAFE Score&trade;</div>
+          <div class="ag-fc-desc">Multi-factor confidence index combining model agreement, historical accuracy, matchup context, line movement, and injury impact into a single actionable score.</div>
+          <div class="ag-fc-specs">
+            <span class="ag-fc-spec">5-Factor Composite</span>
+            <span class="ag-fc-spec">Calibrated Daily</span>
+            <span class="ag-fc-spec">Threshold Alerts</span>
+          </div>
+        </div>
+
+        <div class="ag-fcard fc-pur">
+          <div class="ag-fc-top">
+            <span class="ag-fc-badge"><span class="dot"></span>LIVE</span>
+            <span class="ag-fc-metric">RT</span>
+          </div>
+          <div class="ag-fc-name">Sweat Tracker</div>
+          <div class="ag-fc-desc">Real-time in-game monitoring with pace projections, live stat accumulation, and probability updates every 30 seconds. Watch your bets resolve in real time.</div>
+          <div class="ag-fc-specs">
+            <span class="ag-fc-spec">30s Refresh</span>
+            <span class="ag-fc-spec">Pace Projection</span>
+            <span class="ag-fc-spec">Live Probability</span>
+          </div>
+        </div>
+
+        <div class="ag-fcard fc-amb">
+          <div class="ag-fc-top">
+            <span class="ag-fc-badge"><span class="dot"></span>ALPHA</span>
+            <span class="ag-fc-metric">300+</span>
+          </div>
+          <div class="ag-fc-name">Edge Detection</div>
+          <div class="ag-fc-desc">Automated market scanner that identifies mispriced lines across sportsbooks. Compares AI projections to live odds and surfaces the highest expected-value props.</div>
+          <div class="ag-fc-specs">
+            <span class="ag-fc-spec">Multi-Book Scan</span>
+            <span class="ag-fc-spec">EV Calculator</span>
+            <span class="ag-fc-spec">Props / Night</span>
+          </div>
+        </div>
+
+        <div class="ag-fcard fc-cyn">
+          <div class="ag-fc-top">
+            <span class="ag-fc-badge"><span class="dot"></span>ANALYTICS</span>
+            <span class="ag-fc-metric">450+</span>
+          </div>
+          <div class="ag-fc-name">Defensive DNA</div>
+          <div class="ag-fc-desc">Matchup-aware profiling that decodes how each defense surrenders stats. Adjusts projections based on positional tendencies, pace, and scheme vulnerabilities.</div>
+          <div class="ag-fc-specs">
+            <span class="ag-fc-spec">Positional Splits</span>
+            <span class="ag-fc-spec">Pace-Adjusted</span>
+            <span class="ag-fc-spec">Player Profiles</span>
+          </div>
+        </div>
+
+        <div class="ag-fcard fc-red">
+          <div class="ag-fc-top">
+            <span class="ag-fc-badge"><span class="dot"></span>VERIFIED</span>
+            <span class="ag-fc-metric">92%</span>
+          </div>
+          <div class="ag-fc-name">CLV Capture</div>
+          <div class="ag-fc-desc">Closing line value engine that measures whether our picks beat the final market odds. 92% CLV capture rate proves sustained, quantifiable edge &mdash; not luck.</div>
+          <div class="ag-fc-specs">
+            <span class="ag-fc-spec">Line Tracking</span>
+            <span class="ag-fc-spec">Market Validation</span>
+            <span class="ag-fc-spec">Edge Verified</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -3942,6 +3980,20 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .bt-stat-grid,.bt-plat-grid{grid-template-columns:1fr 1fr}
 .bt-cal-grid{grid-template-columns:repeat(7,1fr)}
 .bt-how-grid{grid-template-columns:1fr}
+}
+@media(max-width:380px){
+.bt-summary{grid-template-columns:1fr 1fr;gap:6px}
+.bt-card{grid-template-columns:auto 1fr;gap:4px;padding:8px 10px}
+.bt-card-line,.bt-card-result{display:none}
+.bt-card-player{font-size:.68rem}
+.bt-cards{padding:6px 10px}
+.sh h3{font-size:1.3rem}
+.sh p{font-size:.66rem}
+.bt-tabs{flex-wrap:wrap}.bt-tab{font-size:.5rem;padding:8px 8px}
+.bt-how-grid{grid-template-columns:1fr}
+.bt-bankroll{padding:14px 14px}
+.bt-pnl{padding:14px 14px}
+.bt-date-hdr{padding:10px 14px}
 }
 </style>
 
@@ -4415,6 +4467,21 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
   .pr-head h2{font-size:1.8rem}
   .tc2{padding:24px 16px 20px}
   .pr-ins-seats{font-size:2.2rem}
+  .pr-save{padding:22px 16px}
+  .pr-insider{padding:28px 18px}
+  .pr-head p{font-size:.85rem}
+}
+@media(max-width:380px){
+  .pr-head h2{font-size:1.4rem}
+  .pr-head p{font-size:.75rem}
+  .tc2{padding:20px 12px 18px;border-radius:16px}
+  .tc2-name{font-size:.82rem}
+  .pr-save-big{font-size:1.8rem}
+  .pr-save-txt{font-size:.82rem}
+  .pr-ins-h{font-size:1.1rem}
+  .pr-ins-seats{font-size:1.8rem}
+  .pr-insider{padding:22px 14px;border-radius:18px}
+  .pr-save{padding:18px 12px;border-radius:16px}
 }
 </style>
 
@@ -5027,6 +5094,25 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
   .ft-cta-h{font-size:1.8rem}
   .ft-cta{padding:36px 20px}
   .ft-cta-btn{padding:14px 36px;font-size:0.92rem}
+  .ft-qi summary{padding:14px 16px;font-size:.76rem}
+  .ft-qi-ans{padding:0 16px 14px;font-size:.7rem}
+  .ft-cta-s{font-size:.85rem}
+  .ft-trust{gap:10px}
+  .ft-trust-item{font-size:.58rem;padding:4px 10px}
+}
+@media(max-width:380px){
+  .ft-perf-head h2,.ft-faq-head h2{font-size:1.3rem}
+  .ft-perf-head p,.ft-faq-head p{font-size:.75rem}
+  .ft-cta-h{font-size:1.4rem}
+  .ft-cta{padding:28px 14px;border-radius:18px}
+  .ft-cta-btn{padding:12px 28px;font-size:.82rem;border-radius:12px}
+  .ft-cta-s{font-size:.78rem}
+  .ft-qi summary{padding:12px 12px;font-size:.7rem}
+  .ft-qi-ans{padding:0 12px 12px;font-size:.66rem}
+  .ft-qi summary .chevron{width:24px;height:24px;font-size:.5rem}
+  .ft-perf-num{font-size:1.5rem}
+  .ft-perf-card{padding:20px 14px 16px;border-radius:16px}
+  .ft-trust-item{font-size:.52rem;padding:3px 8px}
 }
 </style>
 
