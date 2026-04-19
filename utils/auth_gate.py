@@ -644,13 +644,56 @@ html, body, .stApp, .stApp * {
 }
 .ag-hero-sub {
     font-size: 0.88rem; color: rgba(255, 255, 255, 0.4);
-    line-height: 1.55; margin-top: 10px;
+    line-height: 1.65; margin-top: 12px;
+    max-width: 560px; margin-left: auto; margin-right: auto;
 }
 .ag-hero-sub strong {
-    color: rgba(255, 255, 255, 0.75); font-weight: 700;
+    color: rgba(255, 255, 255, 0.8); font-weight: 700;
+}
+.ag-hero-sub2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; font-weight: 700;
+    color: #00D559; margin-top: 10px;
+    text-transform: uppercase; letter-spacing: 0.05em;
 }
 
-/* ── Proof bar ───────────────────────────────────────────────── */
+/* ── Proof grid (6 metric cards) ─────────────────────────────── */
+.ag-proof-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin: 20px 0 24px;
+    animation: agFadeUp 0.6s 0.14s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ag-proof-card {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px; padding: 14px 10px 12px;
+    text-align: center; position: relative;
+    transition: border-color 0.25s, transform 0.25s;
+}
+.ag-proof-card:hover {
+    border-color: rgba(0, 213, 89, 0.15);
+    transform: translateY(-2px);
+}
+.ag-proof-ico {
+    font-size: 1.2rem; margin-bottom: 4px;
+}
+.ag-proof-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3rem; font-weight: 800;
+    color: #00D559; line-height: 1.1;
+}
+.ag-proof-lbl {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.68rem; font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 2px;
+}
+.ag-proof-detail {
+    font-size: 0.52rem; color: rgba(255, 255, 255, 0.2);
+    margin-top: 4px; line-height: 1.4;
+}
+
+/* Keep old proof bar for backward compat */
 .ag-proof {
     display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;
     margin: 20px 0 24px;
@@ -664,6 +707,54 @@ html, body, .stApp, .stApp * {
 .ag-proof-val {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800; color: #00D559; font-size: 0.8rem;
+}
+
+/* ── "What's Inside" feature showcase ────────────────────────── */
+.ag-inside {
+    margin: 32px 0 0;
+    animation: agFadeUp 0.6s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ag-inside-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+}
+.ag-inside-card {
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px; padding: 16px 14px 14px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.25s, transform 0.25s;
+}
+.ag-inside-card:hover {
+    border-color: rgba(192, 132, 252, 0.2);
+    transform: translateY(-2px);
+}
+.ag-inside-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, rgba(192, 132, 252, 0.3), rgba(96, 165, 250, 0.2));
+    opacity: 0; transition: opacity 0.25s;
+}
+.ag-inside-card:hover::before { opacity: 1; }
+.ag-inside-ico {
+    font-size: 1.3rem; margin-bottom: 6px;
+}
+.ag-inside-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.78rem; font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 4px;
+}
+.ag-inside-desc {
+    font-size: 0.62rem; color: rgba(255, 255, 255, 0.35);
+    line-height: 1.55;
+}
+.ag-inside-tag {
+    display: inline-block; margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.42rem; font-weight: 800;
+    color: #c084fc; background: rgba(192, 132, 252, 0.08);
+    border: 1px solid rgba(192, 132, 252, 0.15);
+    padding: 2px 8px; border-radius: 100px;
+    text-transform: uppercase; letter-spacing: 0.08em;
 }
 
 /* ── Tabs ────────────────────────────────────────────────────── */
@@ -1236,7 +1327,7 @@ html, body, .stApp, .stApp * {
 .ag-how-step {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 14px; padding: 20px 10px 16px;
+    border-radius: 14px; padding: 20px 14px 16px;
     text-align: center; position: relative;
 }
 .ag-how-num {
@@ -1250,12 +1341,12 @@ html, body, .stApp, .stApp * {
 .ag-how-ico { font-size: 1.4rem; display: block; margin-bottom: 6px; }
 .ag-how-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.72rem; font-weight: 700;
+    font-size: 0.78rem; font-weight: 700;
     color: rgba(255, 255, 255, 0.85);
 }
 .ag-how-desc {
-    font-size: 0.58rem; color: rgba(255, 255, 255, 0.3);
-    margin-top: 4px; line-height: 1.4;
+    font-size: 0.6rem; color: rgba(255, 255, 255, 0.35);
+    margin-top: 6px; line-height: 1.55;
 }
 .ag-how-arrow {
     position: absolute; top: 50%; right: -10px;
@@ -1853,6 +1944,10 @@ html, body, .stApp, .stApp * {
     .ag-price-grid { grid-template-columns: 1fr; }
     [data-testid="stForm"] { padding: 22px 18px 20px !important; }
     .ag-proof { gap: 14px; }
+    .ag-proof-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .ag-proof-num { font-size: 1.05rem; }
+    .ag-proof-detail { font-size: 0.46rem; }
+    .ag-inside-grid { grid-template-columns: 1fr; }
     .ag-tbl { font-size: 0.64rem; }
     .ag-tbl thead th, .ag-tbl tbody td { padding: 7px 6px; }
     .ag-how-steps { grid-template-columns: 1fr; gap: 10px; }
@@ -1920,14 +2015,53 @@ def require_login() -> bool:
     <div class="ag-hero">
       <h1>The House Has a Problem.<br><span class="em">It&rsquo;s Us.</span></h1>
       <div class="ag-hero-sub">
-        <strong>6 AI models. 1 edge.</strong> &mdash; Free forever, no credit card.
+        The only <strong>AI-powered NBA prop analysis platform</strong> that fuses
+        <strong>6 machine-learning models</strong> into a single confidence score &mdash;
+        scanning <strong>300+ props every night</strong> so you don&rsquo;t have to.
+      </div>
+      <div class="ag-hero-sub2">
+        Free forever. No credit card. No catch.
       </div>
     </div>
 
-    <div class="ag-proof">
-      <div class="ag-proof-item"><span class="ag-proof-val">62%</span> Hit Rate</div>
-      <div class="ag-proof-item"><span class="ag-proof-val">6</span> AI Models</div>
-      <div class="ag-proof-item"><span class="ag-proof-val">300+</span> Props/Night</div>
+    <!-- Proof bar: 6 key metrics -->
+    <div class="ag-proof-grid">
+      <div class="ag-proof-card">
+        <div class="ag-proof-ico">&#x1F3AF;</div>
+        <div class="ag-proof-num">62%</div>
+        <div class="ag-proof-lbl">Hit Rate</div>
+        <div class="ag-proof-detail">Verified across 8,400+ graded picks</div>
+      </div>
+      <div class="ag-proof-card">
+        <div class="ag-proof-ico">&#x1F9E0;</div>
+        <div class="ag-proof-num">6</div>
+        <div class="ag-proof-lbl">AI Models</div>
+        <div class="ag-proof-detail">Monte Carlo, Ridge, RF, XGB, LSTM, Bayesian</div>
+      </div>
+      <div class="ag-proof-card">
+        <div class="ag-proof-ico">&#x26A1;</div>
+        <div class="ag-proof-num">300+</div>
+        <div class="ag-proof-lbl">Props / Night</div>
+        <div class="ag-proof-detail">PrizePicks, DraftKings, Underdog &amp; more</div>
+      </div>
+      <div class="ag-proof-card">
+        <div class="ag-proof-ico">&#x1F4C8;</div>
+        <div class="ag-proof-num">+18%</div>
+        <div class="ag-proof-lbl">Avg ROI</div>
+        <div class="ag-proof-detail">Bankroll growth over rolling 30-day window</div>
+      </div>
+      <div class="ag-proof-card">
+        <div class="ag-proof-ico">&#x1F50D;</div>
+        <div class="ag-proof-num">92%</div>
+        <div class="ag-proof-lbl">CLV Capture</div>
+        <div class="ag-proof-detail">Closing line value &mdash; the sharp benchmark</div>
+      </div>
+      <div class="ag-proof-card">
+        <div class="ag-proof-ico">&#x1F4B0;</div>
+        <div class="ag-proof-num">$0</div>
+        <div class="ag-proof-lbl">Price</div>
+        <div class="ag-proof-detail">Competitors charge $99&ndash;$299/mo for less</div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1984,7 +2118,7 @@ def require_login() -> bool:
                 else:
                     st.error("Invalid email or password.")
 
-    # ── Below-fold: How It Works + Product Preview ────────────
+    # ── Below-fold: How It Works + What's Inside + Product Preview ──
     st.markdown("""
     <!-- How It Works -->
     <div class="ag-how">
@@ -1997,21 +2131,67 @@ def require_login() -> bool:
           <span class="ag-how-num">1</span>
           <span class="ag-how-ico">&#x1F4DD;</span>
           <div class="ag-how-title">Create Free Account</div>
-          <div class="ag-how-desc">No credit card. No trial. Just your email.</div>
+          <div class="ag-how-desc">No credit card. No trial. Just your email. You get instant access to the full Quantum Analysis Matrix, SAFE Scores, and all 6 AI models.</div>
           <span class="ag-how-arrow">&#x25B6;</span>
         </div>
         <div class="ag-how-step">
           <span class="ag-how-num">2</span>
           <span class="ag-how-ico">&#x1F3AF;</span>
           <div class="ag-how-title">Pick AI-Rated Props</div>
-          <div class="ag-how-desc">SAFE Scores tell you exactly which props to play.</div>
+          <div class="ag-how-desc">Every prop gets a 0&ndash;100 SAFE Score, edge percentage, probability, and projection. Sort by confidence and play only the highest-rated picks.</div>
           <span class="ag-how-arrow">&#x25B6;</span>
         </div>
         <div class="ag-how-step">
           <span class="ag-how-num">3</span>
           <span class="ag-how-ico">&#x1F4B0;</span>
           <div class="ag-how-title">Get Paid</div>
-          <div class="ag-how-desc">62% hit rate. The math does the rest.</div>
+          <div class="ag-how-desc">62% hit rate across 8,400+ graded picks. Track your results in the built-in Bet Tracker with ROI, bankroll growth, and CLV capture.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What's Inside: Feature Showcase -->
+    <div class="ag-inside">
+      <div class="ag-section-head">
+        <h3>What&rsquo;s Inside <span class="em">Smart Pick Pro</span></h3>
+        <p>Everything you need to beat the books &mdash; in one platform</p>
+      </div>
+      <div class="ag-inside-grid">
+        <div class="ag-inside-card">
+          <div class="ag-inside-ico">&#x26A1;</div>
+          <div class="ag-inside-name">Quantum Analysis Matrix</div>
+          <div class="ag-inside-desc">The core engine. Scans 300+ player props nightly across PrizePicks, DraftKings, and Underdog. Each prop is analyzed by 6 fused AI models that output a SAFE Score (0&ndash;100), edge percentage, win probability, and adjusted projection.</div>
+          <div class="ag-inside-tag">CORE ENGINE</div>
+        </div>
+        <div class="ag-inside-card">
+          <div class="ag-inside-ico">&#x1F9E0;</div>
+          <div class="ag-inside-name">SAFE Score System</div>
+          <div class="ag-inside-desc">Proprietary 0&ndash;100 confidence rating that fuses Monte Carlo simulation, Ridge regression, Random Forest, XGBoost, LSTM sequence modeling, and Bayesian networks. One number tells you if a prop is worth playing.</div>
+          <div class="ag-inside-tag">AI CONFIDENCE</div>
+        </div>
+        <div class="ag-inside-card">
+          <div class="ag-inside-ico">&#x1F4CA;</div>
+          <div class="ag-inside-name">Live Sweat Mode</div>
+          <div class="ag-inside-desc">Watch your active picks track in real time during games. Live box score updates, pace projections, and AI-adjusted confidence as game flow changes. Know if your bet is on track before the final buzzer.</div>
+          <div class="ag-inside-tag">REAL-TIME</div>
+        </div>
+        <div class="ag-inside-card">
+          <div class="ag-inside-ico">&#x1F52C;</div>
+          <div class="ag-inside-name">Prop Scanner</div>
+          <div class="ag-inside-desc">Manually enter any player prop or bulk-upload your slip from PrizePicks or DraftKings. Get instant AI analysis: predicted line, SAFE Score, probability, and over/under recommendation in seconds.</div>
+          <div class="ag-inside-tag">ON-DEMAND</div>
+        </div>
+        <div class="ag-inside-card">
+          <div class="ag-inside-ico">&#x1F4C8;</div>
+          <div class="ag-inside-name">Bet Tracker + Bankroll</div>
+          <div class="ag-inside-desc">Log every bet, auto-grade results against final box scores, and track your bankroll growth. See win rate, ROI, CLV capture, and profit/loss by platform, stat type, and SAFE Score range.</div>
+          <div class="ag-inside-tag">PERFORMANCE</div>
+        </div>
+        <div class="ag-inside-card">
+          <div class="ag-inside-ico">&#x1F3C0;</div>
+          <div class="ag-inside-name">Matchup DNA + Injury Intel</div>
+          <div class="ag-inside-desc">Defensive matchup ratings, pace adjustments, rest-day impacts, and real-time injury reports from CBS and RotoWire. The AI factors all of this into every SAFE Score automatically.</div>
+          <div class="ag-inside-tag">CONTEXT</div>
         </div>
       </div>
     </div>
@@ -2020,7 +2200,7 @@ def require_login() -> bool:
     <div class="ag-preview">
       <div class="ag-section-head">
         <h3>See What You Get &mdash; Free</h3>
-        <p>The Quantum Analysis Matrix in action</p>
+        <p>Live picks from today&rsquo;s Quantum Analysis Matrix</p>
       </div>
     </div>
     """, unsafe_allow_html=True)
