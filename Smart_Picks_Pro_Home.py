@@ -880,13 +880,7 @@ if os.environ.get("SMARTAI_PRODUCTION", "").lower() in ("true", "1", "yes"):
             "Consider PostgreSQL or persistent storage. See docs/database_migration.md",
             _db_path,
         )
-        if "sqlite_warning_shown" not in st.session_state:
-            st.session_state["sqlite_warning_shown"] = True
-            st.warning(
-                "⚠️ **SQLite in Production Mode** — This app is running with SQLite, "
-                "which may not persist data on ephemeral cloud platforms (e.g., Streamlit Cloud). "
-                "See `docs/database_migration.md` for migration options."
-            )
+        # SQLite production warning removed — acceptable for single-instance Railway deploy.
 
 # ── Premium Status — Check and display in sidebar ─────────────
 # This runs silently on app load.  is_premium_user() is cached in
