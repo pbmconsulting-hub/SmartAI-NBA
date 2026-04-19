@@ -2013,175 +2013,87 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
     """, unsafe_allow_html=True)
 
     # ── Below-fold: Bet Tracker transparency ─────────────────
-    st.markdown("""
-    <!-- Bet Tracker: Transparency -->
-    <div class="ag-tracker">
-      <div class="ag-section-head">
-        <h3>We Don&rsquo;t Hide Results. <span class="em">We Track Every Pick.</span></h3>
-        <p>Full transparency &mdash; every AI pick is logged, graded, and visible in your Bet Tracker</p>
-      </div>
-      <div class="ag-tracker-badge">&#x1F4C8; BUILT-IN BET TRACKER &mdash; SHARP IQ+</div>
-
-      <div class="ag-tracker-why">
-        <div class="ag-tracker-why-head">How the Bet Tracker Works</div>
-        <ul class="ag-tracker-why-list">
-          <li class="ag-tracker-why-item">
-            <span class="ag-tracker-why-ico">&#x1F4DD;</span>
-            <span><strong>Log every bet</strong> &mdash; record your picks with one click from the QAM or Entry Builder. Platform, stake, odds, and SAFE Score saved automatically.</span>
-          </li>
-          <li class="ag-tracker-why-item">
-            <span class="ag-tracker-why-ico">&#x1F4CA;</span>
-            <span><strong>Auto-grade results</strong> &mdash; the system checks final box scores and marks every prop as HIT or MISS. No manual entry needed.</span>
-          </li>
-          <li class="ag-tracker-why-item">
-            <span class="ag-tracker-why-ico">&#x1F4B0;</span>
-            <span><strong>Track your bankroll</strong> &mdash; see ROI, win rate, CLV capture, profit/loss, and bankroll growth over time with real charts.</span>
-          </li>
-          <li class="ag-tracker-why-item">
-            <span class="ag-tracker-why-ico">&#x1F50D;</span>
-            <span><strong>Find what works</strong> &mdash; filter by platform, stat type, SAFE Score range, or time period to see which strategies actually make money.</span>
-          </li>
-          <li class="ag-tracker-why-item">
-            <span class="ag-tracker-why-ico">&#x1F6E1;&#xFE0F;</span>
-            <span><strong>No fake screenshots</strong> &mdash; unlike tout services, your Bet Tracker is YOUR data. Every win and loss, verifiable and auditable.</span>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Bet Tracker mockup -->
-      <div class="ag-bt-frame">
-        <div class="ag-bt-topbar">
-          <div class="ag-bt-topbar-title">&#x1F4C8; Bet Tracker &mdash; Your Performance</div>
-          <div class="ag-bt-topbar-period">Last 30 Days</div>
-        </div>
-
-        <div class="ag-bt-summary">
-          <div class="ag-bt-sum-item">
-            <div class="ag-bt-sum-val gr">62.4%</div>
-            <div class="ag-bt-sum-lbl">Win Rate</div>
-          </div>
-          <div class="ag-bt-sum-item">
-            <div class="ag-bt-sum-val gd">+$847</div>
-            <div class="ag-bt-sum-lbl">Net Profit</div>
-          </div>
-          <div class="ag-bt-sum-item">
-            <div class="ag-bt-sum-val bl">+18.3%</div>
-            <div class="ag-bt-sum-lbl">ROI</div>
-          </div>
-          <div class="ag-bt-sum-item">
-            <div class="ag-bt-sum-val wh">92%</div>
-            <div class="ag-bt-sum-lbl">CLV Capture</div>
-          </div>
-        </div>
-
-        <div class="ag-bt-body">
-          <div class="ag-bt-row ag-bt-hdr">
-            <div>Player / Prop</div>
-            <div>Line</div>
-            <div style="text-align:center">Actual</div>
-            <div style="text-align:center">CLV</div>
-            <div style="text-align:center"></div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F525; Luka Donci&#x107; PTS</div>
-            <div class="ag-bt-prop ov">O 28.5</div>
-            <div class="ag-bt-actual hit">34</div>
-            <div class="ag-bt-clv pos">+3.2%</div>
-            <div class="ag-bt-result-icon w">&#x2713;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F3AF; Jayson Tatum REB</div>
-            <div class="ag-bt-prop ov">O 8.5</div>
-            <div class="ag-bt-actual hit">11</div>
-            <div class="ag-bt-clv pos">+2.1%</div>
-            <div class="ag-bt-result-icon w">&#x2713;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x26A1; Ant Edwards PTS</div>
-            <div class="ag-bt-prop un">U 26.5</div>
-            <div class="ag-bt-actual hit">21</div>
-            <div class="ag-bt-clv pos">+4.7%</div>
-            <div class="ag-bt-result-icon w">&#x2713;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F9E0; Nikola Joki&#x107; AST</div>
-            <div class="ag-bt-prop ov">O 9.5</div>
-            <div class="ag-bt-actual miss">8</div>
-            <div class="ag-bt-clv neg">&minus;1.4%</div>
-            <div class="ag-bt-result-icon l">&#x2717;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F4CA; Tyrese Maxey AST</div>
-            <div class="ag-bt-prop ov">O 5.5</div>
-            <div class="ag-bt-actual hit">7</div>
-            <div class="ag-bt-clv pos">+1.8%</div>
-            <div class="ag-bt-result-icon w">&#x2713;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F525; SGA PTS</div>
-            <div class="ag-bt-prop ov">O 30.5</div>
-            <div class="ag-bt-actual hit">36</div>
-            <div class="ag-bt-clv pos">+5.3%</div>
-            <div class="ag-bt-result-icon w">&#x2713;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F451; LeBron James PTS</div>
-            <div class="ag-bt-prop ov">O 25.5</div>
-            <div class="ag-bt-actual hit">31</div>
-            <div class="ag-bt-clv pos">+3.1%</div>
-            <div class="ag-bt-result-icon w">&#x2713;</div>
-          </div>
-          <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x26A1; Steph Curry 3PM</div>
-            <div class="ag-bt-prop ov">O 4.5</div>
-            <div class="ag-bt-actual miss">3</div>
-            <div class="ag-bt-clv neg">&minus;0.8%</div>
-            <div class="ag-bt-result-icon l">&#x2717;</div>
-          </div>
-        </div>
-
-        <div class="ag-bt-bankroll">
-          <div class="ag-bt-bankroll-head">
-            <div class="ag-bt-bankroll-lbl">Bankroll Growth (30d)</div>
-            <div class="ag-bt-bankroll-val">$1,000 &#x2192; $1,847</div>
-          </div>
-          <div class="ag-bt-growth">
-            <div class="ag-bt-growth-bar" style="height:20%"></div>
-            <div class="ag-bt-growth-bar" style="height:25%"></div>
-            <div class="ag-bt-growth-bar" style="height:22%"></div>
-            <div class="ag-bt-growth-bar" style="height:30%"></div>
-            <div class="ag-bt-growth-bar" style="height:28%"></div>
-            <div class="ag-bt-growth-bar" style="height:35%"></div>
-            <div class="ag-bt-growth-bar" style="height:32%"></div>
-            <div class="ag-bt-growth-bar" style="height:40%"></div>
-            <div class="ag-bt-growth-bar" style="height:38%"></div>
-            <div class="ag-bt-growth-bar" style="height:45%"></div>
-            <div class="ag-bt-growth-bar" style="height:42%"></div>
-            <div class="ag-bt-growth-bar" style="height:50%"></div>
-            <div class="ag-bt-growth-bar" style="height:48%"></div>
-            <div class="ag-bt-growth-bar" style="height:55%"></div>
-            <div class="ag-bt-growth-bar" style="height:52%"></div>
-            <div class="ag-bt-growth-bar" style="height:58%"></div>
-            <div class="ag-bt-growth-bar" style="height:60%"></div>
-            <div class="ag-bt-growth-bar" style="height:56%"></div>
-            <div class="ag-bt-growth-bar" style="height:62%"></div>
-            <div class="ag-bt-growth-bar" style="height:65%"></div>
-            <div class="ag-bt-growth-bar" style="height:68%"></div>
-            <div class="ag-bt-growth-bar" style="height:72%"></div>
-            <div class="ag-bt-growth-bar" style="height:70%"></div>
-            <div class="ag-bt-growth-bar" style="height:75%"></div>
-            <div class="ag-bt-growth-bar" style="height:78%"></div>
-            <div class="ag-bt-growth-bar" style="height:80%"></div>
-            <div class="ag-bt-growth-bar" style="height:82%"></div>
-            <div class="ag-bt-growth-bar" style="height:85%"></div>
-            <div class="ag-bt-growth-bar" style="height:88%"></div>
-            <div class="ag-bt-growth-bar" style="height:92%"></div>
-          </div>
-        </div>
-      </div>
-      <div class="ag-tracker-label">&#x2191; Every pick tracked. Every result graded. No hiding.</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Uses st.html() to bypass Streamlit's markdown parser which
+    # cannot handle deeply nested HTML structures.
+    st.html("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.7)}
+.em{color:#00D559}
+.sh{text-align:center;margin-bottom:14px}
+.sh h3{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:4px}
+.sh p{font-size:0.72rem;color:rgba(255,255,255,0.35)}
+.bdg{display:block;width:fit-content;margin:0 auto 10px;font-family:'JetBrains Mono',monospace;font-size:.52rem;font-weight:800;color:#2D9EFF;background:rgba(45,158,255,0.06);border:1px solid rgba(45,158,255,0.12);padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em}
+.tw{background:rgba(45,158,255,0.03);border:1px solid rgba(45,158,255,0.08);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+.tw-h{font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:800;color:rgba(255,255,255,0.7);margin:0 0 8px}
+.tw-l{list-style:none;padding:0;margin:0}
+.tw-i{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:.66rem;color:rgba(255,255,255,0.4);line-height:1.5}
+.tw-ic{flex-shrink:0;font-size:.72rem;margin-top:1px}
+.tw-i strong{color:rgba(255,255,255,0.65)}
+.bf{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden}
+.bt{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.04)}
+.bt-t{font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:700;color:rgba(255,255,255,0.65)}
+.bt-p{font-family:'JetBrains Mono',monospace;font-size:.48rem;font-weight:600;color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.04);padding:2px 8px;border-radius:100px}
+.sm{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.si{text-align:center;padding:12px 6px;border-right:1px solid rgba(255,255,255,0.03)}
+.si:last-child{border-right:none}
+.sv{font-family:'JetBrains Mono',monospace;font-size:.92rem;font-weight:800;line-height:1.1}
+.sv.gr{color:#00D559}.sv.bl{color:#2D9EFF}.sv.gd{color:#F9C62B}.sv.wh{color:rgba(255,255,255,0.7)}
+.sl{font-size:.46rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,0.18);margin-top:2px}
+.bd{padding:4px 0}
+.br{display:grid;grid-template-columns:2.5fr 1.2fr .8fr .8fr .6fr;align-items:center;gap:4px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.02);transition:background .15s}
+.br:hover{background:rgba(255,255,255,0.015)}.br:last-child{border-bottom:none}
+.bh{font-size:.42rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,0.15);padding:5px 12px}
+.bp{font-size:.6rem;font-weight:600;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl2{font-family:'JetBrains Mono',monospace;font-size:.52rem;font-weight:600}
+.bl2.ov{color:#00D559}.bl2.un{color:#2D9EFF}
+.ba{font-family:'JetBrains Mono',monospace;font-size:.55rem;font-weight:700;text-align:center}
+.ba.hit{color:#00D559}.ba.miss{color:rgba(242,67,54,0.5)}
+.bc{font-family:'JetBrains Mono',monospace;font-size:.5rem;font-weight:700;text-align:center}
+.bc.pos{color:#F9C62B}.bc.neg{color:rgba(255,255,255,0.15)}
+.bi{text-align:center;font-size:.6rem}.bi.w{color:#00D559}.bi.l{color:rgba(242,67,54,0.4)}
+.bk{padding:10px 14px;border-top:1px solid rgba(255,255,255,0.04)}
+.bk-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.bk-l{font-size:.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,0.2)}
+.bk-v{font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:800;color:#00D559}
+.bg{height:28px;display:flex;align-items:flex-end;gap:2px;width:100%}
+.bg-b{flex:1;border-radius:2px 2px 0 0;background:linear-gradient(180deg,rgba(0,213,89,0.5),rgba(0,213,89,0.15))}
+.tl{text-align:center;margin-top:10px;font-size:.58rem;font-style:italic;color:rgba(255,255,255,0.18)}
+</style>
+<div class="sh"><h3>We Don&rsquo;t Hide Results. <span class="em">We Track Every Pick.</span></h3><p>Full transparency &mdash; every AI pick is logged, graded, and visible in your Bet Tracker</p></div>
+<div class="bdg">&#x1F4C8; BUILT-IN BET TRACKER &mdash; SHARP IQ+</div>
+<div class="tw"><div class="tw-h">How the Bet Tracker Works</div><ul class="tw-l">
+<li class="tw-i"><span class="tw-ic">&#x1F4DD;</span><span><strong>Log every bet</strong> &mdash; record your picks with one click from the QAM or Entry Builder. Platform, stake, odds, and SAFE Score saved automatically.</span></li>
+<li class="tw-i"><span class="tw-ic">&#x1F4CA;</span><span><strong>Auto-grade results</strong> &mdash; the system checks final box scores and marks every prop as HIT or MISS. No manual entry needed.</span></li>
+<li class="tw-i"><span class="tw-ic">&#x1F4B0;</span><span><strong>Track your bankroll</strong> &mdash; see ROI, win rate, CLV capture, profit/loss, and bankroll growth over time with real charts.</span></li>
+<li class="tw-i"><span class="tw-ic">&#x1F50D;</span><span><strong>Find what works</strong> &mdash; filter by platform, stat type, SAFE Score range, or time period to see which strategies actually make money.</span></li>
+<li class="tw-i"><span class="tw-ic">&#x1F6E1;&#xFE0F;</span><span><strong>No fake screenshots</strong> &mdash; unlike tout services, your Bet Tracker is YOUR data. Every win and loss, verifiable and auditable.</span></li>
+</ul></div>
+<div class="bf">
+<div class="bt"><div class="bt-t">&#x1F4C8; Bet Tracker &mdash; Your Performance</div><div class="bt-p">Last 30 Days</div></div>
+<div class="sm">
+<div class="si"><div class="sv gr">62.4%</div><div class="sl">Win Rate</div></div>
+<div class="si"><div class="sv gd">+$847</div><div class="sl">Net Profit</div></div>
+<div class="si"><div class="sv bl">+18.3%</div><div class="sl">ROI</div></div>
+<div class="si"><div class="sv wh">92%</div><div class="sl">CLV Capture</div></div>
+</div>
+<div class="bd">
+<div class="br bh"><div>Player / Prop</div><div>Line</div><div style="text-align:center">Actual</div><div style="text-align:center">CLV</div><div style="text-align:center"></div></div>
+<div class="br"><div class="bp">&#x1F525; Luka Donci&#x107; PTS</div><div class="bl2 ov">O 28.5</div><div class="ba hit">34</div><div class="bc pos">+3.2%</div><div class="bi w">&#x2713;</div></div>
+<div class="br"><div class="bp">&#x1F3AF; Jayson Tatum REB</div><div class="bl2 ov">O 8.5</div><div class="ba hit">11</div><div class="bc pos">+2.1%</div><div class="bi w">&#x2713;</div></div>
+<div class="br"><div class="bp">&#x26A1; Ant Edwards PTS</div><div class="bl2 un">U 26.5</div><div class="ba hit">21</div><div class="bc pos">+4.7%</div><div class="bi w">&#x2713;</div></div>
+<div class="br"><div class="bp">&#x1F9E0; Nikola Joki&#x107; AST</div><div class="bl2 ov">O 9.5</div><div class="ba miss">8</div><div class="bc neg">&minus;1.4%</div><div class="bi l">&#x2717;</div></div>
+<div class="br"><div class="bp">&#x1F4CA; Tyrese Maxey AST</div><div class="bl2 ov">O 5.5</div><div class="ba hit">7</div><div class="bc pos">+1.8%</div><div class="bi w">&#x2713;</div></div>
+<div class="br"><div class="bp">&#x1F525; SGA PTS</div><div class="bl2 ov">O 30.5</div><div class="ba hit">36</div><div class="bc pos">+5.3%</div><div class="bi w">&#x2713;</div></div>
+<div class="br"><div class="bp">&#x1F451; LeBron James PTS</div><div class="bl2 ov">O 25.5</div><div class="ba hit">31</div><div class="bc pos">+3.1%</div><div class="bi w">&#x2713;</div></div>
+<div class="br"><div class="bp">&#x26A1; Steph Curry 3PM</div><div class="bl2 ov">O 4.5</div><div class="ba miss">3</div><div class="bc neg">&minus;0.8%</div><div class="bi l">&#x2717;</div></div>
+</div>
+<div class="bk"><div class="bk-h"><div class="bk-l">Bankroll Growth (30d)</div><div class="bk-v">$1,000 &#x2192; $1,847</div></div>
+<div class="bg"><div class="bg-b" style="height:20%"></div><div class="bg-b" style="height:25%"></div><div class="bg-b" style="height:22%"></div><div class="bg-b" style="height:30%"></div><div class="bg-b" style="height:28%"></div><div class="bg-b" style="height:35%"></div><div class="bg-b" style="height:32%"></div><div class="bg-b" style="height:40%"></div><div class="bg-b" style="height:38%"></div><div class="bg-b" style="height:45%"></div><div class="bg-b" style="height:42%"></div><div class="bg-b" style="height:50%"></div><div class="bg-b" style="height:48%"></div><div class="bg-b" style="height:55%"></div><div class="bg-b" style="height:52%"></div><div class="bg-b" style="height:58%"></div><div class="bg-b" style="height:60%"></div><div class="bg-b" style="height:56%"></div><div class="bg-b" style="height:62%"></div><div class="bg-b" style="height:65%"></div><div class="bg-b" style="height:68%"></div><div class="bg-b" style="height:72%"></div><div class="bg-b" style="height:70%"></div><div class="bg-b" style="height:75%"></div><div class="bg-b" style="height:78%"></div><div class="bg-b" style="height:80%"></div><div class="bg-b" style="height:82%"></div><div class="bg-b" style="height:85%"></div><div class="bg-b" style="height:88%"></div><div class="bg-b" style="height:92%"></div></div>
+</div>
+</div>
+<div class="tl">&#x2191; Every pick tracked. Every result graded. No hiding.</div>
+""")
 
     # ── Below-fold: Pricing + rest ───────────────────────────
     st.markdown("""
