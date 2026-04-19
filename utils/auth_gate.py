@@ -4778,13 +4778,29 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 <div class="ft-cta">
   <div class="ft-cta-h">Ready to <span class="em">Beat the Books?</span></div>
   <p class="ft-cta-s">Join thousands of sharps using AI to find edges the books don&rsquo;t want you to see.</p>
-  <a class="ft-cta-btn" href="#" onclick="(function(){try{var d=window.parent.document;var tabs=d.querySelectorAll('button[data-baseweb=tab]');for(var i=0;i&lt;tabs.length;i++){if(tabs[i].textContent.indexOf('Create Free Account')!==-1){tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return false;}}var forms=d.querySelectorAll('[data-testid=stForm]');if(forms.length){forms[0].scrollIntoView({behavior:'smooth',block:'center'});return false;}d.querySelector('.main').scrollTo({top:0,behavior:'smooth'});}catch(e){window.parent.scrollTo({top:0,behavior:'smooth'});}return false;})();return false;">&#x26A1; Create Free Account</a>
+  <a class="ft-cta-btn" href="javascript:void(0)" id="ctaScrollBtn">&#x26A1; Create Free Account</a>
   <div class="ft-cta-trust">
     <span>&#x1F512; No credit card</span>
     <span>&#x23F1;&#xFE0F; 10 second signup</span>
     <span>&#x1F6AB; Never sell your data</span>
   </div>
 </div>
+<script>
+document.getElementById('ctaScrollBtn').addEventListener('click',function(e){
+  e.preventDefault();
+  try{
+    var p=window.parent;
+    if(p&&p.document){
+      var main=p.document.querySelector('[data-testid="stMainBlockContainer"]')||p.document.querySelector('.main')||p.document.querySelector('section.main');
+      if(main){main.scrollIntoView({behavior:'smooth',block:'start'});return;}
+      p.document.documentElement.scrollTop=0;
+      p.scrollTo({top:0,behavior:'smooth'});
+    }
+  }catch(err){
+    window.parent.scrollTo({top:0,behavior:'smooth'});
+  }
+});
+</script>
 
 <!-- Trust -->
 <div class="ft-trust">
