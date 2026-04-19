@@ -5,6 +5,13 @@ WORKDIR /app
 RUN groupadd --gid 1000 appuser \
     && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
 
+# Install system dependencies required by curl_cffi, lxml, etc.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ \
+    libcurl4-openssl-dev libssl-dev \
+    libxml2-dev libxslt1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
