@@ -3568,100 +3568,73 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       </div>
     </div>
 
-    <!-- ── AI SYSTEMS BREAKDOWN ── -->
-    <div class="ag-compare">
-      <div class="ag-section-head">
-        <h3>AI Systems <span class="em">Breakdown</span></h3>
-        <p>Six autonomous engines working in parallel to find your edge</p>
-      </div>
-      <div class="ag-fgrid">
+    </div><!-- /ag-section graveyard part 1 -->
+    """, unsafe_allow_html=True)
 
-        <div class="ag-fcard fc-grn">
-          <div class="ag-fc-top">
-            <span class="ag-fc-badge"><span class="dot"></span>CORE ENGINE</span>
-            <span class="ag-fc-metric">6</span>
-          </div>
-          <div class="ag-fc-name">Quantum Ensemble</div>
-          <div class="ag-fc-desc">Six neural networks &mdash; XGBoost, LightGBM, Ridge, Bayesian, LSTM, and Random Forest &mdash; fused into a single weighted signal. Each model specializes in a different statistical dimension.</div>
-          <div class="ag-fc-specs">
-            <span class="ag-fc-spec">Multi-Model Fusion</span>
-            <span class="ag-fc-spec">Auto-Calibrated</span>
-            <span class="ag-fc-spec">300+ Features</span>
-          </div>
-        </div>
+    # ── AI Systems Breakdown — rendered via st.html() to avoid
+    #    Streamlit markdown parser sanitizing deeply nested divs ──
+    st.html("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.7);overflow-y:hidden}
+.em{background:linear-gradient(135deg,#00D559,#2D9EFF,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+@keyframes agFadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes agPulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.sh{text-align:center;margin-bottom:20px}
+.sh::before{content:'';display:block;width:40px;height:3px;margin:0 auto 14px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:4px}
+.sh h3{font-family:'Space Grotesk',sans-serif;font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-0.03em}
+.sh p{font-size:0.78rem;color:rgba(255,255,255,0.35);line-height:1.6}
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:0 4px}
+.fc{background:linear-gradient(168deg,rgba(8,14,28,0.97),rgba(5,9,16,0.99));border:1.5px solid rgba(255,255,255,0.04);border-radius:20px;padding:28px 22px 24px;position:relative;overflow:hidden;transition:border-color .4s,transform .4s,box-shadow .4s;box-shadow:0 4px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.02)}
+.fc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;transition:opacity .4s}
+.fc::after{content:'';position:absolute;inset:0;border-radius:20px;opacity:0;transition:opacity .4s;pointer-events:none}
+.fc:hover{transform:translateY(-6px);box-shadow:0 16px 48px rgba(0,0,0,0.5),0 0 40px var(--g,rgba(0,213,89,0.08))}
+.fc:hover::after{opacity:1}
+.fc.g{--g:rgba(0,213,89,0.1)}.fc.g::before{background:linear-gradient(90deg,#00D559,#00B74D)}.fc.g::after{background:radial-gradient(ellipse at 50% 0%,rgba(0,213,89,0.06),transparent 65%)}.fc.g:hover{border-color:rgba(0,213,89,0.25)}
+.fc.b{--g:rgba(45,158,255,0.1)}.fc.b::before{background:linear-gradient(90deg,#2D9EFF,#1a7ad9)}.fc.b::after{background:radial-gradient(ellipse at 50% 0%,rgba(45,158,255,0.06),transparent 65%)}.fc.b:hover{border-color:rgba(45,158,255,0.25)}
+.fc.p{--g:rgba(192,132,252,0.1)}.fc.p::before{background:linear-gradient(90deg,#c084fc,#9333ea)}.fc.p::after{background:radial-gradient(ellipse at 50% 0%,rgba(192,132,252,0.06),transparent 65%)}.fc.p:hover{border-color:rgba(192,132,252,0.25)}
+.fc.a{--g:rgba(249,198,43,0.1)}.fc.a::before{background:linear-gradient(90deg,#F9C62B,#ff8c00)}.fc.a::after{background:radial-gradient(ellipse at 50% 0%,rgba(249,198,43,0.06),transparent 65%)}.fc.a:hover{border-color:rgba(249,198,43,0.25)}
+.fc.c{--g:rgba(34,211,238,0.1)}.fc.c::before{background:linear-gradient(90deg,#22d3ee,#06b6d4)}.fc.c::after{background:radial-gradient(ellipse at 50% 0%,rgba(34,211,238,0.06),transparent 65%)}.fc.c:hover{border-color:rgba(34,211,238,0.25)}
+.fc.r{--g:rgba(248,113,113,0.1)}.fc.r::before{background:linear-gradient(90deg,#f87171,#dc2626)}.fc.r::after{background:radial-gradient(ellipse at 50% 0%,rgba(248,113,113,0.06),transparent 65%)}.fc.r:hover{border-color:rgba(248,113,113,0.25)}
+.ft{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.bd{font-family:'JetBrains Mono',monospace;font-size:.42rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em;padding:3px 10px;border-radius:100px;display:inline-flex;align-items:center;gap:5px}
+.bd .dt{width:5px;height:5px;border-radius:50%;animation:agPulse 2s ease infinite}
+.g .bd{color:#00D559;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15)}.g .bd .dt{background:#00D559}
+.b .bd{color:#2D9EFF;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15)}.b .bd .dt{background:#2D9EFF}
+.p .bd{color:#c084fc;background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.15)}.p .bd .dt{background:#c084fc}
+.a .bd{color:#F9C62B;background:rgba(249,198,43,0.08);border:1px solid rgba(249,198,43,0.15)}.a .bd .dt{background:#F9C62B}
+.c .bd{color:#22d3ee;background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.15)}.c .bd .dt{background:#22d3ee}
+.r .bd{color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.15)}.r .bd .dt{background:#f87171}
+.mt{font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.g .mt{color:#00D559;text-shadow:0 0 20px rgba(0,213,89,0.2)}.b .mt{color:#2D9EFF;text-shadow:0 0 20px rgba(45,158,255,0.2)}.p .mt{color:#c084fc;text-shadow:0 0 20px rgba(192,132,252,0.2)}.a .mt{color:#F9C62B;text-shadow:0 0 20px rgba(249,198,43,0.2)}.c .mt{color:#22d3ee;text-shadow:0 0 20px rgba(34,211,238,0.2)}.r .mt{color:#f87171;text-shadow:0 0 20px rgba(248,113,113,0.2)}
+.fn{font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.02em}
+.fd{font-size:.72rem;color:rgba(255,255,255,0.38);line-height:1.6;margin-bottom:14px}
+.fs{display:flex;flex-wrap:wrap;gap:6px}
+.sp{font-family:'JetBrains Mono',monospace;font-size:.44rem;font-weight:700;color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.04);padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.06em}
+.fc:nth-child(1){animation:agFadeUp .5s .1s cubic-bezier(.22,1,.36,1) both}
+.fc:nth-child(2){animation:agFadeUp .5s .15s cubic-bezier(.22,1,.36,1) both}
+.fc:nth-child(3){animation:agFadeUp .5s .2s cubic-bezier(.22,1,.36,1) both}
+.fc:nth-child(4){animation:agFadeUp .5s .25s cubic-bezier(.22,1,.36,1) both}
+.fc:nth-child(5){animation:agFadeUp .5s .3s cubic-bezier(.22,1,.36,1) both}
+.fc:nth-child(6){animation:agFadeUp .5s .35s cubic-bezier(.22,1,.36,1) both}
+@media(max-width:768px){.fg{grid-template-columns:repeat(2,1fr);gap:12px}.fc{padding:22px 18px 20px}.mt{font-size:1.3rem}.fn{font-size:.95rem}.fd{font-size:.68rem}.sp{font-size:.4rem}}
+@media(max-width:520px){.fg{grid-template-columns:repeat(2,1fr);gap:10px}.fc{padding:18px 14px 16px;border-radius:16px}.mt{font-size:1.1rem}.fn{font-size:.88rem}.fd{font-size:.64rem}.bd{font-size:.38rem;padding:2px 8px}.sp{font-size:.38rem;padding:2px 6px}.sh h3{font-size:1.2rem}.sh p{font-size:.7rem}}
+@media(max-width:380px){.fg{grid-template-columns:1fr;gap:8px}.fc{padding:16px 12px 14px;border-radius:14px}.ft{margin-bottom:10px}.mt{font-size:1rem}.fn{font-size:.82rem}.fd{font-size:.62rem;margin-bottom:10px}.bd{font-size:.36rem;padding:2px 7px}.sp{font-size:.36rem;padding:2px 5px}.sh h3{font-size:1rem}.sh p{font-size:.62rem}}
+</style>
+<div class="sh"><h3>AI Systems <span class="em">Breakdown</span></h3><p>Six autonomous engines working in parallel to find your edge</p></div>
+<div class="fg">
+<div class="fc g"><div class="ft"><span class="bd"><span class="dt"></span>CORE ENGINE</span><span class="mt">6</span></div><div class="fn">Quantum Ensemble</div><div class="fd">Six neural networks &mdash; XGBoost, LightGBM, Ridge, Bayesian, LSTM, and Random Forest &mdash; fused into a single weighted signal. Each model specializes in a different statistical dimension.</div><div class="fs"><span class="sp">Multi-Model Fusion</span><span class="sp">Auto-Calibrated</span><span class="sp">300+ Features</span></div></div>
+<div class="fc b"><div class="ft"><span class="bd"><span class="dt"></span>INTELLIGENCE</span><span class="mt">0&ndash;100</span></div><div class="fn">SAFE Score&trade;</div><div class="fd">Multi-factor confidence index combining model agreement, historical accuracy, matchup context, line movement, and injury impact into a single actionable score.</div><div class="fs"><span class="sp">5-Factor Composite</span><span class="sp">Calibrated Daily</span><span class="sp">Threshold Alerts</span></div></div>
+<div class="fc p"><div class="ft"><span class="bd"><span class="dt"></span>LIVE</span><span class="mt">RT</span></div><div class="fn">Sweat Tracker</div><div class="fd">Real-time in-game monitoring with pace projections, live stat accumulation, and probability updates every 30 seconds. Watch your bets resolve in real time.</div><div class="fs"><span class="sp">30s Refresh</span><span class="sp">Pace Projection</span><span class="sp">Live Probability</span></div></div>
+<div class="fc a"><div class="ft"><span class="bd"><span class="dt"></span>ALPHA</span><span class="mt">300+</span></div><div class="fn">Edge Detection</div><div class="fd">Automated market scanner that identifies mispriced lines across sportsbooks. Compares AI projections to live odds and surfaces the highest expected-value props.</div><div class="fs"><span class="sp">Multi-Book Scan</span><span class="sp">EV Calculator</span><span class="sp">Props / Night</span></div></div>
+<div class="fc c"><div class="ft"><span class="bd"><span class="dt"></span>ANALYTICS</span><span class="mt">450+</span></div><div class="fn">Defensive DNA</div><div class="fd">Matchup-aware profiling that decodes how each defense surrenders stats. Adjusts projections based on positional tendencies, pace, and scheme vulnerabilities.</div><div class="fs"><span class="sp">Positional Splits</span><span class="sp">Pace-Adjusted</span><span class="sp">Player Profiles</span></div></div>
+<div class="fc r"><div class="ft"><span class="bd"><span class="dt"></span>VERIFIED</span><span class="mt">92%</span></div><div class="fn">CLV Capture</div><div class="fd">Closing line value engine that measures whether our picks beat the final market odds. 92% CLV capture rate proves sustained, quantifiable edge &mdash; not luck.</div><div class="fs"><span class="sp">Line Tracking</span><span class="sp">Market Validation</span><span class="sp">Edge Verified</span></div></div>
+</div>
+""")
 
-        <div class="ag-fcard fc-blu">
-          <div class="ag-fc-top">
-            <span class="ag-fc-badge"><span class="dot"></span>INTELLIGENCE</span>
-            <span class="ag-fc-metric">0&ndash;100</span>
-          </div>
-          <div class="ag-fc-name">SAFE Score&trade;</div>
-          <div class="ag-fc-desc">Multi-factor confidence index combining model agreement, historical accuracy, matchup context, line movement, and injury impact into a single actionable score.</div>
-          <div class="ag-fc-specs">
-            <span class="ag-fc-spec">5-Factor Composite</span>
-            <span class="ag-fc-spec">Calibrated Daily</span>
-            <span class="ag-fc-spec">Threshold Alerts</span>
-          </div>
-        </div>
-
-        <div class="ag-fcard fc-pur">
-          <div class="ag-fc-top">
-            <span class="ag-fc-badge"><span class="dot"></span>LIVE</span>
-            <span class="ag-fc-metric">RT</span>
-          </div>
-          <div class="ag-fc-name">Sweat Tracker</div>
-          <div class="ag-fc-desc">Real-time in-game monitoring with pace projections, live stat accumulation, and probability updates every 30 seconds. Watch your bets resolve in real time.</div>
-          <div class="ag-fc-specs">
-            <span class="ag-fc-spec">30s Refresh</span>
-            <span class="ag-fc-spec">Pace Projection</span>
-            <span class="ag-fc-spec">Live Probability</span>
-          </div>
-        </div>
-
-        <div class="ag-fcard fc-amb">
-          <div class="ag-fc-top">
-            <span class="ag-fc-badge"><span class="dot"></span>ALPHA</span>
-            <span class="ag-fc-metric">300+</span>
-          </div>
-          <div class="ag-fc-name">Edge Detection</div>
-          <div class="ag-fc-desc">Automated market scanner that identifies mispriced lines across sportsbooks. Compares AI projections to live odds and surfaces the highest expected-value props.</div>
-          <div class="ag-fc-specs">
-            <span class="ag-fc-spec">Multi-Book Scan</span>
-            <span class="ag-fc-spec">EV Calculator</span>
-            <span class="ag-fc-spec">Props / Night</span>
-          </div>
-        </div>
-
-        <div class="ag-fcard fc-cyn">
-          <div class="ag-fc-top">
-            <span class="ag-fc-badge"><span class="dot"></span>ANALYTICS</span>
-            <span class="ag-fc-metric">450+</span>
-          </div>
-          <div class="ag-fc-name">Defensive DNA</div>
-          <div class="ag-fc-desc">Matchup-aware profiling that decodes how each defense surrenders stats. Adjusts projections based on positional tendencies, pace, and scheme vulnerabilities.</div>
-          <div class="ag-fc-specs">
-            <span class="ag-fc-spec">Positional Splits</span>
-            <span class="ag-fc-spec">Pace-Adjusted</span>
-            <span class="ag-fc-spec">Player Profiles</span>
-          </div>
-        </div>
-
-        <div class="ag-fcard fc-red">
-          <div class="ag-fc-top">
-            <span class="ag-fc-badge"><span class="dot"></span>VERIFIED</span>
-            <span class="ag-fc-metric">92%</span>
-          </div>
-          <div class="ag-fc-name">CLV Capture</div>
-          <div class="ag-fc-desc">Closing line value engine that measures whether our picks beat the final market odds. 92% CLV capture rate proves sustained, quantifiable edge &mdash; not luck.</div>
-          <div class="ag-fc-specs">
-            <span class="ag-fc-spec">Line Tracking</span>
-            <span class="ag-fc-spec">Market Validation</span>
-            <span class="ag-fc-spec">Edge Verified</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
+    # ── Below-fold: stats + testimonials (continued) ─────────
+    st.markdown("""
+    <div class="ag-section">
 
     <!-- ── METRIC COUNTERS ── -->
     <div class="ag-stats-strip">
