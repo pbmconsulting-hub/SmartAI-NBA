@@ -499,8 +499,8 @@ footer { display: none !important; }
 }
 
 .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
-    padding: 0 24px !important;
-    max-width: 640px !important;
+    padding: 0 !important;
+    max-width: 100% !important;
     margin: 0 auto !important;
     position: relative;
     z-index: 10;
@@ -508,6 +508,21 @@ footer { display: none !important; }
 
 html, body, .stApp, .stApp * {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ── Full-bleed wrapper ──────────────────────────────────────── */
+.ag-section {
+    width: 100%; max-width: 780px; margin: 0 auto;
+    padding-left: 28px; padding-right: 28px;
+}
+.ag-full-bleed {
+    width: 100vw; position: relative;
+    left: 50%; transform: translateX(-50%);
+    padding: 48px 0;
+}
+.ag-full-bleed .ag-section {
+    max-width: 780px; margin: 0 auto;
+    padding-left: 28px; padding-right: 28px;
 }
 
 /* ── Keyframes ───────────────────────────────────────────────── */
@@ -534,7 +549,17 @@ html, body, .stApp, .stApp * {
 }
 @keyframes agPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(0, 213, 89, 0.4); }
-    50%      { box-shadow: 0 0 0 8px rgba(0, 213, 89, 0); }
+    50%      { box-shadow: 0 0 0 10px rgba(0, 213, 89, 0); }
+}
+@keyframes agGradientShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+@keyframes agNumberPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
 }
 @keyframes agLogoGlow {
     0%, 100% { filter: drop-shadow(0 0 20px rgba(0, 213, 89, 0.15)) drop-shadow(0 0 40px rgba(45, 158, 255, 0.08)); }
@@ -552,37 +577,37 @@ html, body, .stApp, .stApp * {
 /* ── Background ──────────────────────────────────────────────── */
 .ag-bg {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background: radial-gradient(ellipse at 50% 0%, rgba(0, 213, 89, 0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(45, 158, 255, 0.04) 0%, transparent 40%),
-                radial-gradient(ellipse at 20% 60%, rgba(192, 132, 252, 0.03) 0%, transparent 40%),
+    background: radial-gradient(ellipse at 50% 0%, rgba(0, 213, 89, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(45, 158, 255, 0.06) 0%, transparent 40%),
+                radial-gradient(ellipse at 20% 60%, rgba(192, 132, 252, 0.04) 0%, transparent 40%),
                 #0B0F19;
     overflow: hidden;
 }
 .ag-orb {
     position: absolute; border-radius: 50%; pointer-events: none;
-    filter: blur(120px); opacity: 0.6;
+    filter: blur(100px); opacity: 0.7;
     animation: agOrbFloat 20s ease-in-out infinite;
 }
 .ag-orb-1 {
-    width: 500px; height: 500px; top: -120px; left: -100px;
-    background: rgba(0, 213, 89, 0.09);
+    width: 600px; height: 600px; top: -150px; left: -120px;
+    background: rgba(0, 213, 89, 0.12);
 }
 .ag-orb-2 {
-    width: 450px; height: 450px; bottom: -100px; right: -80px;
-    background: rgba(45, 158, 255, 0.07);
+    width: 550px; height: 550px; bottom: -120px; right: -100px;
+    background: rgba(45, 158, 255, 0.09);
     animation-delay: -7s;
 }
 .ag-orb-3 {
-    width: 350px; height: 350px; top: 40%; left: 50%;
+    width: 400px; height: 400px; top: 40%; left: 50%;
     transform: translateX(-50%);
-    background: rgba(192, 132, 252, 0.04);
+    background: rgba(192, 132, 252, 0.06);
     animation-delay: -12s;
 }
 
 /* \u2500\u2500 Section divider \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .ag-divider {
-    height: 1px; margin: 36px 40px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+    height: 1px; margin: 48px 40px;
+    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.15), rgba(45, 158, 255, 0.1), transparent);
 }
 
 /* ── Ticker bar ──────────────────────────────────────────────── */
@@ -632,92 +657,95 @@ html, body, .stApp, .stApp * {
     animation: agFadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-logo-img {
-    width: 220px;
+    width: 200px;
     height: auto;
     animation: agLogoGlow 4s ease-in-out infinite;
 }
 
-/* ── Hero ────────────────────────────────────────────────────── */
+/* ── Hero (Nike-scale) ─────────────────────────────────────── */
 .ag-hero {
     text-align: center;
-    margin: 20px 0 0;
+    padding: 24px 28px 0;
+    max-width: 780px; margin: 0 auto;
     animation: agFadeUp 0.6s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-hero h1 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 2.4rem; font-weight: 700;
-    line-height: 1.1; letter-spacing: -0.035em;
+    font-size: 4.2rem; font-weight: 700;
+    line-height: 0.98; letter-spacing: -0.05em;
     color: #fff; margin: 0;
+    text-transform: uppercase;
 }
 .ag-hero .em {
-    background: linear-gradient(135deg, #00D559 0%, #2D9EFF 50%, #c084fc 100%);
+    display: block;
+    background: linear-gradient(135deg, #00D559 0%, #2D9EFF 40%, #c084fc 100%);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: agGradientShift 6s ease infinite;
 }
 .ag-hero-sub {
-    font-size: 0.92rem; color: rgba(255, 255, 255, 0.45);
-    line-height: 1.7; margin-top: 16px;
+    font-size: 1rem; color: rgba(255, 255, 255, 0.5);
+    line-height: 1.7; margin-top: 20px;
     max-width: 540px; margin-left: auto; margin-right: auto;
 }
 .ag-hero-sub strong {
-    color: rgba(255, 255, 255, 0.85); font-weight: 700;
+    color: #fff; font-weight: 700;
 }
 .ag-hero-sub2 {
-    display: inline-block; margin-top: 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 20px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.68rem; font-weight: 700;
+    font-size: 0.7rem; font-weight: 700;
     color: #00D559;
     background: rgba(0, 213, 89, 0.06);
-    border: 1px solid rgba(0, 213, 89, 0.15);
-    padding: 6px 18px; border-radius: 100px;
+    border: 1px solid rgba(0, 213, 89, 0.18);
+    padding: 8px 24px; border-radius: 100px;
     text-transform: uppercase; letter-spacing: 0.06em;
 }
 
-/* ── Proof grid (6 metric cards) ─────────────────────────────── */
-.ag-proof-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-    margin: 24px 0 28px;
-    animation: agFadeUp 0.6s 0.14s cubic-bezier(0.22, 1, 0.36, 1) both;
+/* ── Proof strip (3 oversized stats) ─────────────────────── */
+.ag-proof-strip {
+    width: 100vw; position: relative;
+    left: 50%; transform: translateX(-50%);
+    background: linear-gradient(180deg, rgba(0, 213, 89, 0.04) 0%, transparent 100%);
+    border-top: 1px solid rgba(0, 213, 89, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 36px 0;
+    margin: 28px 0 0;
 }
-.ag-proof-card {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px; padding: 18px 12px 16px;
-    text-align: center; position: relative; overflow: hidden;
-    transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+.ag-proof-inner {
+    display: flex; justify-content: center; gap: 0;
+    max-width: 780px; margin: 0 auto;
 }
-.ag-proof-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, #00D559, #2D9EFF);
-    opacity: 0; transition: opacity 0.3s;
+.ag-proof-stat {
+    flex: 1; text-align: center;
+    padding: 12px 20px;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    animation: agNumberPop 0.6s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.ag-proof-card:hover::before { opacity: 1; }
-.ag-proof-card:hover {
-    border-color: rgba(0, 213, 89, 0.2);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 213, 89, 0.05);
-}
-.ag-proof-ico {
-    font-size: 1.5rem; margin-bottom: 6px;
-    filter: drop-shadow(0 2px 8px rgba(0, 213, 89, 0.2));
-}
-.ag-proof-num {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.6rem; font-weight: 800;
+.ag-proof-stat:last-child { border-right: none; }
+.ag-proof-stat:nth-child(2) { animation-delay: 0.35s; }
+.ag-proof-stat:nth-child(3) { animation-delay: 0.5s; }
+.ag-proof-stat:nth-child(4) { animation-delay: 0.65s; }
+.ag-proof-big {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.2rem; font-weight: 700;
+    letter-spacing: -0.04em; line-height: 1;
     background: linear-gradient(135deg, #00D559, #2D9EFF);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
-    line-height: 1.1;
 }
-.ag-proof-lbl {
-    font-family: 'Space Grotesk', sans-serif;
+.ag-proof-label {
+    font-family: 'Inter', sans-serif;
     font-size: 0.72rem; font-weight: 700;
-    color: rgba(255, 255, 255, 0.7);
-    margin-top: 4px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-top: 6px;
 }
-.ag-proof-detail {
-    font-size: 0.55rem; color: rgba(255, 255, 255, 0.25);
-    margin-top: 6px; line-height: 1.45;
+.ag-proof-sub {
+    font-size: 0.6rem; color: rgba(255, 255, 255, 0.2);
+    margin-top: 4px;
 }
 
 /* Keep old proof bar for backward compat */
@@ -738,18 +766,19 @@ html, body, .stApp, .stApp * {
 
 /* ── "What's Inside" feature showcase ────────────────────────── */
 .ag-inside {
-    margin: 36px 0 0;
+    margin: 48px 0 0;
     animation: agFadeUp 0.6s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-inside-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
 }
 .ag-inside-card {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 16px; padding: 20px 16px 16px;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px; padding: 24px 20px 20px;
     position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+}
 }
 .ag-inside-card:hover {
     border-color: rgba(192, 132, 252, 0.25);
@@ -764,34 +793,35 @@ html, body, .stApp, .stApp * {
 .ag-inside-card:hover::before { opacity: 1; }
 .ag-inside-ico {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 44px; height: 44px; border-radius: 12px;
-    background: linear-gradient(135deg, rgba(192, 132, 252, 0.1), rgba(96, 165, 250, 0.06));
-    border: 1px solid rgba(192, 132, 252, 0.1);
-    font-size: 1.3rem; margin-bottom: 10px;
+    width: 52px; height: 52px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(192, 132, 252, 0.12), rgba(96, 165, 250, 0.08));
+    border: 1px solid rgba(192, 132, 252, 0.12);
+    font-size: 1.5rem; margin-bottom: 14px;
 }
 .ag-inside-name {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.82rem; font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 6px;
+    font-size: 1rem; font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
 }
 .ag-inside-desc {
-    font-size: 0.64rem; color: rgba(255, 255, 255, 0.38);
-    line-height: 1.6;
+    font-size: 0.72rem; color: rgba(255, 255, 255, 0.42);
+    line-height: 1.65;
 }
 .ag-inside-tag {
-    display: inline-block; margin-top: 10px;
+    display: inline-block; margin-top: 12px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.44rem; font-weight: 800;
-    color: #c084fc; background: rgba(192, 132, 252, 0.08);
-    border: 1px solid rgba(192, 132, 252, 0.15);
-    padding: 3px 10px; border-radius: 100px;
+    font-size: 0.5rem; font-weight: 800;
+    color: #c084fc; background: rgba(192, 132, 252, 0.1);
+    border: 1px solid rgba(192, 132, 252, 0.18);
+    padding: 4px 12px; border-radius: 100px;
     text-transform: uppercase; letter-spacing: 0.08em;
 }
 
 /* ── Tabs ────────────────────────────────────────────────────── */
 [data-testid="stTabs"] {
     animation: agFadeUp 0.6s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+    max-width: 520px; margin: 0 auto;
 }
 [data-testid="stTabs"] > [data-baseweb="tab-list"] {
     background: rgba(255, 255, 255, 0.03);
@@ -901,27 +931,30 @@ html, body, .stApp, .stApp * {
 
 /* Section header */
 .ag-section-head {
-    text-align: center; margin-bottom: 20px;
+    text-align: center; margin-bottom: 28px;
     position: relative;
 }
 .ag-section-head::before {
-    content: ''; display: block; width: 40px; height: 3px; margin: 0 auto 14px;
+    content: ''; display: block; width: 60px; height: 4px; margin: 0 auto 18px;
     background: linear-gradient(90deg, #00D559, #2D9EFF);
     border-radius: 4px;
 }
 .ag-section-head h3 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.35rem; font-weight: 700;
-    color: #fff; margin: 0 0 6px;
-    letter-spacing: -0.025em;
+    font-size: 2.2rem; font-weight: 700;
+    color: #fff; margin: 0 0 10px;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
 }
 .ag-section-head h3 .em {
     background: linear-gradient(135deg, #00D559 0%, #2D9EFF 50%, #c084fc 100%);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: agGradientShift 6s ease infinite;
 }
 .ag-section-head p {
-    font-size: 0.74rem; color: rgba(255, 255, 255, 0.35);
+    font-size: 0.85rem; color: rgba(255, 255, 255, 0.4);
     margin: 0; line-height: 1.6;
 }
 
@@ -931,26 +964,29 @@ html, body, .stApp, .stApp * {
     animation: agFadeUp 0.6s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-gy-head {
-    text-align: center; margin-bottom: 20px; position: relative;
+    text-align: center; margin-bottom: 24px; position: relative;
 }
 .ag-gy-head::before {
-    content: ''; display: block; width: 40px; height: 3px; margin: 0 auto 14px;
+    content: ''; display: block; width: 60px; height: 4px; margin: 0 auto 18px;
     background: linear-gradient(90deg, #f24336, #F9C62B);
     border-radius: 4px;
 }
 .ag-gy-head h3 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.35rem; font-weight: 800;
-    color: #fff; margin: 0 0 6px;
-    letter-spacing: -0.025em;
+    font-size: 2.2rem; font-weight: 800;
+    color: #fff; margin: 0 0 10px;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
 }
 .ag-gy-head h3 .em {
     background: linear-gradient(135deg, #00D559 0%, #2D9EFF 50%, #c084fc 100%);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: agGradientShift 6s ease infinite;
 }
 .ag-gy-head p {
-    font-size: 0.74rem; color: rgba(255, 255, 255, 0.35);
+    font-size: 0.85rem; color: rgba(255, 255, 255, 0.4);
     margin: 0; line-height: 1.6;
 }
 
@@ -1094,101 +1130,104 @@ html, body, .stApp, .stApp * {
 
 /* ── Feature cards (3-col) ───────────────────────────────────── */
 .ag-features {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-    margin: 28px 0 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin: 32px 0 0;
     animation: agFadeUp 0.6s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-feat {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 16px; padding: 20px 12px 16px;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px; padding: 24px 16px 20px;
     text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
 }
 .ag-feat:hover {
-    border-color: rgba(0, 213, 89, 0.2);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+    border-color: rgba(0, 213, 89, 0.25);
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 24px rgba(0, 213, 89, 0.06);
 }
 .ag-feat::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, #00D559, #2D9EFF);
     opacity: 0; transition: opacity 0.3s;
 }
 .ag-feat:hover::before { opacity: 1; }
 .ag-feat-ico {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 40px; height: 40px; border-radius: 10px;
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.1), rgba(45, 158, 255, 0.06));
-    border: 1px solid rgba(0, 213, 89, 0.08);
-    font-size: 1.2rem; margin-bottom: 8px;
+    width: 48px; height: 48px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.12), rgba(45, 158, 255, 0.08));
+    border: 1px solid rgba(0, 213, 89, 0.1);
+    font-size: 1.4rem; margin-bottom: 10px;
 }
 .ag-feat-name {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.72rem; font-weight: 700;
-    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.85rem; font-weight: 700;
+    color: #fff;
     line-height: 1.2;
 }
 .ag-feat-desc {
-    font-size: 0.58rem; color: rgba(255, 255, 255, 0.32);
-    margin-top: 4px; line-height: 1.5;
+    font-size: 0.68rem; color: rgba(255, 255, 255, 0.38);
+    margin-top: 6px; line-height: 1.55;
 }
 
 /* ── Metric counters ─────────────────────────────────────────── */
 .ag-stats {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-    margin: 28px 0 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin: 32px 0 0;
     animation: agFadeUp 0.6s 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-stat {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px; padding: 16px 10px 12px;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px; padding: 20px 12px 16px;
     text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s;
 }
 .ag-stat:hover {
-    border-color: rgba(0, 213, 89, 0.15);
-    transform: translateY(-2px);
+    border-color: rgba(0, 213, 89, 0.2);
+    transform: translateY(-3px);
 }
 .ag-stat-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.3rem; font-weight: 700;
-    color: #00D559; line-height: 1.1;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.8rem; font-weight: 700;
+    background: linear-gradient(135deg, #00D559, #2D9EFF);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
 }
 .ag-stat-label {
-    font-size: 0.58rem; color: rgba(255, 255, 255, 0.25);
-    font-weight: 600; margin-top: 3px;
+    font-size: 0.65rem; color: rgba(255, 255, 255, 0.3);
+    font-weight: 600; margin-top: 4px;
     text-transform: uppercase; letter-spacing: 0.05em;
 }
 
 /* ── Testimonials ────────────────────────────────────────────── */
 .ag-reviews {
-    margin: 32px 0 0;
+    margin: 36px 0 0;
     animation: agFadeUp 0.6s 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-review {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px; padding: 18px 20px;
-    margin-bottom: 10px; position: relative;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px; padding: 22px 24px;
+    margin-bottom: 12px; position: relative;
     transition: border-color 0.3s, transform 0.3s;
 }
 .ag-review:hover {
-    border-color: rgba(0, 213, 89, 0.15);
-    transform: translateY(-1px);
+    border-color: rgba(0, 213, 89, 0.2);
+    transform: translateY(-2px);
 }
 .ag-review-text {
-    font-size: 0.82rem; color: rgba(255, 255, 255, 0.55);
-    font-style: italic; line-height: 1.55;
+    font-size: 0.92rem; color: rgba(255, 255, 255, 0.6);
+    font-style: italic; line-height: 1.6;
 }
 .ag-review-author {
-    font-size: 0.68rem; font-weight: 700;
-    color: rgba(0, 213, 89, 0.7);
-    margin-top: 8px;
+    font-size: 0.75rem; font-weight: 700;
+    color: rgba(0, 213, 89, 0.8);
+    margin-top: 10px;
 }
 .ag-review-stars {
-    color: #F9C62B; font-size: 0.65rem; margin-top: 3px;
+    color: #F9C62B; font-size: 0.72rem; margin-top: 4px;
 }
 
 /* ── Pricing ─────────────────────────────────────────────────── */
@@ -1411,49 +1450,50 @@ html, body, .stApp, .stApp * {
 
 /* ── How It Works (3-step) ───────────────────────────────────── */
 .ag-how {
-    margin: 40px 0 0;
+    margin: 48px 0 0;
     animation: agFadeUp 0.6s 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-how-steps {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
     position: relative;
 }
 .ag-how-step {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 16px; padding: 22px 14px 18px;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px; padding: 28px 18px 24px;
     text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
 }
 .ag-how-step:hover {
-    border-color: rgba(0, 213, 89, 0.2);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    border-color: rgba(0, 213, 89, 0.25);
+    transform: translateY(-5px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 30px rgba(0, 213, 89, 0.06);
 }
 .ag-how-step::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, #00D559, #2D9EFF);
     opacity: 0; transition: opacity 0.3s;
 }
 .ag-how-step:hover::before { opacity: 1; }
 .ag-how-num {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border-radius: 50%;
+    width: 44px; height: 44px; border-radius: 50%;
     background: linear-gradient(135deg, #00D559, #2D9EFF);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem; font-weight: 800; color: #0B0F19;
-    margin-bottom: 10px;
-    box-shadow: 0 4px 16px rgba(0, 213, 89, 0.2);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.1rem; font-weight: 800; color: #0B0F19;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 24px rgba(0, 213, 89, 0.25);
 }
-.ag-how-ico { font-size: 1.5rem; display: block; margin-bottom: 8px; }
+.ag-how-ico { font-size: 2rem; display: block; margin-bottom: 10px; }
 .ag-how-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.82rem; font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.05rem; font-weight: 700;
+    color: #fff;
+    text-transform: uppercase; letter-spacing: -0.02em;
 }
 .ag-how-desc {
-    font-size: 0.62rem; color: rgba(255, 255, 255, 0.38);
-    margin-top: 8px; line-height: 1.6;
+    font-size: 0.72rem; color: rgba(255, 255, 255, 0.4);
+    margin-top: 10px; line-height: 1.65;
 }
 .ag-how-arrow {
     position: absolute; top: 50%; right: -10px;
@@ -1983,44 +2023,56 @@ html, body, .stApp, .stApp * {
 
 /* ── Second CTA ──────────────────────────────────────────────── */
 .ag-cta2 {
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.08), rgba(45, 158, 255, 0.05));
-    border: 1px solid rgba(0, 213, 89, 0.15);
-    border-radius: 16px; padding: 24px 18px;
-    text-align: center; margin: 28px 0 0;
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.1), rgba(45, 158, 255, 0.06));
+    border: 2px solid rgba(0, 213, 89, 0.2);
+    border-radius: 24px; padding: 40px 28px;
+    text-align: center; margin: 40px 0 0;
     animation: agFadeUp 0.6s 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+    position: relative; overflow: hidden;
+}
+.ag-cta2::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0, 213, 89, 0.08) 0%, transparent 60%);
+    pointer-events: none;
 }
 .ag-cta2-head {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.1rem; font-weight: 800;
-    color: #fff; margin: 0 0 6px;
+    font-size: 2rem; font-weight: 800;
+    color: #fff; margin: 0 0 10px;
+    text-transform: uppercase; letter-spacing: -0.03em;
+    position: relative;
 }
 .ag-cta2-head .em {
     background: linear-gradient(135deg, #00D559, #2D9EFF);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: agGradientShift 6s ease infinite;
 }
 .ag-cta2-sub {
-    font-size: 0.72rem; color: rgba(255, 255, 255, 0.35);
-    margin: 0 0 12px; line-height: 1.5;
+    font-size: 0.85rem; color: rgba(255, 255, 255, 0.4);
+    margin: 0 0 20px; line-height: 1.6;
+    position: relative;
 }
 .ag-cta2-btn {
     display: inline-block;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.88rem; font-weight: 700;
+    font-size: 1rem; font-weight: 700;
     color: #0B0F19; background: linear-gradient(135deg, #00D559, #00B74D);
-    padding: 14px 40px; border-radius: 14px;
+    padding: 16px 52px; border-radius: 16px;
     text-decoration: none;
-    box-shadow: 0 4px 24px rgba(0, 213, 89, 0.3);
+    box-shadow: 0 6px 32px rgba(0, 213, 89, 0.35);
     transition: all 0.25s ease;
     animation: agPulse 3s ease-in-out infinite;
+    position: relative;
 }
 .ag-cta2-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 40px rgba(0, 213, 89, 0.45);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 48px rgba(0, 213, 89, 0.5);
 }
 .ag-cta2-trust {
-    font-size: 0.55rem; color: rgba(255, 255, 255, 0.15);
-    margin-top: 10px;
+    font-size: 0.6rem; color: rgba(255, 255, 255, 0.18);
+    margin-top: 14px; position: relative;
 }
 
 /* ── Trust + footer ──────────────────────────────────────────── */
@@ -2043,23 +2095,29 @@ html, body, .stApp, .stApp * {
 .ag-footer a { color: rgba(255, 255, 255, 0.15); text-decoration: underline; }
 
 /* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ag-hero h1 { font-size: 2.8rem; }
+    .ag-section-head h3, .ag-gy-head h3 { font-size: 1.6rem; }
+    .ag-proof-big { font-size: 2.2rem; }
+    .ag-proof-inner { flex-wrap: wrap; }
+    .ag-proof-stat { flex: 0 0 50%; border-right: none; padding: 10px 16px; }
+    .ag-inside-grid { grid-template-columns: 1fr; }
+    .ag-how-steps { grid-template-columns: 1fr; gap: 12px; }
+    .ag-how-arrow { display: none; }
+}
 @media (max-width: 520px) {
-    .ag-hero h1 { font-size: 1.5rem; }
-    .ag-logo-img { width: 180px; }
+    .ag-hero h1 { font-size: 2.2rem; }
+    .ag-section-head h3, .ag-gy-head h3 { font-size: 1.35rem; }
+    .ag-logo-img { width: 160px; }
     .ag-features { grid-template-columns: 1fr 1fr; }
     .ag-stats { grid-template-columns: 1fr 1fr; }
     .ag-price-grid { grid-template-columns: 1fr; }
     [data-testid="stForm"] { padding: 22px 18px 20px !important; }
-    .ag-proof { gap: 14px; }
-    .ag-proof-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
-    .ag-proof-num { font-size: 1.05rem; }
-    .ag-proof-detail { font-size: 0.46rem; }
-    .ag-inside-grid { grid-template-columns: 1fr; }
+    .ag-proof-big { font-size: 1.8rem; }
+    .ag-proof-label { font-size: 0.6rem; }
     .ag-tbl { font-size: 0.64rem; }
     .ag-tbl thead th, .ag-tbl tbody td { padding: 7px 6px; }
-    .ag-how-steps { grid-template-columns: 1fr; gap: 10px; }
-    .ag-how-arrow { display: none; }
-    .ag-cta2-head { font-size: 0.95rem; }
+    .ag-cta2-head { font-size: 1.4rem; }
     .ag-pick-card { width: 152px; }
     .ag-pc-line { font-size: 1.2rem; }
     .ag-pc-player { font-size: 0.7rem; }
@@ -2121,54 +2179,40 @@ def require_login() -> bool:
     <div class="ag-logo-section">{_logo_html}</div>
 
     <div class="ag-hero">
-      <h1>The House Has<br>a Problem.<br><span class="em">It&rsquo;s Us.</span></h1>
+      <h1>The House<br>Has a Problem.<br><span class="em">It&rsquo;s Us.</span></h1>
       <div class="ag-hero-sub">
-        The only <strong>AI-powered NBA prop analysis platform</strong> that fuses
-        <strong>6 machine-learning models</strong> into a single confidence score &mdash;
-        scanning <strong>300+ props every night</strong> across PrizePicks, DraftKings &amp; Underdog.
+        <strong>6 AI models. 300+ props. Every night.</strong><br>
+        The only platform that fuses machine learning into a single confidence score
+        across PrizePicks, DraftKings &amp; Underdog.
       </div>
       <div class="ag-hero-sub2">
         &#x1F50B; Free forever &nbsp;&bull;&nbsp; No credit card &nbsp;&bull;&nbsp; No catch
       </div>
     </div>
 
-    <!-- Proof bar: 6 key metrics -->
-    <div class="ag-proof-grid">
-      <div class="ag-proof-card">
-        <div class="ag-proof-ico">&#x1F3AF;</div>
-        <div class="ag-proof-num">62%</div>
-        <div class="ag-proof-lbl">Hit Rate</div>
-        <div class="ag-proof-detail">Verified across 8,400+ graded picks</div>
-      </div>
-      <div class="ag-proof-card">
-        <div class="ag-proof-ico">&#x1F9E0;</div>
-        <div class="ag-proof-num">6</div>
-        <div class="ag-proof-lbl">AI Models</div>
-        <div class="ag-proof-detail">Monte Carlo, Ridge, RF, XGB, LSTM, Bayesian</div>
-      </div>
-      <div class="ag-proof-card">
-        <div class="ag-proof-ico">&#x26A1;</div>
-        <div class="ag-proof-num">300+</div>
-        <div class="ag-proof-lbl">Props / Night</div>
-        <div class="ag-proof-detail">PrizePicks, DraftKings, Underdog &amp; more</div>
-      </div>
-      <div class="ag-proof-card">
-        <div class="ag-proof-ico">&#x1F4C8;</div>
-        <div class="ag-proof-num">+18%</div>
-        <div class="ag-proof-lbl">Avg ROI</div>
-        <div class="ag-proof-detail">Bankroll growth over rolling 30-day window</div>
-      </div>
-      <div class="ag-proof-card">
-        <div class="ag-proof-ico">&#x1F50D;</div>
-        <div class="ag-proof-num">92%</div>
-        <div class="ag-proof-lbl">CLV Capture</div>
-        <div class="ag-proof-detail">Closing line value &mdash; the sharp benchmark</div>
-      </div>
-      <div class="ag-proof-card">
-        <div class="ag-proof-ico">&#x1F4B0;</div>
-        <div class="ag-proof-num">$0</div>
-        <div class="ag-proof-lbl">Price</div>
-        <div class="ag-proof-detail">Competitors charge $99&ndash;$299/mo for less</div>
+    <!-- Proof strip: 4 oversized stats -->
+    <div class="ag-proof-strip">
+      <div class="ag-proof-inner">
+        <div class="ag-proof-stat">
+          <div class="ag-proof-big">62%</div>
+          <div class="ag-proof-label">Hit Rate</div>
+          <div class="ag-proof-sub">8,400+ graded picks</div>
+        </div>
+        <div class="ag-proof-stat">
+          <div class="ag-proof-big">300+</div>
+          <div class="ag-proof-label">Props / Night</div>
+          <div class="ag-proof-sub">3 platforms scanned</div>
+        </div>
+        <div class="ag-proof-stat">
+          <div class="ag-proof-big">+18%</div>
+          <div class="ag-proof-label">Avg ROI</div>
+          <div class="ag-proof-sub">Rolling 30-day window</div>
+        </div>
+        <div class="ag-proof-stat">
+          <div class="ag-proof-big">$0</div>
+          <div class="ag-proof-label">Price</div>
+          <div class="ag-proof-sub">Others charge $99&ndash;$299/mo</div>
+        </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2229,9 +2273,10 @@ def require_login() -> bool:
     # ── Below-fold: How It Works + What's Inside + Product Preview ──
     st.markdown("""
     <!-- How It Works -->
+    <div class="ag-section">
     <div class="ag-how">
       <div class="ag-section-head">
-        <h3>Start Winning in 3 Steps</h3>
+        <h3>Start Winning<br>in <span class="em">3 Steps</span></h3>
         <p>From signup to payout in under 60 seconds</p>
       </div>
       <div class="ag-how-steps">
@@ -2263,7 +2308,7 @@ def require_login() -> bool:
     <!-- What's Inside: Feature Showcase -->
     <div class="ag-inside">
       <div class="ag-section-head">
-        <h3>What&rsquo;s Inside <span class="em">Smart Pick Pro</span></h3>
+        <h3>What&rsquo;s Inside<br><span class="em">Smart Pick Pro</span></h3>
         <p>Everything you need to beat the books &mdash; in one platform</p>
       </div>
       <div class="ag-inside-grid">
@@ -2311,10 +2356,11 @@ def require_login() -> bool:
     <!-- Product Preview -->
     <div class="ag-preview">
       <div class="ag-section-head">
-        <h3>See What You Get &mdash; Free</h3>
+        <h3>See What You Get &mdash; <span class="em">Free</span></h3>
         <p>Live picks from today&rsquo;s Quantum Analysis Matrix</p>
       </div>
     </div>
+    </div><!-- /ag-section -->
     """, unsafe_allow_html=True)
 
     # ── Product Preview: live platform picks from today's analysis ──
@@ -2342,8 +2388,8 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .sw::-webkit-scrollbar-track{background:rgba(255,255,255,0.02);border-radius:100px}
 .sw::-webkit-scrollbar-thumb{background:rgba(0,213,89,0.25);border-radius:100px}
 .tk{display:inline-flex;gap:12px;padding:0 4px}
-.cd{width:180px;flex-shrink:0;background:linear-gradient(168deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.012) 100%);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:0;position:relative;overflow:hidden;transition:border-color .3s,transform .3s,box-shadow .3s}
-.cd:hover{border-color:rgba(0,213,89,0.25);transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.35),0 0 24px rgba(0,213,89,0.05)}
+.cd{width:220px;flex-shrink:0;background:linear-gradient(168deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.015) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:0;position:relative;overflow:hidden;transition:border-color .3s,transform .3s,box-shadow .3s}
+.cd:hover{border-color:rgba(0,213,89,0.3);transform:translateY(-6px);box-shadow:0 16px 48px rgba(0,0,0,0.4),0 0 30px rgba(0,213,89,0.08)}
 .cd::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
 .cd.pp::before{background:linear-gradient(90deg,#00D559,#2D9EFF)}
 .cd.dk::before{background:linear-gradient(90deg,#F9C62B,#ff8c00)}
@@ -2356,11 +2402,11 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .cd.ud .cp{color:#c084fc}.cd.ud .cp .dt{background:#c084fc}
 .ht{font-family:'JetBrains Mono',monospace;font-size:.46rem;font-weight:800;color:#00D559;background:rgba(0,213,89,0.1);border:1px solid rgba(0,213,89,0.18);padding:2px 8px;border-radius:100px}
 .cb{padding:10px 12px 8px;text-align:center}
-.pl{font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;color:rgba(255,255,255,0.92);line-height:1.2;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl{font-family:'Space Grotesk',sans-serif;font-size:.92rem;font-weight:700;color:#fff;line-height:1.2;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tm{font-family:'JetBrains Mono',monospace;font-size:.46rem;font-weight:600;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
 .dr{font-family:'Space Grotesk',sans-serif;font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em;margin-bottom:2px}
 .dr.more{color:#00D559}.dr.less{color:#2D9EFF}
-.ln{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:800;color:rgba(255,255,255,0.95);line-height:1;margin-bottom:2px}
+.ln{font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:800;color:#fff;line-height:1;margin-bottom:2px}
 .st{font-family:'JetBrains Mono',monospace;font-size:.52rem;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.08em}
 .cf{padding:6px 12px 10px;border-top:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:space-between}
 .sf{font-family:'JetBrains Mono',monospace;font-size:.48rem;font-weight:800;display:flex;align-items:center;gap:3px}
@@ -2390,9 +2436,10 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 
     # ── Below-fold: competitor graveyard ─────────────────────
     st.markdown("""
+    <div class="ag-section">
     <div class="ag-graveyard">
       <div class="ag-gy-head">
-        <h3>They Charge You Hundreds.<br><span class="em">We Do It Better &mdash; Free.</span></h3>
+        <h3>They Charge Hundreds.<br><span class="em">We Do It Better &mdash; Free.</span></h3>
         <p>Every major sports betting tool charges $30&ndash;$300+/mo for <em>less</em> than what you get here.</p>
       </div>
 
@@ -2541,6 +2588,7 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
         <div class="ag-review-author">&mdash; @nightowl_picks</div>
       </div>
     </div>
+    </div><!-- /ag-section graveyard -->
     """, unsafe_allow_html=True)
 
     # ── Below-fold: Bet Tracker transparency ─────────────────
@@ -2553,11 +2601,11 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .em{color:#00D559}
 .sh{text-align:center;margin-bottom:18px;position:relative}
 .sh::before{content:'';display:block;width:40px;height:3px;margin:0 auto 14px;background:linear-gradient(90deg,#2D9EFF,#c084fc);border-radius:4px}
-.sh h3{font-family:'Space Grotesk',sans-serif;font-size:1.35rem;font-weight:700;color:#fff;margin-bottom:6px;letter-spacing:-0.025em}
-.sh p{font-size:0.74rem;color:rgba(255,255,255,0.35);line-height:1.6}
+.sh h3{font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;color:#fff;margin-bottom:8px;letter-spacing:-0.04em;text-transform:uppercase}
+.sh p{font-size:0.85rem;color:rgba(255,255,255,0.4);line-height:1.6}
 .bdg{display:block;width:fit-content;margin:0 auto 12px;font-family:'JetBrains Mono',monospace;font-size:.52rem;font-weight:800;color:#2D9EFF;background:rgba(45,158,255,0.06);border:1px solid rgba(45,158,255,0.12);padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em}
-.tw{background:linear-gradient(168deg,rgba(45,158,255,0.04),rgba(45,158,255,0.01));border:1px solid rgba(45,158,255,0.1);border-radius:16px;padding:18px 20px;margin-bottom:14px}
-.tw-h{font-family:'Space Grotesk',sans-serif;font-size:.82rem;font-weight:800;color:rgba(255,255,255,0.75);margin:0 0 10px}
+.tw{background:linear-gradient(168deg,rgba(45,158,255,0.04),rgba(45,158,255,0.01));border:1px solid rgba(45,158,255,0.1);border-radius:20px;padding:22px 24px;margin-bottom:16px}
+.tw-h{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:800;color:rgba(255,255,255,0.8);margin:0 0 12px}
 .tw-l{list-style:none;padding:0;margin:0}
 .tw-i{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:.66rem;color:rgba(255,255,255,0.4);line-height:1.5}
 .tw-ic{flex-shrink:0;font-size:.72rem;margin-top:1px}
@@ -2635,13 +2683,13 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.7)}
 .em{background:linear-gradient(135deg,#00D559 0%,#2D9EFF 50%,#c084fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.sh{text-align:center;margin-bottom:20px;position:relative}
-.sh::before{content:'';display:block;width:40px;height:3px;margin:0 auto 14px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:4px}
-.sh h3{font-family:'Space Grotesk',sans-serif;font-size:1.35rem;font-weight:700;color:#fff;margin:0 0 6px;letter-spacing:-0.025em}
-.sh p{font-size:0.74rem;color:rgba(255,255,255,0.35);margin:0;line-height:1.6}
+.sh{text-align:center;margin-bottom:24px;position:relative}
+.sh::before{content:'';display:block;width:60px;height:4px;margin:0 auto 18px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:4px}
+.sh h3{font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;color:#fff;margin:0 0 10px;letter-spacing:-0.04em;text-transform:uppercase}
+.sh p{font-size:0.85rem;color:rgba(255,255,255,0.4);margin:0;line-height:1.6}
 /* Tier cards */
-.tc{background:linear-gradient(168deg,rgba(255,255,255,0.04),rgba(255,255,255,0.008));border:1px solid rgba(255,255,255,0.07);border-radius:18px;padding:22px 20px;margin:14px 0 0;position:relative;overflow:hidden;transition:border-color 0.3s,transform 0.3s,box-shadow 0.3s}
-.tc:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,0.2)}
+.tc{background:linear-gradient(168deg,rgba(255,255,255,0.05),rgba(255,255,255,0.012));border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:26px 24px;margin:16px 0 0;position:relative;overflow:hidden;transition:border-color 0.3s,transform 0.3s,box-shadow 0.3s}
+.tc:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
 .tc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
 .tc.tf::before{background:linear-gradient(90deg,#708090,#A0AABE)}
 .tc.ts::before{background:linear-gradient(90deg,#F9C62B,#ff8c00)}
@@ -2718,12 +2766,13 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .fi[open] summary .fa{transform:rotate(180deg)}
 .fi-a{padding:0 16px 14px;font-size:0.7rem;color:rgba(255,255,255,0.35);line-height:1.6}
 /* CTA2 */
-.c2{background:linear-gradient(135deg,rgba(0,213,89,0.08),rgba(45,158,255,0.05));border:1px solid rgba(0,213,89,0.15);border-radius:16px;padding:24px 18px;text-align:center;margin:28px 0 0}
-.c2-h{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:800;color:#fff;margin:0 0 6px}
-.c2-s{font-size:0.72rem;color:rgba(255,255,255,0.35);margin:0 0 12px;line-height:1.5}
-.c2-b{display:inline-block;font-family:'Space Grotesk',sans-serif;font-size:0.82rem;font-weight:700;color:#0B0F19;background:linear-gradient(135deg,#00D559,#00B74D);padding:12px 32px;border-radius:12px;text-decoration:none;box-shadow:0 4px 24px rgba(0,213,89,0.3)}
-.c2-b:hover{transform:translateY(-2px);box-shadow:0 6px 32px rgba(0,213,89,0.4)}
-.c2-t{font-size:0.55rem;color:rgba(255,255,255,0.15);margin-top:10px}
+.c2{background:linear-gradient(135deg,rgba(0,213,89,0.1),rgba(45,158,255,0.06));border:2px solid rgba(0,213,89,0.2);border-radius:24px;padding:44px 28px;text-align:center;margin:36px 0 0;position:relative;overflow:hidden}
+.c2::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,213,89,0.08) 0%,transparent 60%);pointer-events:none}
+.c2-h{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#fff;margin:0 0 10px;text-transform:uppercase;letter-spacing:-0.03em;position:relative}
+.c2-s{font-size:0.85rem;color:rgba(255,255,255,0.4);margin:0 0 20px;line-height:1.6;position:relative}
+.c2-b{display:inline-block;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;color:#0B0F19;background:linear-gradient(135deg,#00D559,#00B74D);padding:16px 52px;border-radius:16px;text-decoration:none;box-shadow:0 6px 32px rgba(0,213,89,0.35);position:relative}
+.c2-b:hover{transform:translateY(-4px);box-shadow:0 12px 48px rgba(0,213,89,0.5)}
+.c2-t{font-size:0.6rem;color:rgba(255,255,255,0.18);margin-top:14px;position:relative}
 /* Trust + Footer */
 .tr{display:flex;justify-content:center;gap:16px;margin:28px 0 6px;flex-wrap:wrap}
 .tr-i{font-size:0.62rem;font-weight:600;color:rgba(255,255,255,0.22);display:flex;align-items:center;gap:4px}
