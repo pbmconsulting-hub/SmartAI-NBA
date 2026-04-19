@@ -181,116 +181,403 @@ def logout_user() -> None:
         st.session_state.pop(key, None)
 
 
+# ── Logo helper ───────────────────────────────────────────────
+
+def _get_logo_b64() -> str:
+    """Return base64-encoded SPP logo for inline embedding."""
+    import base64 as _b64
+    _logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
+    try:
+        with open(_logo_path, "rb") as f:
+            return _b64.b64encode(f.read()).decode()
+    except OSError:
+        return ""
+
+
 # ── CSS for the gate ──────────────────────────────────────────
 
 _GATE_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-/* Hide Streamlit sidebar + default header while on gate */
-[data-testid="stSidebar"], header[data-testid="stHeader"] {
+/* ── Hide Streamlit chrome while on gate ────────────────────── */
+[data-testid="stSidebar"], header[data-testid="stHeader"],
+[data-testid="stDecoration"], .stDeployButton {
     display: none !important;
 }
 [data-testid="stAppViewContainer"] {
     padding-top: 0 !important;
 }
+.stApp { background: transparent !important; }
 
+/* ── Keyframes ──────────────────────────────────────────────── */
+@keyframes authOrbFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25%  { transform: translate(30px, -20px) scale(1.08); }
+    50%  { transform: translate(-15px, 15px) scale(0.95); }
+    75%  { transform: translate(20px, 25px) scale(1.04); }
+}
+@keyframes authOrbFloat2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%  { transform: translate(-40px, 20px) scale(1.1); }
+    66%  { transform: translate(25px, -30px) scale(0.92); }
+}
+@keyframes authGradShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+@keyframes authFadeInUp {
+    from { opacity: 0; transform: translateY(32px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes authPulseGlow {
+    0%, 100% { box-shadow: 0 0 40px rgba(0,213,89,0.08), 0 0 80px rgba(45,158,255,0.04); }
+    50%      { box-shadow: 0 0 60px rgba(0,213,89,0.14), 0 0 120px rgba(45,158,255,0.08); }
+}
+@keyframes authScanLine {
+    0%   { top: -2px; opacity: 0.7; }
+    100% { top: 100%; opacity: 0; }
+}
+@keyframes authShimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+@keyframes authLogoSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+@keyframes authTickerScroll {
+    0%   { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+}
+
+/* ── Full-screen dark canvas ───────────────────────────────── */
 .auth-gate-bg {
     position: fixed; inset: 0; z-index: 9998;
-    background: linear-gradient(135deg, #070a13 0%, #0d1117 40%, #111827 100%);
+    background: linear-gradient(160deg, #04060c 0%, #080d1a 25%, #0a1428 50%, #0c1020 75%, #060a14 100%);
+    background-size: 400% 400%;
+    animation: authGradShift 20s ease infinite;
     overflow-y: auto;
+    overflow-x: hidden;
 }
-.auth-gate-bg::before {
-    content: '';
-    position: fixed; inset: 0;
-    background:
-        radial-gradient(ellipse at 20% 30%, rgba(0,213,89,0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 70%, rgba(45,158,255,0.05) 0%, transparent 50%);
+
+/* Ambient orbs */
+.auth-orb {
+    position: fixed; border-radius: 50%;
+    pointer-events: none; z-index: 9998;
+    filter: blur(100px);
+}
+.auth-orb-1 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,213,89,0.1) 0%, transparent 70%);
+    top: -120px; left: -80px;
+    animation: authOrbFloat 14s ease-in-out infinite;
+}
+.auth-orb-2 {
+    width: 450px; height: 450px;
+    background: radial-gradient(circle, rgba(45,158,255,0.08) 0%, transparent 70%);
+    bottom: -100px; right: -100px;
+    animation: authOrbFloat2 18s ease-in-out infinite;
+}
+.auth-orb-3 {
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(249,198,43,0.05) 0%, transparent 70%);
+    top: 40%; left: 60%;
+    animation: authOrbFloat 22s ease-in-out infinite reverse;
+}
+
+/* Scan line */
+.auth-scan-line {
+    position: fixed; left: 0; width: 100%; height: 2px; z-index: 9999;
+    background: linear-gradient(90deg, transparent 0%, rgba(0,213,89,0.25) 30%, rgba(45,158,255,0.2) 70%, transparent 100%);
+    animation: authScanLine 8s linear infinite;
     pointer-events: none;
 }
 
-.auth-gate-container {
-    position: relative; z-index: 9999;
-    max-width: 440px; margin: 0 auto; padding: 60px 24px 40px;
-    font-family: 'Inter', sans-serif;
+/* Grid pattern overlay */
+.auth-grid-overlay {
+    position: fixed; inset: 0; z-index: 9998; pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 80%);
 }
 
-.auth-logo {
-    text-align: center; margin-bottom: 12px;
+/* ── Main container ────────────────────────────────────────── */
+.auth-gate-container {
+    position: relative; z-index: 10000;
+    max-width: 480px; margin: 0 auto;
+    padding: 40px 24px 32px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
-.auth-logo-text {
-    font-size: 2rem; font-weight: 900;
-    background: linear-gradient(135deg, #FFFFFF, #00D559 60%, #2D9EFF);
+
+/* ── Sports ticker (top) ───────────────────────────────────── */
+.auth-ticker-wrap {
+    position: relative; z-index: 10001;
+    overflow: hidden; margin-bottom: 32px;
+    background: linear-gradient(90deg, rgba(0,213,89,0.06), rgba(45,158,255,0.06), rgba(249,198,43,0.06));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 0;
+    height: 38px; display: flex; align-items: center;
+}
+.auth-ticker-track {
+    display: flex; white-space: nowrap;
+    animation: authTickerScroll 30s linear infinite;
+}
+.auth-ticker-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 28px; font-size: 0.76rem; font-weight: 600;
+    color: rgba(255,255,255,0.6); letter-spacing: 0.03em;
+}
+.auth-ticker-item .ticker-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0;
+}
+.ticker-dot-live { background: #00D559; box-shadow: 0 0 6px rgba(0,213,89,0.6); }
+.ticker-dot-soon { background: #F9C62B; opacity: 0.7; }
+
+/* ── Logo section ──────────────────────────────────────────── */
+.auth-logo-section {
+    text-align: center; margin-bottom: 8px;
+    animation: authFadeInUp 0.7s cubic-bezier(0.22,1,0.36,1) both;
+}
+.auth-logo-ring {
+    display: inline-block; position: relative;
+    width: 96px; height: 96px; margin-bottom: 16px;
+}
+.auth-logo-ring::before {
+    content: ''; position: absolute; inset: -4px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #00D559, #2D9EFF, #F9C62B, #c084fc, #00D559);
+    animation: authLogoSpin 6s linear infinite;
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px));
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px));
+}
+.auth-logo-ring img {
+    width: 96px; height: 96px; border-radius: 50%;
+    position: relative; z-index: 1;
+}
+.auth-brand-name {
+    font-size: 1.65rem; font-weight: 900;
+    background: linear-gradient(135deg, #FFFFFF 0%, #00D559 50%, #2D9EFF 100%);
+    background-size: 200% 200%;
+    animation: authGradShift 6s ease infinite;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em; line-height: 1.1;
 }
-.auth-logo-sub {
-    font-size: 0.82rem; color: rgba(255,255,255,0.45);
-    letter-spacing: 0.08em; text-transform: uppercase;
-    margin-top: 4px;
+.auth-brand-sub {
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.18em;
+    text-transform: uppercase; margin-top: 6px;
+    color: rgba(255,255,255,0.35);
 }
 
+/* ── Headline ──────────────────────────────────────────────── */
 .auth-headline {
-    text-align: center; margin: 28px 0 8px;
-    font-size: 1.5rem; font-weight: 800; color: #FFFFFF;
-    line-height: 1.3;
+    text-align: center; margin: 28px 0 6px;
+    font-size: 1.75rem; font-weight: 900; color: #FFFFFF;
+    line-height: 1.2; letter-spacing: -0.03em;
+    animation: authFadeInUp 0.7s 0.12s cubic-bezier(0.22,1,0.36,1) both;
+}
+.auth-headline .hl-accent {
+    background: linear-gradient(135deg, #00D559, #2D9EFF);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 .auth-subheadline {
-    text-align: center; font-size: 0.92rem;
-    color: rgba(255,255,255,0.55); margin-bottom: 28px;
-    line-height: 1.5;
+    text-align: center; font-size: 0.88rem; font-weight: 400;
+    color: rgba(255,255,255,0.5); margin-bottom: 28px;
+    line-height: 1.55;
+    animation: authFadeInUp 0.7s 0.2s cubic-bezier(0.22,1,0.36,1) both;
 }
 
-.auth-card {
-    background: rgba(22,27,39,0.85);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 18px; padding: 32px 28px;
-    backdrop-filter: blur(24px);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+/* ── Stats bar ─────────────────────────────────────────────── */
+.auth-stats-bar {
+    display: flex; justify-content: center; gap: 8px;
+    margin-bottom: 28px; flex-wrap: wrap;
+    animation: authFadeInUp 0.7s 0.28s cubic-bezier(0.22,1,0.36,1) both;
+}
+.auth-stat-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 100px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.74rem; font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    backdrop-filter: blur(8px);
+}
+.auth-stat-chip .stat-val {
+    color: #00D559; font-weight: 800;
 }
 
-.auth-divider {
-    display: flex; align-items: center; gap: 12px;
-    margin: 20px 0; color: rgba(255,255,255,0.25);
-    font-size: 0.78rem; text-transform: uppercase;
-    letter-spacing: 0.1em;
+/* ── Glass card wrapping Streamlit forms ───────────────────── */
+/* We style the Streamlit tab container + form elements */
+.auth-gate-container [data-testid="stTabs"] {
+    animation: authFadeInUp 0.7s 0.35s cubic-bezier(0.22,1,0.36,1) both;
 }
-.auth-divider::before, .auth-divider::after {
-    content: ''; flex: 1; height: 1px;
-    background: rgba(255,255,255,0.08);
+.auth-gate-container [data-testid="stTabs"] > [data-baseweb="tab-list"] {
+    background: rgba(255,255,255,0.03);
+    border-radius: 14px; padding: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+    gap: 4px; margin-bottom: 24px;
+    justify-content: center;
 }
-
-.auth-features {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    margin-top: 28px;
+.auth-gate-container [data-testid="stTabs"] [data-baseweb="tab"] {
+    border-radius: 10px !important; font-weight: 700 !important;
+    font-size: 0.88rem !important; padding: 10px 28px !important;
+    color: rgba(255,255,255,0.45) !important;
+    background: transparent !important;
+    border: none !important;
+    transition: all 0.25s ease !important;
 }
-.auth-feature {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 0.78rem; color: rgba(255,255,255,0.55);
+.auth-gate-container [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
+    background: linear-gradient(135deg, rgba(0,213,89,0.15), rgba(45,158,255,0.12)) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 12px rgba(0,213,89,0.15) !important;
+    border: 1px solid rgba(0,213,89,0.2) !important;
 }
-.auth-feature-icon {
-    color: #00D559; font-size: 0.9rem; flex-shrink: 0;
+/* Tab highlight bar — hide default */
+.auth-gate-container [data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+    display: none !important;
 }
-
-.auth-trust {
-    text-align: center; margin-top: 24px;
-    font-size: 0.72rem; color: rgba(255,255,255,0.3);
-}
-
-.auth-banner {
-    text-align: center; padding: 10px;
-    background: linear-gradient(90deg, rgba(0,213,89,0.08), rgba(45,158,255,0.08));
-    border: 1px solid rgba(0,213,89,0.15);
-    border-radius: 10px; margin-bottom: 20px;
-    font-size: 0.82rem; color: rgba(255,255,255,0.7);
+.auth-gate-container [data-testid="stTabs"] [data-baseweb="tab-border"] {
+    display: none !important;
 }
 
+/* Form panel area */
+.auth-gate-container [data-testid="stForm"] {
+    background: rgba(14, 20, 38, 0.7) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 20px !important;
+    padding: 32px 28px 28px !important;
+    backdrop-filter: blur(30px) saturate(1.2) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(1.2) !important;
+    box-shadow:
+        0 24px 80px rgba(0,0,0,0.45),
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        0 1px 0 rgba(255,255,255,0.06) inset !important;
+    animation: authPulseGlow 6s ease-in-out infinite;
+}
+
+/* Inputs */
+.auth-gate-container [data-testid="stForm"] input {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 12px !important;
+    color: #FFFFFF !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.9rem !important;
+    padding: 12px 16px !important;
+    transition: border-color 0.25s, box-shadow 0.25s !important;
+}
+.auth-gate-container [data-testid="stForm"] input:focus {
+    border-color: rgba(0,213,89,0.45) !important;
+    box-shadow: 0 0 0 3px rgba(0,213,89,0.1), 0 0 20px rgba(0,213,89,0.06) !important;
+    outline: none !important;
+}
+.auth-gate-container [data-testid="stForm"] input::placeholder {
+    color: rgba(255,255,255,0.25) !important;
+}
+/* Labels */
+.auth-gate-container [data-testid="stForm"] label {
+    color: rgba(255,255,255,0.6) !important;
+    font-weight: 600 !important; font-size: 0.82rem !important;
+    letter-spacing: 0.01em !important;
+}
+
+/* Submit buttons */
+.auth-gate-container [data-testid="stForm"] button[kind="primaryFormSubmit"],
+.auth-gate-container [data-testid="stForm"] button[type="submit"] {
+    background: linear-gradient(135deg, #00D559 0%, #00B84D 40%, #00A043 100%) !important;
+    color: #FFFFFF !important;
+    font-weight: 800 !important; font-size: 1rem !important;
+    letter-spacing: -0.01em !important;
+    border: none !important; border-radius: 14px !important;
+    padding: 14px 32px !important;
+    margin-top: 8px !important;
+    box-shadow: 0 4px 24px rgba(0,213,89,0.3), 0 1px 0 rgba(255,255,255,0.1) inset !important;
+    transition: all 0.2s ease !important;
+    position: relative; overflow: hidden;
+}
+.auth-gate-container [data-testid="stForm"] button[kind="primaryFormSubmit"]:hover,
+.auth-gate-container [data-testid="stForm"] button[type="submit"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 32px rgba(0,213,89,0.4), 0 1px 0 rgba(255,255,255,0.15) inset !important;
+}
+
+/* ── Feature cards grid (below forms) ──────────────────────── */
+.auth-features-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px; margin-top: 28px;
+    animation: authFadeInUp 0.7s 0.5s cubic-bezier(0.22,1,0.36,1) both;
+}
+.auth-feat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px; padding: 16px 12px;
+    text-align: center;
+    transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+.auth-feat-card:hover {
+    border-color: rgba(0,213,89,0.2);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.auth-feat-icon {
+    font-size: 1.4rem; margin-bottom: 6px; display: block;
+}
+.auth-feat-label {
+    font-size: 0.72rem; font-weight: 700;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.3; letter-spacing: -0.01em;
+}
+.auth-feat-sublabel {
+    font-size: 0.62rem; font-weight: 500;
+    color: rgba(255,255,255,0.3); margin-top: 3px;
+}
+
+/* ── Trust strip ───────────────────────────────────────────── */
+.auth-trust-strip {
+    display: flex; justify-content: center; align-items: center;
+    gap: 20px; margin-top: 24px; flex-wrap: wrap;
+    animation: authFadeInUp 0.7s 0.6s cubic-bezier(0.22,1,0.36,1) both;
+}
+.auth-trust-item {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.68rem; font-weight: 500;
+    color: rgba(255,255,255,0.28);
+}
+.auth-trust-icon { font-size: 0.72rem; }
+
+/* ── Footer ────────────────────────────────────────────────── */
+.auth-footer {
+    text-align: center; margin-top: 36px;
+    font-size: 0.65rem; color: rgba(255,255,255,0.18);
+    line-height: 1.6;
+    animation: authFadeInUp 0.7s 0.7s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 520px) {
-    .auth-gate-container { padding: 40px 16px 30px; }
-    .auth-card { padding: 24px 18px; }
-    .auth-features { grid-template-columns: 1fr; }
-    .auth-headline { font-size: 1.25rem; }
+    .auth-gate-container { padding: 28px 14px 24px; }
+    .auth-gate-container [data-testid="stForm"] {
+        padding: 24px 18px 22px !important;
+        border-radius: 16px !important;
+    }
+    .auth-headline { font-size: 1.35rem; }
+    .auth-features-grid { grid-template-columns: 1fr 1fr; }
+    .auth-logo-ring { width: 76px; height: 76px; }
+    .auth-logo-ring img { width: 76px; height: 76px; }
+    .auth-brand-name { font-size: 1.35rem; }
+    .auth-stats-bar { gap: 6px; }
+    .auth-stat-chip { font-size: 0.68rem; padding: 6px 10px; }
+    .auth-ticker-wrap { margin-bottom: 24px; }
+}
+@media (max-width: 360px) {
+    .auth-features-grid { grid-template-columns: 1fr; }
 }
 </style>
 """
@@ -318,29 +605,74 @@ def require_login() -> bool:
     # ── Render the gate ───────────────────────────────────────
     st.markdown(_GATE_CSS, unsafe_allow_html=True)
 
-    st.markdown("""
+    # Logo base64
+    _logo_b64 = _get_logo_b64()
+    _logo_tag = f'<img src="data:image/png;base64,{_logo_b64}" alt="Smart Pick Pro">' if _logo_b64 else '<div style="font-size:2.8rem;">🏀</div>'
+
+    st.markdown(f"""
+    <!-- Ambient background layers -->
     <div class="auth-gate-bg"></div>
+    <div class="auth-orb auth-orb-1"></div>
+    <div class="auth-orb auth-orb-2"></div>
+    <div class="auth-orb auth-orb-3"></div>
+    <div class="auth-scan-line"></div>
+    <div class="auth-grid-overlay"></div>
+
     <div class="auth-gate-container">
-      <div class="auth-logo">
-        <div class="auth-logo-text">Smart Pick Pro</div>
-        <div class="auth-logo-sub">The Sharpest Prop Engine on the Internet</div>
+
+      <!-- Sports ticker -->
+      <div class="auth-ticker-wrap">
+        <div class="auth-ticker-track">
+          <div class="auth-ticker-item"><span class="ticker-dot ticker-dot-live"></span> NBA PLAYOFFS LIVE</div>
+          <div class="auth-ticker-item"><span class="ticker-dot ticker-dot-soon"></span> MLB COMING SOON</div>
+          <div class="auth-ticker-item"><span class="ticker-dot ticker-dot-soon"></span> NFL COMING SOON</div>
+          <div class="auth-ticker-item">⚡ 300+ PROPS ANALYZED NIGHTLY</div>
+          <div class="auth-ticker-item">🧠 QUANTUM MATRIX ENGINE</div>
+          <div class="auth-ticker-item">📊 62% HIT RATE VERIFIED</div>
+          <!-- duplicate for seamless loop -->
+          <div class="auth-ticker-item"><span class="ticker-dot ticker-dot-live"></span> NBA PLAYOFFS LIVE</div>
+          <div class="auth-ticker-item"><span class="ticker-dot ticker-dot-soon"></span> MLB COMING SOON</div>
+          <div class="auth-ticker-item"><span class="ticker-dot ticker-dot-soon"></span> NFL COMING SOON</div>
+          <div class="auth-ticker-item">⚡ 300+ PROPS ANALYZED NIGHTLY</div>
+          <div class="auth-ticker-item">🧠 QUANTUM MATRIX ENGINE</div>
+          <div class="auth-ticker-item">📊 62% HIT RATE VERIFIED</div>
+        </div>
       </div>
-      <div class="auth-headline">The House Has a Problem. It's Us.</div>
-      <div class="auth-subheadline">Create your free account to access the platform.<br>No credit card required.</div>
+
+      <!-- Logo + Brand -->
+      <div class="auth-logo-section">
+        <div class="auth-logo-ring">{_logo_tag}</div>
+        <div class="auth-brand-name">Smart Pick Pro</div>
+        <div class="auth-brand-sub">The Sharpest Prop Engine on the Internet</div>
+      </div>
+
+      <!-- Headline -->
+      <div class="auth-headline">
+        The House Has a Problem.<br><span class="hl-accent">It's Us.</span>
+      </div>
+      <div class="auth-subheadline">
+        Create your free account to access the full platform.<br>No credit card required. Ever.
+      </div>
+
+      <!-- Social proof chips -->
+      <div class="auth-stats-bar">
+        <div class="auth-stat-chip">🏀 <span class="stat-val">300+</span> Props / Night</div>
+        <div class="auth-stat-chip">🎯 <span class="stat-val">62%</span> Hit Rate</div>
+        <div class="auth-stat-chip">🤖 <span class="stat-val">AI</span> Powered</div>
+      </div>
+
     </div>
     """, unsafe_allow_html=True)
 
     # Tabs for signup / login
-    tab_signup, tab_login = st.tabs(["Create Account", "Log In"])
+    tab_signup, tab_login = st.tabs(["⚡  Create Account", "🔓  Log In"])
 
     with tab_signup:
-        st.markdown('<div class="auth-banner">🏀 NBA IS LIVE · ⚾ MLB COMING SOON · 🏈 NFL COMING SOON</div>', unsafe_allow_html=True)
-
         with st.form("signup_form", clear_on_submit=False):
             su_name = st.text_input("Display Name", placeholder="e.g. Joseph", key="_su_name")
-            su_email = st.text_input("Email", placeholder="you@example.com", key="_su_email")
+            su_email = st.text_input("Email Address", placeholder="you@example.com", key="_su_email")
             su_pw = st.text_input("Password", type="password", placeholder="Min 8 chars, 1 letter, 1 number", key="_su_pw")
-            su_pw2 = st.text_input("Confirm Password", type="password", placeholder="Re-enter password", key="_su_pw2")
+            su_pw2 = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password", key="_su_pw2")
             su_submit = st.form_submit_button("⚡ Create Free Account", use_container_width=True, type="primary")
 
         if su_submit:
@@ -365,21 +697,9 @@ def require_login() -> bool:
                 else:
                     st.error("Could not create account. Please try again.")
 
-        st.markdown("""
-        <div class="auth-features">
-          <div class="auth-feature"><span class="auth-feature-icon">✅</span> 300+ props analyzed nightly</div>
-          <div class="auth-feature"><span class="auth-feature-icon">✅</span> Quantum Matrix Engine</div>
-          <div class="auth-feature"><span class="auth-feature-icon">✅</span> SAFE Score™ on every pick</div>
-          <div class="auth-feature"><span class="auth-feature-icon">✅</span> AI Analyst Joseph M. Smith</div>
-          <div class="auth-feature"><span class="auth-feature-icon">✅</span> PrizePicks · Underdog · DK</div>
-          <div class="auth-feature"><span class="auth-feature-icon">✅</span> Free tier — no card needed</div>
-        </div>
-        <div class="auth-trust">🔒 256-bit SSL · Passwords are encrypted · We never share your data</div>
-        """, unsafe_allow_html=True)
-
     with tab_login:
         with st.form("login_form", clear_on_submit=False):
-            li_email = st.text_input("Email", placeholder="you@example.com", key="_li_email")
+            li_email = st.text_input("Email Address", placeholder="you@example.com", key="_li_email")
             li_pw = st.text_input("Password", type="password", placeholder="Enter your password", key="_li_pw")
             li_submit = st.form_submit_button("🔓 Log In", use_container_width=True, type="primary")
 
@@ -397,9 +717,49 @@ def require_login() -> bool:
                 else:
                     st.error("Invalid email or password.")
 
+    # Feature cards
     st.markdown("""
-    <div style="text-align:center;margin-top:32px;font-size:0.72rem;color:rgba(255,255,255,0.25);">
-      © 2026 Smart Pick Pro · For entertainment & educational purposes only · 21+ · 1-800-GAMBLER
+    <div class="auth-features-grid">
+      <div class="auth-feat-card">
+        <span class="auth-feat-icon">🎯</span>
+        <div class="auth-feat-label">SAFE Score™</div>
+        <div class="auth-feat-sublabel">Every pick rated</div>
+      </div>
+      <div class="auth-feat-card">
+        <span class="auth-feat-icon">🧠</span>
+        <div class="auth-feat-label">Quantum Engine</div>
+        <div class="auth-feat-sublabel">AI-powered analysis</div>
+      </div>
+      <div class="auth-feat-card">
+        <span class="auth-feat-icon">📡</span>
+        <div class="auth-feat-label">Live Sweat</div>
+        <div class="auth-feat-sublabel">Real-time tracking</div>
+      </div>
+      <div class="auth-feat-card">
+        <span class="auth-feat-icon">🔬</span>
+        <div class="auth-feat-label">Prop Scanner</div>
+        <div class="auth-feat-sublabel">Find edge instantly</div>
+      </div>
+      <div class="auth-feat-card">
+        <span class="auth-feat-icon">🎙️</span>
+        <div class="auth-feat-label">The Studio</div>
+        <div class="auth-feat-sublabel">Joseph's AI brain</div>
+      </div>
+      <div class="auth-feat-card">
+        <span class="auth-feat-icon">🛡️</span>
+        <div class="auth-feat-label">Risk Shield</div>
+        <div class="auth-feat-sublabel">Protect your bankroll</div>
+      </div>
+    </div>
+
+    <div class="auth-trust-strip">
+      <div class="auth-trust-item"><span class="auth-trust-icon">🔒</span> 256-bit Encryption</div>
+      <div class="auth-trust-item"><span class="auth-trust-icon">🚫</span> No Credit Card</div>
+      <div class="auth-trust-item"><span class="auth-trust-icon">🤝</span> Never Sold Data</div>
+    </div>
+
+    <div class="auth-footer">
+      © 2026 Smart Pick Pro · For entertainment &amp; educational purposes only · 21+ · <a href="https://www.ncpgambling.org/" target="_blank" style="color:rgba(255,255,255,0.3);text-decoration:underline;">1-800-GAMBLER</a>
     </div>
     """, unsafe_allow_html=True)
 
