@@ -132,7 +132,7 @@ valid_stat_types = (
     + ["double_double", "triple_double"]
 )
 valid_platforms = [
-    "SPP", "Underdog Fantasy", "DraftKings Pick6",
+    "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
 ]
 
 # ── Import platform service (optional — app works without it) ──
@@ -524,7 +524,7 @@ with tab_load:
         # Platform checkboxes
         plat_col_pp, plat_col_ud, plat_col_dk = st.columns(3)
         with plat_col_pp:
-            pp_on = st.checkbox("🟢 SPP", value=True, key="scanner_pp_checkbox")
+            pp_on = st.checkbox("🟢 PrizePicks", value=True, key="scanner_pp_checkbox")
         with plat_col_ud:
             ud_on = st.checkbox("🟡 Underdog Fantasy", value=True, key="scanner_ud_checkbox")
         with plat_col_dk:
@@ -538,7 +538,7 @@ with tab_load:
 
         enabled_platforms = []
         if pp_on:
-            enabled_platforms.append("SPP")
+            enabled_platforms.append("PrizePicks")
         if ud_on:
             enabled_platforms.append("Underdog Fantasy")
         if dk_on:

@@ -900,20 +900,48 @@ if run_analysis:
         _selected_platforms = st.session_state.get(
             "selected_platforms", ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"]
         )
+        # Build a normalised set of platform names so variants like
+        # "SPP", "Smart Pick", "prizepicks" all match "PrizePicks".
+        _PLATFORM_ALIASES = {
+            "spp": "PrizePicks", "smart pick": "PrizePicks",
+            "smart pick pro": "PrizePicks", "prizepicks": "PrizePicks",
+            "underdog": "Underdog Fantasy", "underdog fantasy": "Underdog Fantasy",
+            "draftkings": "DraftKings Pick6", "draftkings pick6": "DraftKings Pick6",
+            "dk": "DraftKings Pick6", "dk pick6": "DraftKings Pick6",
+        }
+        _selected_set = set(_selected_platforms)
+        # Also add lowercase variants and known aliases
+        for _sp in list(_selected_platforms):
+            _selected_set.add(_sp.lower())
+        for _alias, _canonical in _PLATFORM_ALIASES.items():
+            if _canonical in _selected_set:
+                _selected_set.add(_alias)
+
         if _selected_platforms:
             before_plat = len(props_to_analyze)
-            props_to_analyze = [
+            _plat_filtered = [
                 p for p in props_to_analyze
                 if not p.get("platform", "").strip()          # include props with no platform
-                or p.get("platform", "") in _selected_platforms
+                or p.get("platform", "") in _selected_set
+                or p.get("platform", "").lower() in _selected_set
             ]
-            plat_skipped = before_plat - len(props_to_analyze)
+            plat_skipped = before_plat - len(_plat_filtered)
             if plat_skipped > 0:
                 st.info(
                     f"ℹ️ Skipping **{plat_skipped}** prop(s) for platforms not in your "
                     f"selection ({', '.join(_selected_platforms)}). "
                     "Change platforms on the ⚙️ Settings page."
                 )
+            # Fallback: if platform filter removes ALL props, proceed with
+            # all of them so the user isn't blocked by a name mismatch.
+            if len(_plat_filtered) == 0 and before_plat > 0:
+                st.warning(
+                    f"⚠️ Platform filter removed all **{before_plat}** props. "
+                    f"**Proceeding with all props** so analysis isn't blocked. "
+                    "Check the ⚙️ Settings page to update your platform selection."
+                )
+            else:
+                props_to_analyze = _plat_filtered
 
         # ── Show per-platform prop count summary ─────────────────────────
         if props_to_analyze:
