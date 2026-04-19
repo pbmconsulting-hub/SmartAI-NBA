@@ -783,6 +783,280 @@ html, body, .stApp, .stApp * {
 }
 .ag-price-info strong { color: rgba(255, 255, 255, 0.55); }
 
+/* ── Compare Subscriptions toggle ────────────────────────────── */
+.ag-cmp-btn {
+    display: block; width: 100%; margin: 16px 0 0;
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.08), rgba(45, 158, 255, 0.06));
+    border: 1px solid rgba(0, 213, 89, 0.2);
+    border-radius: 12px; padding: 14px 20px;
+    text-align: center; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem; font-weight: 700;
+    color: #00D559; letter-spacing: 0.02em;
+    transition: all 0.25s ease;
+    animation: agPulse 3s ease-in-out infinite;
+}
+.ag-cmp-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.14), rgba(45, 158, 255, 0.1));
+    border-color: rgba(0, 213, 89, 0.35);
+    transform: translateY(-1px);
+}
+.ag-cmp-btn .arrow { display: inline-block; transition: transform 0.3s; margin-left: 6px; }
+#ag-cmp-toggle:checked ~ .ag-cmp-btn .arrow { transform: rotate(180deg); }
+
+/* Hidden checkbox trick for expand/collapse */
+#ag-cmp-toggle { display: none; }
+.ag-cmp-panel {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#ag-cmp-toggle:checked ~ .ag-cmp-panel {
+    max-height: 6000px;
+}
+
+/* Tier detail cards */
+.ag-tier-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px; padding: 20px 18px;
+    margin: 12px 0 0; position: relative;
+    overflow: hidden;
+}
+.ag-tier-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.ag-tier-card.t-free::before { background: linear-gradient(90deg, #708090, #A0AABE); }
+.ag-tier-card.t-sharp::before { background: linear-gradient(90deg, #F9C62B, #ff8c00); }
+.ag-tier-card.t-smart::before { background: linear-gradient(90deg, #00D559, #2D9EFF); }
+.ag-tier-card.t-insider::before { background: linear-gradient(90deg, #c084fc, #9333ea); }
+
+.ag-tier-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+}
+.ag-tier-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em;
+}
+.ag-tier-card.t-free .ag-tier-name { color: #A0AABE; }
+.ag-tier-card.t-sharp .ag-tier-name { color: #F9C62B; }
+.ag-tier-card.t-smart .ag-tier-name { color: #00D559; }
+.ag-tier-card.t-insider .ag-tier-name { color: #c084fc; }
+
+.ag-tier-price-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; font-weight: 700;
+}
+.ag-tier-card.t-free .ag-tier-price-tag { color: #A0AABE; }
+.ag-tier-card.t-sharp .ag-tier-price-tag { color: #F9C62B; }
+.ag-tier-card.t-smart .ag-tier-price-tag { color: #00D559; }
+.ag-tier-card.t-insider .ag-tier-price-tag { color: #c084fc; }
+
+.ag-tier-tagline {
+    font-size: 0.65rem; font-style: italic;
+    color: rgba(255, 255, 255, 0.25);
+    margin-bottom: 12px;
+}
+
+/* Page items inside tier cards */
+.ag-page-list { list-style: none; padding: 0; margin: 0; }
+.ag-page-item {
+    padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.ag-page-item:last-child { border-bottom: none; }
+.ag-page-head {
+    display: flex; align-items: center; gap: 6px;
+}
+.ag-page-ico { font-size: 0.85rem; flex-shrink: 0; }
+.ag-page-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.72rem; font-weight: 700;
+    color: rgba(255, 255, 255, 0.75);
+}
+.ag-page-benefit {
+    font-size: 0.62rem; color: rgba(255, 255, 255, 0.32);
+    line-height: 1.5; margin-top: 2px; padding-left: 22px;
+}
+
+/* Full comparison table inside panel */
+.ag-tier-tbl-wrap {
+    margin: 18px 0 0; overflow-x: auto;
+}
+.ag-tier-tbl {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px; overflow: hidden;
+    font-size: 0.64rem;
+}
+.ag-tier-tbl thead th {
+    padding: 10px 8px; font-size: 0.55rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: center;
+}
+.ag-tier-tbl thead th:first-child { text-align: left; width: 34%; padding-left: 10px; }
+.ag-tier-tbl thead th.th-fr { color: #A0AABE; }
+.ag-tier-tbl thead th.th-sh { color: #F9C62B; }
+.ag-tier-tbl thead th.th-sm { color: #00D559; }
+.ag-tier-tbl thead th.th-in { color: #c084fc; }
+.ag-tier-tbl tbody td {
+    padding: 7px 8px; text-align: center;
+    color: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.025);
+    font-weight: 500;
+}
+.ag-tier-tbl tbody td:first-child { text-align: left; padding-left: 10px; color: rgba(255, 255, 255, 0.5); font-weight: 600; }
+.ag-tier-tbl tbody tr:last-child td { border-bottom: none; }
+.ag-tier-tbl .y { color: #00D559; font-weight: 700; }
+.ag-tier-tbl .n { color: rgba(255, 255, 255, 0.1); }
+.ag-tier-tbl .lim { color: #ff9d00; font-weight: 700; }
+.ag-tier-tbl .cat td {
+    color: rgba(0, 213, 89, 0.5); font-weight: 700;
+    font-size: 0.58rem; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 6px 10px;
+    background: rgba(0, 213, 89, 0.02);
+}
+
+/* ── Compare Subscriptions toggle ────────────────────────────── */
+.ag-cmp-btn {
+    display: block; width: 100%; margin: 16px 0 0;
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.08), rgba(45, 158, 255, 0.06));
+    border: 1px solid rgba(0, 213, 89, 0.2);
+    border-radius: 12px; padding: 14px 20px;
+    text-align: center; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem; font-weight: 700;
+    color: #00D559; letter-spacing: 0.02em;
+    transition: all 0.25s ease;
+    animation: agPulse 3s ease-in-out infinite;
+}
+.ag-cmp-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.14), rgba(45, 158, 255, 0.1));
+    border-color: rgba(0, 213, 89, 0.35);
+    transform: translateY(-1px);
+}
+.ag-cmp-btn .arrow { display: inline-block; transition: transform 0.3s; margin-left: 6px; }
+#ag-cmp-toggle:checked ~ .ag-cmp-btn .arrow { transform: rotate(180deg); }
+
+/* Hidden checkbox trick for expand/collapse */
+#ag-cmp-toggle { display: none; }
+.ag-cmp-panel {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#ag-cmp-toggle:checked ~ .ag-cmp-panel {
+    max-height: 6000px;
+}
+
+/* Tier detail cards */
+.ag-tier-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px; padding: 20px 18px;
+    margin: 12px 0 0; position: relative;
+    overflow: hidden;
+}
+.ag-tier-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.ag-tier-card.t-free::before { background: linear-gradient(90deg, #708090, #A0AABE); }
+.ag-tier-card.t-sharp::before { background: linear-gradient(90deg, #F9C62B, #ff8c00); }
+.ag-tier-card.t-smart::before { background: linear-gradient(90deg, #00D559, #2D9EFF); }
+.ag-tier-card.t-insider::before { background: linear-gradient(90deg, #c084fc, #9333ea); }
+
+.ag-tier-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+}
+.ag-tier-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em;
+}
+.ag-tier-card.t-free .ag-tier-name { color: #A0AABE; }
+.ag-tier-card.t-sharp .ag-tier-name { color: #F9C62B; }
+.ag-tier-card.t-smart .ag-tier-name { color: #00D559; }
+.ag-tier-card.t-insider .ag-tier-name { color: #c084fc; }
+
+.ag-tier-price-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; font-weight: 700;
+}
+.ag-tier-card.t-free .ag-tier-price-tag { color: #A0AABE; }
+.ag-tier-card.t-sharp .ag-tier-price-tag { color: #F9C62B; }
+.ag-tier-card.t-smart .ag-tier-price-tag { color: #00D559; }
+.ag-tier-card.t-insider .ag-tier-price-tag { color: #c084fc; }
+
+.ag-tier-tagline {
+    font-size: 0.65rem; font-style: italic;
+    color: rgba(255, 255, 255, 0.25);
+    margin-bottom: 12px;
+}
+
+/* Page items inside tier cards */
+.ag-page-list { list-style: none; padding: 0; margin: 0; }
+.ag-page-item {
+    padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.ag-page-item:last-child { border-bottom: none; }
+.ag-page-head {
+    display: flex; align-items: center; gap: 6px;
+}
+.ag-page-ico { font-size: 0.85rem; flex-shrink: 0; }
+.ag-page-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.72rem; font-weight: 700;
+    color: rgba(255, 255, 255, 0.75);
+}
+.ag-page-benefit {
+    font-size: 0.62rem; color: rgba(255, 255, 255, 0.32);
+    line-height: 1.5; margin-top: 2px; padding-left: 22px;
+}
+
+/* Full comparison table inside panel */
+.ag-tier-tbl-wrap {
+    margin: 18px 0 0; overflow-x: auto;
+}
+.ag-tier-tbl {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px; overflow: hidden;
+    font-size: 0.64rem;
+}
+.ag-tier-tbl thead th {
+    padding: 10px 8px; font-size: 0.55rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: center;
+}
+.ag-tier-tbl thead th:first-child { text-align: left; width: 34%; padding-left: 10px; }
+.ag-tier-tbl thead th.th-fr { color: #A0AABE; }
+.ag-tier-tbl thead th.th-sh { color: #F9C62B; }
+.ag-tier-tbl thead th.th-sm { color: #00D559; }
+.ag-tier-tbl thead th.th-in { color: #c084fc; }
+.ag-tier-tbl tbody td {
+    padding: 7px 8px; text-align: center;
+    color: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.025);
+    font-weight: 500;
+}
+.ag-tier-tbl tbody td:first-child { text-align: left; padding-left: 10px; color: rgba(255, 255, 255, 0.5); font-weight: 600; }
+.ag-tier-tbl tbody tr:last-child td { border-bottom: none; }
+.ag-tier-tbl .y { color: #00D559; font-weight: 700; }
+.ag-tier-tbl .n { color: rgba(255, 255, 255, 0.1); }
+.ag-tier-tbl .lim { color: #ff9d00; font-weight: 700; }
+.ag-tier-tbl .cat td {
+    color: rgba(0, 213, 89, 0.5); font-weight: 700;
+    font-size: 0.58rem; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 6px 10px;
+    background: rgba(0, 213, 89, 0.02);
+}
+
 /* ── Savings callout ─────────────────────────────────────────── */
 .ag-savings {
     background: rgba(249, 198, 43, 0.04);
@@ -1120,26 +1394,204 @@ def require_login() -> bool:
       </div>
       <div class="ag-price-grid">
         <div class="ag-price">
-          <div class="ag-price-tier">Free</div>
+          <div class="ag-price-tier">&#x2B50; Smart Rookie</div>
           <div class="ag-price-amount">$0 <span class="p">forever</span></div>
-          <div class="ag-price-info"><strong>3 props / night</strong><br>Quantum Analysis &middot; SAFE Scores</div>
+          <div class="ag-price-info"><strong>10 QAM props</strong><br>Live Sweat &middot; Live Games &middot; SAFE Scores</div>
         </div>
         <div class="ag-price pop">
-          <div class="ag-price-tier">Sharp IQ</div>
+          <div class="ag-price-tier">&#x1F525; Sharp IQ</div>
           <div class="ag-price-amount">$9.99 <span class="p">/mo</span></div>
-          <div class="ag-price-info"><strong>Unlimited props</strong><br>Advanced filters &middot; Bankroll tools</div>
+          <div class="ag-price-info"><strong>25 QAM props</strong><br>Entry Builder &middot; Risk Shield &middot; Bet Tracker</div>
         </div>
         <div class="ag-price">
-          <div class="ag-price-tier">Smart Money</div>
+          <div class="ag-price-tier">&#x1F48E; Smart Money</div>
           <div class="ag-price-amount">$24.99 <span class="p">/mo</span></div>
-          <div class="ag-price-info"><strong>Live Sweat</strong><br>Line alerts &middot; Edge detection</div>
+          <div class="ag-price-info"><strong>All 300+ props</strong><br>Smart Money Bets &middot; Correlation Matrix &middot; Studio</div>
         </div>
         <div class="ag-price">
-          <div class="ag-price-tier">Insider Circle</div>
+          <div class="ag-price-tier">&#x1F451; Insider Circle</div>
           <div class="ag-price-amount">$499 <span class="p">once</span></div>
-          <div class="ag-price-info"><strong>Lifetime access</strong><br>Everything + priority support</div>
+          <div class="ag-price-info"><strong>Lifetime access</strong><br>Everything + early access + founding member</div>
         </div>
       </div>
+
+      <!-- Compare Subscriptions toggle -->
+      <input type="checkbox" id="ag-cmp-toggle">
+      <label class="ag-cmp-btn" for="ag-cmp-toggle">
+        &#x1F50D; Compare Subscriptions &mdash; See Every Page &amp; Feature <span class="arrow">&#x25BC;</span>
+      </label>
+
+      <div class="ag-cmp-panel">
+        <!-- ── TIER 1: Smart Rookie (Free) ─────────────── -->
+        <div class="ag-tier-card t-free">
+          <div class="ag-tier-head">
+            <div class="ag-tier-name">&#x2B50; Smart Rookie</div>
+            <div class="ag-tier-price-tag">$0 / forever</div>
+          </div>
+          <div class="ag-tier-tagline">&ldquo;Welcome to the smart side.&rdquo; &mdash; No credit card required.</div>
+          <ul class="ag-page-list">
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4A6;</span><span class="ag-page-name">Live Sweat</span></div>
+              <div class="ag-page-benefit">Track your active bets in real-time with live scoring, AI confidence updates, and play-by-play. Know instantly if your prop is on pace to hit.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4E1;</span><span class="ag-page-name">Live Games</span></div>
+              <div class="ag-page-benefit">Real-time NBA scoreboard with box scores, quarter-by-quarter breakdowns, and in-game stat leaders. Never miss a beat.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x26A1;</span><span class="ag-page-name">Quantum Analysis Matrix (10 props)</span></div>
+              <div class="ag-page-benefit">Our flagship AI engine: 6 fused models analyze player props with SAFE Scores (0-100), edge detection, and confidence ratings. Free tier gets 10 props per session.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F52C;</span><span class="ag-page-name">Prop Scanner (5 manual)</span></div>
+              <div class="ag-page-benefit">Manually enter any player prop and get instant AI analysis &mdash; predicted line, SAFE Score, and over/under recommendation.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4E1;</span><span class="ag-page-name">Smart NBA Data</span></div>
+              <div class="ag-page-benefit">Full NBA stats dashboard &mdash; player averages, team rankings, defensive ratings, and advanced metrics to research any matchup.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x2699;&#xFE0F;</span><span class="ag-page-name">Settings</span></div>
+              <div class="ag-page-benefit">Customize your experience &mdash; default platforms, display preferences, and notification settings.</div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ── TIER 2: Sharp IQ ($9.99/mo) ─────────────── -->
+        <div class="ag-tier-card t-sharp">
+          <div class="ag-tier-head">
+            <div class="ag-tier-name">&#x1F525; Sharp IQ</div>
+            <div class="ag-tier-price-tag">$9.99/mo &middot; $107.89/yr</div>
+          </div>
+          <div class="ag-tier-tagline">&ldquo;Your IQ just passed the books.&rdquo; &mdash; Everything in Free, plus:</div>
+          <ul class="ag-page-list">
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x26A1;</span><span class="ag-page-name">Quantum Analysis Matrix (25 props)</span></div>
+              <div class="ag-page-benefit">Expanded to 25 AI-analyzed props per session. More coverage = more edges to find before the books adjust.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F52C;</span><span class="ag-page-name">Prop Scanner &mdash; Unlimited + CSV + Live Retrieval</span></div>
+              <div class="ag-page-benefit">Scan unlimited props, bulk-upload via CSV, or auto-pull your PrizePicks/DraftKings slips. AI analyzes every line instantly.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F9EC;</span><span class="ag-page-name">Entry Builder</span></div>
+              <div class="ag-page-benefit">Build optimized PrizePicks &amp; Pick6 entries. AI ranks combinations by expected value, correlation, and SAFE Score to maximize your payout odds.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F6E1;&#xFE0F;</span><span class="ag-page-name">Risk Shield</span></div>
+              <div class="ag-page-benefit">Portfolio-level risk analysis for your entries. See exposure by player, team, and stat type. Avoid correlated losses before they happen.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4CB;</span><span class="ag-page-name">Game Report</span></div>
+              <div class="ag-page-benefit">Deep-dive matchup reports: pace projections, defensive matchup grades, rest advantages, and AI game scripts for every NBA game tonight.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F52E;</span><span class="ag-page-name">Player Simulator</span></div>
+              <div class="ag-page-benefit">Monte Carlo simulation engine. Run 10,000+ scenarios for any player prop to see hit probability, ceiling/floor, and variance risk.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4C8;</span><span class="ag-page-name">Bet Tracker</span></div>
+              <div class="ag-page-benefit">Log every bet and track your ROI, win rate, CLV capture, and bankroll growth over time. See which strategies actually make money.</div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ── TIER 3: Smart Money ($24.99/mo) ──────────── -->
+        <div class="ag-tier-card t-smart">
+          <div class="ag-tier-head">
+            <div class="ag-tier-name">&#x1F48E; Smart Money</div>
+            <div class="ag-tier-price-tag">$24.99/mo &middot; $269.89/yr</div>
+          </div>
+          <div class="ag-tier-tagline">&ldquo;You are the smart money.&rdquo; &mdash; Everything in Sharp IQ, plus:</div>
+          <ul class="ag-page-list">
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x26A1;</span><span class="ag-page-name">Quantum Analysis Matrix &mdash; ALL 300+ Props</span></div>
+              <div class="ag-page-benefit">Full, unrestricted access to every prop the AI analyzes tonight. See the complete board &mdash; no limits, no waiting.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4B0;</span><span class="ag-page-name">Smart Money Bets</span></div>
+              <div class="ag-page-benefit">See where the sharp money is flowing. AI-detected line movement + volume anomalies show you which side the professionals are on.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F5FA;&#xFE0F;</span><span class="ag-page-name">Correlation Matrix</span></div>
+              <div class="ag-page-benefit">Visual correlation heatmap between player props. Find hidden +EV parlays where props move together &mdash; or hedge with negative correlations.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F4CA;</span><span class="ag-page-name">Proving Grounds</span></div>
+              <div class="ag-page-benefit">Backtest any strategy against historical data. See how your filters, SAFE Score thresholds, and entry styles would have performed last season.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F399;&#xFE0F;</span><span class="ag-page-name">The Studio</span></div>
+              <div class="ag-page-benefit">AI-generated analysis reports with narrative breakdowns, data visualizations, and shareable pick cards for your best plays.</div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ── TIER 4: Insider Circle ($499 one-time) ──── -->
+        <div class="ag-tier-card t-insider">
+          <div class="ag-tier-head">
+            <div class="ag-tier-name">&#x1F451; Insider Circle</div>
+            <div class="ag-tier-price-tag">$499.99 one-time &middot; lifetime</div>
+          </div>
+          <div class="ag-tier-tagline">&ldquo;You knew before everyone.&rdquo; &mdash; Everything in Smart Money, plus:</div>
+          <ul class="ag-page-list">
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F451;</span><span class="ag-page-name">Lifetime Access &mdash; Never Pay Again</span></div>
+              <div class="ag-page-benefit">One payment, permanent access to every current feature and every future feature we build. No subscriptions, no renewals, no surprise charges.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F680;</span><span class="ag-page-name">Early Access to New Tools</span></div>
+              <div class="ag-page-benefit">Be the first to test new AI models, pages, and features before they launch to the public. Your feedback shapes what we build next.</div>
+            </li>
+            <li class="ag-page-item">
+              <div class="ag-page-head"><span class="ag-page-ico">&#x1F3C6;</span><span class="ag-page-name">Founding Member Status</span></div>
+              <div class="ag-page-benefit">Limited to 75 members. Exclusive badge, priority support, and recognition as an original Smart Pick Pro insider.</div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Full tier comparison table -->
+        <div class="ag-tier-tbl-wrap">
+          <table class="ag-tier-tbl">
+            <thead>
+              <tr>
+                <th>Page / Feature</th>
+                <th class="th-fr">&#x2B50; Free</th>
+                <th class="th-sh">&#x1F525; Sharp</th>
+                <th class="th-sm">&#x1F48E; Smart</th>
+                <th class="th-in">&#x1F451; Insider</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="cat"><td colspan="5">Core Pages (All Tiers)</td></tr>
+              <tr><td>&#x1F4A6; Live Sweat</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F4E1; Live Games</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F4E1; Smart NBA Data</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x2699;&#xFE0F; Settings</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr class="cat"><td colspan="5">Prop Analysis Engine</td></tr>
+              <tr><td>&#x26A1; Quantum Analysis Matrix</td><td class="lim">10 props</td><td class="lim">25 props</td><td class="y">All 300+</td><td class="y">All 300+</td></tr>
+              <tr><td>&#x1F52C; Prop Scanner &mdash; Manual</td><td class="lim">5 props</td><td class="y">Unlimited</td><td class="y">Unlimited</td><td class="y">Unlimited</td></tr>
+              <tr><td>&#x1F52C; Prop Scanner &mdash; CSV Upload</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F52C; Prop Scanner &mdash; Live Retrieval</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr class="cat"><td colspan="5">Premium Tools (Sharp IQ+)</td></tr>
+              <tr><td>&#x1F9EC; Entry Builder</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F6E1;&#xFE0F; Risk Shield</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F4CB; Game Report</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F52E; Player Simulator</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F4C8; Bet Tracker</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr class="cat"><td colspan="5">Elite Tools (Smart Money+)</td></tr>
+              <tr><td>&#x1F4B0; Smart Money Bets</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F5FA;&#xFE0F; Correlation Matrix</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F4CA; Proving Grounds</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F399;&#xFE0F; The Studio</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
+              <tr class="cat"><td colspan="5">Insider Exclusive</td></tr>
+              <tr><td>&#x1F451; Lifetime Access</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F680; Early Access to New Tools</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td></tr>
+              <tr><td>&#x1F3C6; Founding Member (75 seats)</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end ag-cmp-panel -->
     </div>
 
     <!-- Savings callout -->
