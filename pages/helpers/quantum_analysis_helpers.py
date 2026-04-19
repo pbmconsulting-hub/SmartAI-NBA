@@ -587,11 +587,11 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     delay_style = f' style="animation-delay:{(rank - 1) * 0.06:.2f}s;"' if rank > 0 else ""
 
     # Headshot HTML
+    _onerror_hide = 'this.style.display="none"'
     hs_img = (
         f'<img class="qeg-prop-hs" src="{_html.escape(headshot_url)}" '
         f'alt="{player_name}" loading="lazy" '
-        f'onerror="this.style.display=\'none\'">'
-        if headshot_url else ""
+        f'onerror="{_onerror_hide}">'
     )
 
     # == CARD FACE (summary) ==========================================
@@ -626,11 +626,11 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     prop_call_cls = "qeg-detail-prop-over" if direction == "OVER" else "qeg-detail-prop-under"
 
     # Detail header
+    _onerror_hide_detail = 'this.style.display="none"'
     detail_hs = (
         f'<img class="qeg-detail-hs" src="{_html.escape(headshot_url)}" '
         f'alt="{player_name}" loading="lazy" '
-        f'onerror="this.style.display=\'none\'">'
-        if headshot_url else ""
+        f'onerror="{_onerror_hide_detail}">'
     )
 
     # Team badge color
@@ -843,10 +843,11 @@ def render_quantum_edge_gap_grouped_html(picks: list) -> str:
         headshot_url = (
             f"{_NBA_HEADSHOT_CDN}/{player_id}.png" if player_id else ""
         )
+        _onerr_sum = 'this.style.display="none"'
         headshot_img = (
             f'<img class="qeg-sum-head" src="{_html.escape(headshot_url)}" '
             f'alt="{_html.escape(player_name)}" loading="lazy" '
-            f'onerror="this.style.display=\'none\'">'
+            f'onerror="{_onerr_sum}">'
             if headshot_url else ""
         )
         prop_label = f"{len(player_picks)} prop{'s' if len(player_picks) != 1 else ''}"
@@ -1092,12 +1093,13 @@ def _render_game_group_label(matchup: str, meta: dict) -> str:
         away_rec_html = f' <span class="espn-parlay-team-rec">({away_rec})</span>' if away_rec else ""
         home_rec_html = f' <span class="espn-parlay-team-rec">({home_rec})</span>' if home_rec else ""
 
+        _onerror_logo = f'this.onerror=null;this.src="{_NBA_LOGO_FALLBACK}"'
         return (
             f'<div class="espn-parlay-matchup">'
             f'<div class="espn-parlay-team">'
             f'<img class="espn-parlay-team-logo" '
             f'src="{away_logo}" alt="{safe_away}" '
-            f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+            f'onerror="{_onerror_logo}">'
             f'<span class="espn-parlay-team-name" style="color:{away_color};">{safe_away}</span>'
             f'{away_rec_html}'
             f'</div>'
@@ -1105,7 +1107,7 @@ def _render_game_group_label(matchup: str, meta: dict) -> str:
             f'<div class="espn-parlay-team">'
             f'<img class="espn-parlay-team-logo" '
             f'src="{home_logo}" alt="{safe_home}" '
-            f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+            f'onerror="{_onerror_logo}">'
             f'<span class="espn-parlay-team-name" style="color:{home_color};">{safe_home}</span>'
             f'{home_rec_html}'
             f'</div>'
@@ -1168,12 +1170,13 @@ def _render_single_leg_html(leg_info: dict, raw_picks: list) -> str:
     team_colors = get_team_colors(leg_info.get("player_team", leg_info.get("team", "")) or "")
     team_color = team_colors[0] if team_colors else "rgba(255,255,255,0.12)"
 
+    _onerror_hide_plc = 'this.style.display="none"'
     headshot_html = (
         f'<div class="plc-hs-wrap">'
         f'<img class="plc-hs" '
         f'style="--plc-team-color:{team_color};" '
         f'src="{headshot_url}" alt="{pname}" '
-        f'onerror="this.style.display=\'none\'">'
+        f'onerror="{_onerror_hide_plc}">'
         f'</div>'
     ) if headshot_url else ""
 
@@ -1299,6 +1302,7 @@ def render_game_matchup_card_html(
     home_logo = _safe_logo_url(home_team)
     safe_away = _html.escape(str(away_team))
     safe_home = _html.escape(str(home_team))
+    _onerror_logo_qam = f'this.onerror=null;this.src="{_NBA_LOGO_FALLBACK}"'
     safe_away_rec = _html.escape(str(away_record)) if away_record else ""
     safe_home_rec = _html.escape(str(home_record)) if home_record else ""
 
@@ -1317,7 +1321,7 @@ def render_game_matchup_card_html(
         # Away side
         f'<div class="qam-mu-side qam-mu-away">'
         f'<img class="qam-mu-logo" src="{away_logo}" alt="{safe_away}" '
-        f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+        f'onerror="{_onerror_logo_qam}">' 
         f'<div class="qam-mu-team-info">'
         f'<span class="qam-mu-abbrev" style="color:{away_color};">'
         f'{safe_away}</span>'
@@ -1342,7 +1346,7 @@ def render_game_matchup_card_html(
         f'{home_rec_html}'
         f'</div>'
         f'<img class="qam-mu-logo" src="{home_logo}" alt="{safe_home}" '
-        f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+        f'onerror="{_onerror_logo_qam}">' 
         f'</div>'
         f'</div>'
     )
@@ -1442,12 +1446,13 @@ def render_hero_section_html(top_picks: list) -> str:
         )
         team_colors = get_team_colors(r.get("player_team", "") or "")
         team_color = team_colors[0] if team_colors else "rgba(255,255,255,0.12)"
+        _onerror_hero = 'this.style.display="none"'
         headshot_html = (
             f'<div class="qam-hero-hs-wrap">'
             f'<img class="qam-hero-headshot" '
             f'style="--hero-team-color:{team_color};" '
             f'src="{headshot_url}" alt="{name}" '
-            f'onerror="this.style.display=\'none\'">'
+            f'onerror="{_onerror_hero}">'
             f'</div>'
         ) if headshot_url else ""
 
@@ -1626,11 +1631,12 @@ def render_platform_picks_html(picks: list) -> str:
             f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
             if player_id else ""
         )
+        _onerror_plat = 'this.style.display="none"'
         headshot_html = (
             f'<div class="plat-hs-wrap">'
             f'<img class="plat-headshot" '
             f'src="{headshot_url}" alt="{name}" '
-            f'onerror="this.style.display=\'none\'">'
+            f'onerror="{_onerror_plat}">'
             f'</div>'
         ) if headshot_url else ""
 
