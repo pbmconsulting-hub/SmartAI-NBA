@@ -396,13 +396,20 @@ st.session_state.setdefault("joseph_page_context", "page_analysis")
 inject_joseph_floating()
 render_joseph_hero_banner()
 
-# ── Premium Status (partial gate — free users capped at 3 props) ──
-from utils.auth import is_premium_user as _is_premium_user
+# ── Premium Status (partial gate — free users capped by tier) ──
+from utils.auth import (
+    is_premium_user as _is_premium_user,
+    get_user_tier as _get_user_tier,
+    TIER_QAM_LIMITS,
+    TIER_FREE,
+    get_tier_label as _get_tier_label,
+)
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
 except Exception:
     _PREM_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
-_FREE_ANALYSIS_LIMIT = 3   # Free users can analyze up to 3 props
+_user_tier = _get_user_tier()
+_QAM_PROP_LIMIT = TIER_QAM_LIMITS.get(_user_tier, 10)
 _user_is_premium = _is_premium_user()
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
@@ -959,6 +966,18 @@ if run_analysis:
             st.warning("⚠️ No props remain after filtering to tonight's teams / injury status. Check your games and props.")
             progress_bar.empty()
             st.stop()
+
+        # ── Tier-based prop cap ──────────────────────────────────────
+        if total_props_count > _QAM_PROP_LIMIT:
+            props_to_analyze = props_to_analyze[:_QAM_PROP_LIMIT]
+            _tier_label = _get_tier_label(_user_tier)
+            st.info(
+                f"ℹ️ Your plan ({_tier_label}) includes **{_QAM_PROP_LIMIT}** "
+                f"QAM props per session. Analyzing the top {_QAM_PROP_LIMIT} of "
+                f"{total_props_count} available props. "
+                f"[Upgrade]({_PREM_PATH}) for more."
+            )
+            total_props_count = len(props_to_analyze)
 
         # ── Analysis proceeds with all available props (no cap) ────
 

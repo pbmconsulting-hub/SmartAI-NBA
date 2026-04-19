@@ -63,6 +63,16 @@ _PRICE_MAP = {
     "insider_circle": (STRIPE_PRICE_INSIDER_CIRCLE, "payment"),
 }
 
+# Reverse map: price_id → canonical plan name (used when resolving
+# the plan name from a Stripe checkout session or subscription).
+_PRICE_ID_TO_PLAN_NAME: dict[str, str] = {}
+if STRIPE_PRICE_SHARP_IQ:
+    _PRICE_ID_TO_PLAN_NAME[STRIPE_PRICE_SHARP_IQ] = "Sharp IQ"
+if STRIPE_PRICE_SMART_MONEY:
+    _PRICE_ID_TO_PLAN_NAME[STRIPE_PRICE_SMART_MONEY] = "Smart Money"
+if STRIPE_PRICE_INSIDER_CIRCLE:
+    _PRICE_ID_TO_PLAN_NAME[STRIPE_PRICE_INSIDER_CIRCLE] = "Insider Circle"
+
 # Remove trailing slash from APP_URL so URL construction is clean
 APP_URL = APP_URL.rstrip("/")
 
@@ -292,10 +302,14 @@ def verify_checkout_session(session_id: str) -> dict:
             _pe = _get_period_end(subscription)
             if _pe:
                 period_end = datetime.datetime.fromtimestamp(_pe).isoformat()
-            # Try to get plan name from the subscription's price
+            # Resolve plan name from price_id → canonical name, then
+            # fall back to Stripe nickname / product name.
             try:
                 price = subscription["items"]["data"][0]["price"]
-                if price.get("nickname"):
+                _price_id = price.get("id", "")
+                if _price_id and _price_id in _PRICE_ID_TO_PLAN_NAME:
+                    plan_name = _PRICE_ID_TO_PLAN_NAME[_price_id]
+                elif price.get("nickname"):
                     plan_name = price["nickname"]
                 elif price.get("product"):
                     product = _stripe.Product.retrieve(price["product"])

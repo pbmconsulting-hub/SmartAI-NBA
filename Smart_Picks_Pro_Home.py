@@ -886,34 +886,45 @@ if os.environ.get("SMARTAI_PRODUCTION", "").lower() in ("true", "1", "yes"):
 # This runs silently on app load.  is_premium_user() is cached in
 # session state so it won't make Stripe API calls on every rerun.
 try:
-    from utils.auth import is_premium_user as _is_premium, handle_checkout_redirect as _handle_checkout
+    from utils.auth import (
+        is_premium_user as _is_premium,
+        handle_checkout_redirect as _handle_checkout,
+        get_user_tier as _get_user_tier,
+        get_tier_label as _get_tier_label,
+        TIER_FREE,
+    )
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
     # Handle checkout redirects even on the home page
     _checkout_ok = _handle_checkout()
     _user_is_premium = _is_premium()
+    _user_tier = _get_user_tier()
+    _user_tier_label = _get_tier_label(_user_tier)
     if _checkout_ok:
         st.success("✅ Payment confirmed! Your premium subscription is now active.")
         st.balloons()
 except Exception:
     _user_is_premium = True  # Fail open — don't block the home page
+    _user_tier = "insider_circle"
+    _user_tier_label = "👑 Insider Circle"
     _PREM_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
+    TIER_FREE = "free"
 
 with st.sidebar:
-    if _user_is_premium:
+    if _user_tier != TIER_FREE:
         st.markdown(
-            '<div style="background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.28);'
-            'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
-            '<span style="color:#00D559;font-weight:700;font-size:0.9rem;">💎 Premium Active</span>'
-            '</div>',
+            f'<div style="background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.28);'
+            f'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
+            f'<span style="color:#00D559;font-weight:700;font-size:0.9rem;">{_user_tier_label}</span>'
+            f'</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
             f'<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
             f'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
-            f'<span style="color:#a0b4d0;font-size:0.85rem;">⭐ Free Plan</span><br>'
+            f'<span style="color:#a0b4d0;font-size:0.85rem;">⭐ Smart Rookie — Free</span><br>'
             f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-size:0.78rem;'
-            f'font-weight:600;text-decoration:none;">Upgrade to Premium →</a>'
+            f'font-weight:600;text-decoration:none;">Upgrade Now →</a>'
             f'</div>',
             unsafe_allow_html=True,
         )

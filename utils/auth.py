@@ -439,3 +439,136 @@ def logout_premium() -> None:
     _clear_premium_from_session()
     # Also clear the checkout session flag
     st.session_state.pop("_checkout_session_processed", None)
+
+
+# ============================================================
+# SECTION: Tier System
+# ============================================================
+# Four tiers, each strictly including the features of all lower tiers.
+# Tier names match what the subscription page displays.
+
+TIER_FREE          = "free"
+TIER_SHARP_IQ      = "sharp_iq"
+TIER_SMART_MONEY   = "smart_money"
+TIER_INSIDER       = "insider_circle"
+
+# Ordered lowest → highest so we can compare by index.
+_TIER_ORDER = [TIER_FREE, TIER_SHARP_IQ, TIER_SMART_MONEY, TIER_INSIDER]
+
+# Human-readable labels for display.
+TIER_LABELS = {
+    TIER_FREE:        "⭐ Smart Rookie",
+    TIER_SHARP_IQ:    "🔥 Sharp IQ",
+    TIER_SMART_MONEY: "💎 Smart Money",
+    TIER_INSIDER:     "👑 Insider Circle",
+}
+
+# Map various plan_name strings that might come back from Stripe
+# (product name, price nickname, legacy values) → canonical tier key.
+_PLAN_NAME_TO_TIER: dict[str, str] = {
+    # Exact matches from Stripe products / nicknames
+    "sharp iq":           TIER_SHARP_IQ,
+    "sharp iq monthly":   TIER_SHARP_IQ,
+    "sharp iq annual":    TIER_SHARP_IQ,
+    "smart money":        TIER_SMART_MONEY,
+    "smart money monthly": TIER_SMART_MONEY,
+    "smart money annual": TIER_SMART_MONEY,
+    "insider circle":     TIER_INSIDER,
+    "insider":            TIER_INSIDER,
+    # Legacy / fallback
+    "premium":            TIER_SHARP_IQ,
+    "pro":                TIER_SMART_MONEY,
+}
+
+# Map Stripe price_id env-var names → tier for direct resolution.
+_PRICE_ENV_TO_TIER: dict[str, str] = {
+    os.environ.get("STRIPE_PRICE_SHARP_IQ", ""):      TIER_SHARP_IQ,
+    os.environ.get("STRIPE_PRICE_SMART_MONEY", ""):    TIER_SMART_MONEY,
+    os.environ.get("STRIPE_PRICE_INSIDER_CIRCLE", ""): TIER_INSIDER,
+    # Annual variants (if you add separate env vars later, add here)
+}
+# Remove empty key if env vars aren't set
+_PRICE_ENV_TO_TIER.pop("", None)
+
+# QAM prop limits per tier.
+TIER_QAM_LIMITS = {
+    TIER_FREE:        10,
+    TIER_SHARP_IQ:    25,
+    TIER_SMART_MONEY: 9999,   # effectively unlimited
+    TIER_INSIDER:     9999,
+}
+
+# Page access requirements — the minimum tier needed for each page.
+# Pages not listed here are accessible to ALL tiers (including free).
+PAGE_TIER_REQUIREMENTS: dict[str, str] = {
+    # Free tier pages (listed for documentation, not enforced):
+    # "0_💦_Live_Sweat"            → free
+    # "1_📡_Live_Games"            → free
+    # "10_📡_Smart_NBA_Data"       → free
+    # "14_⚙️_Settings"             → free
+    # "15_💎_Subscription_Level"   → free
+
+    # Sharp IQ ($9.99/mo)
+    "2_🔬_Prop_Scanner":           TIER_SHARP_IQ,
+    "6_📋_Game_Report":            TIER_SHARP_IQ,
+    "7_🔮_Player_Simulator":       TIER_SHARP_IQ,
+    "8_🧬_Entry_Builder":          TIER_SHARP_IQ,
+    "9_🛡️_Risk_Shield":           TIER_SHARP_IQ,
+    "12_📈_Bet_Tracker":           TIER_SHARP_IQ,
+
+    # Smart Money ($24.99/mo)
+    "4_💰_Smart_Money_Bets":       TIER_SMART_MONEY,
+    "5_🎙️_The_Studio":            TIER_SMART_MONEY,
+    "11_🗺️_Correlation_Matrix":   TIER_SMART_MONEY,
+    "13_📊_Proving_Grounds":       TIER_SMART_MONEY,
+}
+
+
+def get_user_tier() -> str:
+    """Return the canonical tier key for the current user.
+
+    Resolution order:
+      1. Non-production bypass → insider_circle (everything unlocked).
+      2. Stripe not configured → insider_circle.
+      3. Not premium → free.
+      4. Match stored plan_name → tier.
+      5. Match stored price_id → tier (fallback).
+      6. Default → sharp_iq (lowest paid).
+    """
+    # Dev / non-production: everything unlocked
+    if os.environ.get("SMARTAI_PRODUCTION", "").lower() not in ("true", "1", "yes"):
+        return TIER_INSIDER
+
+    if not is_stripe_configured():
+        return TIER_INSIDER
+
+    if not is_premium_user():
+        return TIER_FREE
+
+    # Try plan_name first
+    plan_name = st.session_state.get(_SS_PLAN_NAME, "")
+    if plan_name:
+        tier = _PLAN_NAME_TO_TIER.get(plan_name.lower().strip())
+        if tier:
+            return tier
+
+    # Try matching by price_id stored during checkout
+    price_id = st.session_state.get("_sub_price_id", "")
+    if price_id and price_id in _PRICE_ENV_TO_TIER:
+        return _PRICE_ENV_TO_TIER[price_id]
+
+    # Fallback: premium but unknown plan → treat as lowest paid tier
+    return TIER_SHARP_IQ
+
+
+def tier_has_access(user_tier: str, required_tier: str) -> bool:
+    """Return True if *user_tier* meets or exceeds *required_tier*."""
+    try:
+        return _TIER_ORDER.index(user_tier) >= _TIER_ORDER.index(required_tier)
+    except ValueError:
+        return False
+
+
+def get_tier_label(tier: str) -> str:
+    """Return the human-readable emoji label for a tier key."""
+    return TIER_LABELS.get(tier, TIER_LABELS[TIER_FREE])

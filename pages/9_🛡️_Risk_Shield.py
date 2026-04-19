@@ -87,6 +87,11 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── Tier Gate ─────────────────────────────────────────────────
+from utils.tier_gate import require_tier
+if not require_tier():
+    st.stop()
+
 # ─── Inject Global CSS Theme ──────────────────────────────────
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)

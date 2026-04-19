@@ -59,6 +59,11 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── Tier Gate ─────────────────────────────────────────────────
+from utils.tier_gate import require_tier
+if not require_tier():
+    st.stop()
+
 st.markdown(get_font_preload(), unsafe_allow_html=True)
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
