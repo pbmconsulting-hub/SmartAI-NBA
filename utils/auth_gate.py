@@ -2476,6 +2476,62 @@ def require_login() -> bool:
                 else:
                     st.error("Invalid email or password.")
 
+    # ── Sticky Navigation Bar ────────────────────────────────
+    st.html("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;overflow:visible}
+.nav-dock{
+  position:sticky;top:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 16px;
+  background:rgba(8,12,24,0.85);
+  backdrop-filter:blur(20px) saturate(1.8);-webkit-backdrop-filter:blur(20px) saturate(1.8);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  overflow-x:auto;scrollbar-width:none;
+}
+.nav-dock::-webkit-scrollbar{display:none}
+.nav-pill{
+  flex-shrink:0;
+  font-family:'Space Grotesk',sans-serif;font-size:0.68rem;font-weight:700;
+  color:rgba(255,255,255,0.4);
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:100px;padding:7px 16px;
+  cursor:pointer;transition:all 0.3s;
+  text-decoration:none;white-space:nowrap;
+  letter-spacing:0.01em;
+}
+.nav-pill:hover{
+  color:#fff;background:rgba(0,213,89,0.1);
+  border-color:rgba(0,213,89,0.3);
+  box-shadow:0 0 20px rgba(0,213,89,0.15);
+  transform:translateY(-1px);
+}
+.nav-pill.active{
+  color:#0B0F19;background:linear-gradient(135deg,#00D559,#00B74D);
+  border-color:transparent;
+  box-shadow:0 4px 20px rgba(0,213,89,0.35);
+}
+.nav-pill .nav-ico{margin-right:4px;font-size:0.72rem}
+@media(max-width:768px){
+  .nav-dock{gap:4px;padding:8px 10px}
+  .nav-pill{font-size:0.6rem;padding:6px 12px}
+}
+</style>
+<nav class="nav-dock">
+  <a class="nav-pill" onclick="(function(){try{var d=window.parent.document;var els=d.querySelectorAll('[data-section-id]');for(var i=0;i<els.length;i++){if(els[i].getAttribute('data-section-id')==='how-it-works'){els[i].scrollIntoView({behavior:'smooth',block:'start'});return;}}}catch(e){}})();return false;" href="#"><span class="nav-ico">&#x1F3AF;</span>How It Works</a>
+  <a class="nav-pill" onclick="(function(){try{var d=window.parent.document;var els=d.querySelectorAll('[data-section-id]');for(var i=0;i<els.length;i++){if(els[i].getAttribute('data-section-id')==='features'){els[i].scrollIntoView({behavior:'smooth',block:'start'});return;}}}catch(e){}})();return false;" href="#"><span class="nav-ico">&#x26A1;</span>Features</a>
+  <a class="nav-pill" onclick="(function(){try{var d=window.parent.document;var els=d.querySelectorAll('[data-section-id]');for(var i=0;i<els.length;i++){if(els[i].getAttribute('data-section-id')==='picks'){els[i].scrollIntoView({behavior:'smooth',block:'start'});return;}}}catch(e){}})();return false;" href="#"><span class="nav-ico">&#x1F4CA;</span>Free Picks</a>
+  <a class="nav-pill" onclick="(function(){try{var d=window.parent.document;var els=d.querySelectorAll('[data-section-id]');for(var i=0;i<els.length;i++){if(els[i].getAttribute('data-section-id')==='tracker'){els[i].scrollIntoView({behavior:'smooth',block:'start'});return;}}}catch(e){}})();return false;" href="#"><span class="nav-ico">&#x1F4C8;</span>Bet Tracker</a>
+  <a class="nav-pill" onclick="(function(){try{var d=window.parent.document;var els=d.querySelectorAll('[data-section-id]');for(var i=0;i<els.length;i++){if(els[i].getAttribute('data-section-id')==='pricing'){els[i].scrollIntoView({behavior:'smooth',block:'start'});return;}}}catch(e){}})();return false;" href="#"><span class="nav-ico">&#x1F4B0;</span>Pricing</a>
+  <a class="nav-pill" onclick="(function(){try{var d=window.parent.document;var els=d.querySelectorAll('[data-section-id]');for(var i=0;i<els.length;i++){if(els[i].getAttribute('data-section-id')==='faq'){els[i].scrollIntoView({behavior:'smooth',block:'start'});return;}}}catch(e){}})();return false;" href="#"><span class="nav-ico">&#x2753;</span>FAQ</a>
+</nav>
+""")
+
+    # ── Section anchor: How It Works ──
+    st.markdown('<div data-section-id="how-it-works" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
+
     # ── Below-fold: How It Works + What's Inside + Product Preview ──
     st.markdown("""
     <!-- How It Works -->
@@ -2512,7 +2568,7 @@ def require_login() -> bool:
     <div class="ag-divider"></div>
 
     <!-- What's Inside: Feature Showcase -->
-    <div class="ag-inside">
+    <div class="ag-inside" data-section-id="features">
       <div class="ag-section-head">
         <h3>What&rsquo;s Inside<br><span class="em">Smart Pick Pro</span></h3>
         <p>Everything you need to beat the books &mdash; in one platform</p>
@@ -2573,6 +2629,9 @@ def require_login() -> bool:
     _preview_picks = _load_top_preview_picks(5)
     _preview_html = _build_preview_section_html(_preview_picks)
     st.html(_preview_html)
+
+    # ── Section anchor: Free Picks ──
+    st.markdown('<div data-section-id="picks" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
 
     # ── Below-fold: Winning Picks Carousel ───────────────────
     # Uses st.html() to bypass Streamlit's markdown parser which
@@ -2840,6 +2899,9 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 
     </div><!-- /ag-section graveyard -->
     """, unsafe_allow_html=True)
+
+    # ── Section anchor: Bet Tracker ──
+    st.markdown('<div data-section-id="tracker" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
 
     # ── Below-fold: Bet Tracker transparency ─────────────────
     # Uses st.html() to bypass Streamlit's markdown parser which
@@ -3413,157 +3475,215 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 <div class="bt-footer"><span class="bt-footer-text">&#x2191; This is a demo preview with sample data. Sign up free to get your own live Bet Tracker.</span></div>
 """)
 
+    # ── Section anchor: Pricing ──
+    st.markdown('<div data-section-id="pricing" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
+
     # ── Below-fold: Pricing tiers, FAQ, CTA ──────────────────
     # Uses st.html() to bypass Streamlit's markdown parser which
     # cannot handle deeply nested HTML structures.
     st.html("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.7)}
+
+@keyframes prShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes prFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes prPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,213,89,0.2)}50%{box-shadow:0 0 30px 8px rgba(0,213,89,0.08)}}
+@keyframes prGlow{0%,100%{opacity:0.6}50%{opacity:1}}
+@keyframes prFadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes prSeatPulse{0%,100%{color:#c084fc;text-shadow:0 0 10px rgba(192,132,252,0.3)}50%{color:#e9b3ff;text-shadow:0 0 30px rgba(192,132,252,0.6)}}
+@keyframes prBarSlide{0%{background-position:300% 0}100%{background-position:-300% 0}}
+
 .em{background:linear-gradient(135deg,#00D559 0%,#2D9EFF 50%,#c084fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.sh{text-align:center;margin-bottom:24px;position:relative}
-.sh::before{content:'';display:block;width:60px;height:4px;margin:0 auto 18px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:4px}
-.sh h3{font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;color:#fff;margin:0 0 10px;letter-spacing:-0.04em;text-transform:uppercase}
-.sh p{font-size:0.85rem;color:rgba(255,255,255,0.4);margin:0;line-height:1.6}
-/* Tier cards */
-.tc{background:linear-gradient(168deg,rgba(255,255,255,0.05),rgba(255,255,255,0.012));border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:26px 24px;margin:16px 0 0;position:relative;overflow:hidden;transition:border-color 0.3s,transform 0.3s,box-shadow 0.3s}
-.tc:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
-.tc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.tc.tf::before{background:linear-gradient(90deg,#708090,#A0AABE)}
-.tc.ts::before{background:linear-gradient(90deg,#F9C62B,#ff8c00)}
-.tc.tm::before{background:linear-gradient(90deg,#00D559,#2D9EFF)}
-.tc.ti::before{background:linear-gradient(90deg,#c084fc,#9333ea)}
-.th{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.tn{font-family:'Space Grotesk',sans-serif;font-size:0.85rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em}
-.tf .tn{color:#A0AABE}.ts .tn{color:#F9C62B}.tm .tn{color:#00D559}.ti .tn{color:#c084fc}
-.tp{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:700}
-.tf .tp{color:#A0AABE}.ts .tp{color:#F9C62B}.tm .tp{color:#00D559}.ti .tp{color:#c084fc}
-.tg{font-size:0.65rem;font-style:italic;color:rgba(255,255,255,0.25);margin-bottom:12px}
-.pl{list-style:none;padding:0;margin:0}
-.pi{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
-.pi:last-child{border-bottom:none}
-.ph{display:flex;align-items:center;gap:6px}
-.pc{font-size:0.85rem;flex-shrink:0}
-.pn{font-family:'Space Grotesk',sans-serif;font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.75)}
-.pb{font-size:0.62rem;color:rgba(255,255,255,0.32);line-height:1.5;margin-top:2px;padding-left:22px}
-/* Compare toggle */
-.cd2{margin:16px 0 0}
-.cd2 summary{display:block;width:100%;background:linear-gradient(135deg,rgba(0,213,89,0.08),rgba(45,158,255,0.06));border:1px solid rgba(0,213,89,0.2);border-radius:12px;padding:14px 20px;text-align:center;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:0.85rem;font-weight:700;color:#00D559;letter-spacing:0.02em;list-style:none}
-.cd2 summary::-webkit-details-marker{display:none}
-.cd2 summary::marker{display:none;content:''}
-.cd2 summary:hover{background:linear-gradient(135deg,rgba(0,213,89,0.14),rgba(45,158,255,0.1));border-color:rgba(0,213,89,0.35);transform:translateY(-1px)}
-.cd2 summary .arrow{display:inline-block;transition:transform 0.3s;margin-left:6px}
-.cd2[open] summary .arrow{transform:rotate(180deg)}
-/* Comparison table */
-.tw2{margin:18px 0 0;overflow-x:auto}
-.tt{width:100%;border-collapse:separate;border-spacing:0;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.05);border-radius:12px;overflow:hidden;font-size:0.64rem}
-.tt thead th{padding:10px 8px;font-size:0.55rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);border-bottom:1px solid rgba(255,255,255,0.05);text-align:center}
-.tt thead th:first-child{text-align:left;width:34%;padding-left:10px}
-.tt thead th.hf{color:#A0AABE}.tt thead th.hs{color:#F9C62B}.tt thead th.hm{color:#00D559}.tt thead th.hi2{color:#c084fc}
-.tt tbody td{padding:7px 8px;text-align:center;color:rgba(255,255,255,0.3);border-bottom:1px solid rgba(255,255,255,0.025);font-weight:500}
-.tt tbody td:first-child{text-align:left;padding-left:10px;color:rgba(255,255,255,0.5);font-weight:600}
-.tt tbody tr:last-child td{border-bottom:none}
-.tt .y{color:#00D559;font-weight:700}
-.tt .n{color:rgba(255,255,255,0.1)}
-.tt .lim{color:#ff9d00;font-weight:700}
-.tt .cat td{color:rgba(0,213,89,0.5);font-weight:700;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.06em;padding:6px 10px;background:rgba(0,213,89,0.02)}
-/* Savings */
-.sv2{background:rgba(249,198,43,0.04);border:1px solid rgba(249,198,43,0.12);border-radius:12px;padding:14px 16px;text-align:center;margin:16px 0 0}
-.sv2 .st2{font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:700;color:#F9C62B;margin:0}
-.sv2 .st2 .big{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:800}
-.sv2 .ss{font-size:0.62rem;color:rgba(255,255,255,0.3);margin:4px 0 0}
-/* Insider CTA */
-.ic{background:linear-gradient(135deg,rgba(192,132,252,0.06),rgba(147,51,234,0.04));border:1px solid rgba(192,132,252,0.2);border-radius:14px;padding:18px 16px;text-align:center;margin:16px 0 0;position:relative;overflow:hidden}
-.ic::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c084fc,#9333ea,transparent)}
-.ic-f{font-size:1.3rem;margin-bottom:4px}
-.ic-h{font-family:'Space Grotesk',sans-serif;font-size:0.88rem;font-weight:800;color:#c084fc;margin:0 0 4px}
-.ic-s{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;color:#fff;margin:4px 0}
-.ic-s .of{font-size:0.7rem;font-weight:500;color:rgba(255,255,255,0.25)}
-.ic-sub{font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;line-height:1.5}
-.ic-pb{display:inline-block;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;font-weight:700;color:#c084fc;background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.15);padding:4px 14px;border-radius:100px}
-/* Performance */
-.pf{margin:28px 0 0}
-.pf-c{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:18px 16px 14px}
-.pf-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.pf-t{font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.7)}
-.pf-a{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:800;color:#00D559}
-.sk{display:flex;align-items:flex-end;gap:3px;height:50px;width:100%}
-.sb{flex:1;border-radius:3px 3px 0 0;min-height:4px}
-.sb.w{background:linear-gradient(180deg,#00D559,rgba(0,213,89,0.3))}
-.sb.l{background:linear-gradient(180deg,rgba(242,67,54,0.5),rgba(242,67,54,0.15))}
-.sl2{display:flex;justify-content:space-between;margin-top:4px}
-.sl2 span{font-family:'JetBrains Mono',monospace;font-size:0.42rem;color:rgba(255,255,255,0.15);font-weight:600}
-/* FAQ */
-.fq{margin:28px 0 0}
-.fi{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px;margin-bottom:6px}
-.fi summary{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:0.76rem;font-weight:700;color:rgba(255,255,255,0.6);list-style:none}
-.fi summary::-webkit-details-marker{display:none}
-.fi summary::marker{display:none;content:''}
-.fi summary:hover{color:rgba(255,255,255,0.8)}
-.fi summary .fa{display:inline-block;transition:transform 0.3s;color:rgba(0,213,89,0.4);font-size:0.65rem}
-.fi[open] summary .fa{transform:rotate(180deg)}
-.fi-a{padding:0 16px 14px;font-size:0.7rem;color:rgba(255,255,255,0.35);line-height:1.6}
-/* CTA2 */
-.c2{background:linear-gradient(135deg,rgba(0,213,89,0.1),rgba(45,158,255,0.06));border:2px solid rgba(0,213,89,0.2);border-radius:24px;padding:44px 28px;text-align:center;margin:36px 0 0;position:relative;overflow:hidden}
-.c2::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,213,89,0.08) 0%,transparent 60%);pointer-events:none}
-.c2-h{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#fff;margin:0 0 10px;text-transform:uppercase;letter-spacing:-0.03em;position:relative}
-.c2-s{font-size:0.85rem;color:rgba(255,255,255,0.4);margin:0 0 20px;line-height:1.6;position:relative}
-.c2-b{display:inline-block;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;color:#0B0F19;background:linear-gradient(135deg,#00D559,#00B74D);padding:16px 52px;border-radius:16px;text-decoration:none;box-shadow:0 6px 32px rgba(0,213,89,0.35);position:relative}
-.c2-b:hover{transform:translateY(-4px);box-shadow:0 12px 48px rgba(0,213,89,0.5)}
-.c2-t{font-size:0.6rem;color:rgba(255,255,255,0.18);margin-top:14px;position:relative}
-/* Trust + Footer */
-.tr{display:flex;justify-content:center;gap:16px;margin:28px 0 6px;flex-wrap:wrap}
-.tr-i{font-size:0.62rem;font-weight:600;color:rgba(255,255,255,0.22);display:flex;align-items:center;gap:4px}
-.ft{text-align:center;padding:20px 0 40px;font-size:0.55rem;color:rgba(255,255,255,0.1);line-height:1.7}
-.ft a{color:rgba(255,255,255,0.15);text-decoration:underline}
+
+/* ── Section Header ── */
+.pr-head{text-align:center;margin-bottom:48px;position:relative;animation:prFadeUp 0.8s ease both}
+.pr-head::before{content:'';display:block;width:80px;height:5px;margin:0 auto 24px;background:linear-gradient(90deg,#00D559,#2D9EFF,#c084fc);border-radius:6px;background-size:200% 100%;animation:prShimmer 4s ease infinite}
+.pr-head h2{font-family:'Space Grotesk',sans-serif;font-size:3.2rem;font-weight:800;color:#fff;margin:0 0 12px;letter-spacing:-0.04em;line-height:1.1}
+.pr-head p{font-size:1rem;color:rgba(255,255,255,0.4);margin:0;line-height:1.7;max-width:560px;margin:0 auto}
+
+/* ── Tier Grid ── */
+.pr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+
+/* ── Tier Card ── */
+.tc2{background:linear-gradient(168deg,rgba(255,255,255,0.045) 0%,rgba(255,255,255,0.01) 100%);border:1.5px solid rgba(255,255,255,0.07);border-radius:24px;padding:32px 20px 28px;position:relative;overflow:hidden;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);animation:prFadeUp 0.8s ease both}
+.tc2:nth-child(1){animation-delay:0.1s}.tc2:nth-child(2){animation-delay:0.2s}.tc2:nth-child(3){animation-delay:0.3s}.tc2:nth-child(4){animation-delay:0.4s}
+.tc2::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0}
+.tc2::after{content:'';position:absolute;inset:0;border-radius:24px;opacity:0;transition:opacity 0.4s;pointer-events:none}
+.tc2:hover{transform:translateY(-8px);box-shadow:0 24px 64px rgba(0,0,0,0.4)}
+.tc2:hover::after{opacity:1}
+
+/* Tier color variants */
+.tc2.tf::before{background:linear-gradient(90deg,#708090,#A0AABE)}
+.tc2.tf:hover{border-color:rgba(160,170,190,0.3)}.tc2.tf::after{background:radial-gradient(ellipse at 50% 0%,rgba(160,170,190,0.06),transparent 70%)}
+.tc2.ts::before{background:linear-gradient(90deg,#F9C62B,#ff8c00)}
+.tc2.ts:hover{border-color:rgba(249,198,43,0.3)}.tc2.ts::after{background:radial-gradient(ellipse at 50% 0%,rgba(249,198,43,0.06),transparent 70%)}
+.tc2.tm::before{background:linear-gradient(90deg,#00D559,#2D9EFF)}
+.tc2.tm:hover{border-color:rgba(0,213,89,0.3)}.tc2.tm::after{background:radial-gradient(ellipse at 50% 0%,rgba(0,213,89,0.06),transparent 70%)}
+.tc2.ti::before{background:linear-gradient(90deg,#c084fc,#9333ea)}
+.tc2.ti:hover{border-color:rgba(192,132,252,0.3)}.tc2.ti::after{background:radial-gradient(ellipse at 50% 0%,rgba(192,132,252,0.06),transparent 70%)}
+
+/* Popular badge */
+.tc2-pop{position:absolute;top:16px;right:16px;font-family:'JetBrains Mono',monospace;font-size:0.5rem;font-weight:800;color:#0B0F19;background:linear-gradient(135deg,#00D559,#2D9EFF);padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:0.1em}
+
+/* Tier header */
+.tc2-ico{font-size:2.4rem;margin-bottom:12px;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3))}
+.tc2-name{font-family:'Space Grotesk',sans-serif;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px}
+.tf .tc2-name{color:#A0AABE}.ts .tc2-name{color:#F9C62B}.tm .tc2-name{color:#00D559}.ti .tc2-name{color:#c084fc}
+.tc2-price{font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:800;color:#fff;margin-bottom:2px;line-height:1.2}
+.tc2-price .sm{font-size:0.75rem;font-weight:500;color:rgba(255,255,255,0.3)}
+.tc2-yearly{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:rgba(255,255,255,0.25);margin-bottom:12px;display:block}
+.tc2-quote{font-size:0.68rem;font-style:italic;color:rgba(255,255,255,0.2);margin-bottom:18px;line-height:1.5;min-height:2.5em}
+
+/* Feature list */
+.tc2-list{list-style:none;padding:0;margin:0}
+.tc2-feat{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,0.03)}
+.tc2-feat:first-child{border-top:none}
+.tc2-fico{font-size:0.82rem;flex-shrink:0;line-height:1.3}
+.tc2-ftxt{font-family:'Space Grotesk',sans-serif;font-size:0.7rem;font-weight:600;color:rgba(255,255,255,0.65);line-height:1.4}
+.tc2-fdesc{font-size:0.58rem;color:rgba(255,255,255,0.28);line-height:1.5;margin-top:2px}
+
+/* ── Comparison table ── */
+.pr-compare{margin:0 0 28px;animation:prFadeUp 0.8s ease 0.5s both}
+.pr-compare summary{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:linear-gradient(135deg,rgba(0,213,89,0.06),rgba(45,158,255,0.04),rgba(192,132,252,0.04));border:1.5px solid rgba(0,213,89,0.15);border-radius:16px;padding:18px 28px;text-align:center;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:700;color:#00D559;letter-spacing:0.01em;list-style:none;transition:all 0.3s}
+.pr-compare summary::-webkit-details-marker{display:none}
+.pr-compare summary::marker{display:none;content:''}
+.pr-compare summary:hover{background:linear-gradient(135deg,rgba(0,213,89,0.12),rgba(45,158,255,0.08),rgba(192,132,252,0.06));border-color:rgba(0,213,89,0.3);box-shadow:0 8px 32px rgba(0,213,89,0.1);transform:translateY(-2px)}
+.pr-compare summary .arrow{display:inline-block;transition:transform 0.3s}
+.pr-compare[open] summary .arrow{transform:rotate(180deg)}
+
+.pr-tw{margin:20px 0 0;overflow-x:auto;border-radius:20px;border:1.5px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.015);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pr-tt{width:100%;border-collapse:separate;border-spacing:0;font-size:0.7rem}
+.pr-tt thead th{padding:16px 12px;font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);border-bottom:1px solid rgba(255,255,255,0.06);text-align:center;position:sticky;top:0;background:rgba(8,12,24,0.9);backdrop-filter:blur(8px)}
+.pr-tt thead th:first-child{text-align:left;width:32%;padding-left:20px}
+.pr-tt thead th.hf{color:#A0AABE}.pr-tt thead th.hs{color:#F9C62B}.pr-tt thead th.hm{color:#00D559}.pr-tt thead th.hi{color:#c084fc}
+.pr-tt tbody td{padding:12px 12px;text-align:center;color:rgba(255,255,255,0.25);border-bottom:1px solid rgba(255,255,255,0.025);font-weight:500;transition:background 0.2s}
+.pr-tt tbody td:first-child{text-align:left;padding-left:20px;color:rgba(255,255,255,0.55);font-weight:600;font-size:0.68rem}
+.pr-tt tbody tr:hover td{background:rgba(255,255,255,0.02)}
+.pr-tt tbody tr:last-child td{border-bottom:none}
+.pr-tt .y{color:#00D559;font-weight:800;font-size:0.9rem}
+.pr-tt .n{color:rgba(255,255,255,0.08);font-size:0.8rem}
+.pr-tt .lim{color:#ff9d00;font-weight:700;font-size:0.65rem}
+.pr-tt .cat td{color:rgba(0,213,89,0.45);font-weight:800;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;padding:10px 20px;background:rgba(0,213,89,0.02);border-bottom:1px solid rgba(0,213,89,0.06)}
+
+/* ── Savings callout ── */
+.pr-save{background:linear-gradient(135deg,rgba(249,198,43,0.06) 0%,rgba(249,198,43,0.02) 100%);border:1.5px solid rgba(249,198,43,0.15);border-radius:20px;padding:28px 24px;text-align:center;margin:0 0 24px;position:relative;overflow:hidden;animation:prFadeUp 0.8s ease 0.6s both}
+.pr-save::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#F9C62B,#ff8c00,transparent);background-size:200% 100%;animation:prShimmer 3s ease infinite}
+.pr-save-big{font-family:'JetBrains Mono',monospace;font-size:2.4rem;font-weight:800;color:#F9C62B;display:block;margin-bottom:4px;text-shadow:0 0 30px rgba(249,198,43,0.2)}
+.pr-save-txt{font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:700;color:rgba(255,255,255,0.6);margin:0}
+.pr-save-sub{font-size:0.72rem;color:rgba(255,255,255,0.28);margin:8px 0 0;line-height:1.6}
+
+/* ── Insider CTA ── */
+.pr-insider{background:linear-gradient(135deg,rgba(192,132,252,0.08) 0%,rgba(147,51,234,0.04) 100%);border:1.5px solid rgba(192,132,252,0.2);border-radius:24px;padding:36px 28px;text-align:center;position:relative;overflow:hidden;animation:prFadeUp 0.8s ease 0.7s both}
+.pr-insider::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#c084fc,#9333ea,transparent);background-size:200% 100%;animation:prShimmer 3s ease infinite}
+.pr-insider::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(192,132,252,0.06),transparent 60%);pointer-events:none}
+.pr-ins-badge{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;color:#c084fc;background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.15);padding:5px 16px;border-radius:100px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;position:relative}
+.pr-ins-badge .dot{width:6px;height:6px;border-radius:50%;background:#c084fc;animation:prGlow 2s ease infinite}
+.pr-ins-h{font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:800;color:#fff;margin:0 0 6px;position:relative}
+.pr-ins-seats{font-family:'JetBrains Mono',monospace;font-size:3rem;font-weight:800;margin:8px 0;position:relative;animation:prSeatPulse 3s ease infinite}
+.pr-ins-seats .of{font-size:0.9rem;font-weight:500;color:rgba(255,255,255,0.25)}
+.pr-ins-sub{font-size:0.72rem;color:rgba(255,255,255,0.3);margin:0 0 16px;line-height:1.6;max-width:400px;margin-left:auto;margin-right:auto;position:relative}
+.pr-ins-price{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:800;color:#c084fc;background:rgba(192,132,252,0.08);border:1.5px solid rgba(192,132,252,0.2);padding:8px 24px;border-radius:100px;position:relative;transition:all 0.3s}
+.pr-ins-price:hover{background:rgba(192,132,252,0.15);border-color:rgba(192,132,252,0.4);box-shadow:0 8px 32px rgba(192,132,252,0.15);transform:translateY(-2px)}
+.pr-ins-bar{margin-top:18px;position:relative}
+.pr-ins-track{height:6px;background:rgba(255,255,255,0.04);border-radius:100px;overflow:hidden}
+.pr-ins-fill{height:100%;width:84%;background:linear-gradient(90deg,#c084fc,#9333ea);border-radius:100px;position:relative}
+.pr-ins-fill::after{content:'';position:absolute;right:0;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#c084fc;box-shadow:0 0 12px rgba(192,132,252,0.5)}
+.pr-ins-labels{display:flex;justify-content:space-between;margin-top:6px}
+.pr-ins-labels span{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:rgba(255,255,255,0.15)}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  .pr-grid{grid-template-columns:repeat(2,1fr)}
+  .pr-head h2{font-size:2.4rem}
+}
+@media(max-width:520px){
+  .pr-grid{grid-template-columns:1fr}
+  .pr-head h2{font-size:1.8rem}
+  .tc2{padding:24px 16px 20px}
+  .pr-ins-seats{font-size:2.2rem}
+}
 </style>
 
-<details class="cd2">
-<summary>&#x1F50D; Compare All Subscription Tiers <span class="arrow">&#x25BC;</span></summary>
+<!-- Pricing Section -->
+<div class="pr-head">
+  <h2>Choose Your <span class="em">Edge</span></h2>
+  <p>Every tier includes the full AI engine. Upgrade when you want more coverage, more tools, more alpha.</p>
+</div>
 
-<div class="tc tf"><div class="th"><div class="tn">&#x2B50; Smart Rookie</div><div class="tp">$0 / forever</div></div>
-<div class="tg">&ldquo;Welcome to the smart side.&rdquo; &mdash; No credit card required.</div>
-<ul class="pl">
-<li class="pi"><div class="ph"><span class="pc">&#x1F4A6;</span><span class="pn">Live Sweat</span></div><div class="pb">Track your active bets in real-time with live scoring, AI confidence updates, and play-by-play. Know instantly if your prop is on pace to hit.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F4E1;</span><span class="pn">Live Games</span></div><div class="pb">Real-time NBA scoreboard with box scores, quarter-by-quarter breakdowns, and in-game stat leaders. Never miss a beat.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x26A1;</span><span class="pn">Quantum Analysis Matrix (10 props)</span></div><div class="pb">Our flagship AI engine: 6 fused models analyze player props with SAFE Scores (0-100), edge detection, and confidence ratings. Free tier gets 10 props per session.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F52C;</span><span class="pn">Prop Scanner (5 manual)</span></div><div class="pb">Manually enter any player prop and get instant AI analysis &mdash; predicted line, SAFE Score, and over/under recommendation.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F4E1;</span><span class="pn">Smart NBA Data</span></div><div class="pb">Full NBA stats dashboard &mdash; player averages, team rankings, defensive ratings, and advanced metrics to research any matchup.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x2699;&#xFE0F;</span><span class="pn">Settings</span></div><div class="pb">Customize your experience &mdash; default platforms, display preferences, and notification settings.</div></li>
-</ul></div>
+<div class="pr-grid">
+<!-- Smart Rookie -->
+<div class="tc2 tf">
+  <span class="tc2-ico">&#x2B50;</span>
+  <div class="tc2-name">Smart Rookie</div>
+  <div class="tc2-price">$0 <span class="sm">/ forever</span></div>
+  <span class="tc2-yearly">&nbsp;</span>
+  <div class="tc2-quote">&ldquo;Welcome to the smart side.&rdquo;<br>No credit card required.</div>
+  <ul class="tc2-list">
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4A6;</span><div><div class="tc2-ftxt">Live Sweat</div><div class="tc2-fdesc">Track active bets in real-time with live scoring &amp; AI confidence updates.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4E1;</span><div><div class="tc2-ftxt">Live Games</div><div class="tc2-fdesc">Real-time NBA scoreboard with box scores &amp; stat leaders.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x26A1;</span><div><div class="tc2-ftxt">Quantum Analysis Matrix (10 props)</div><div class="tc2-fdesc">6 fused AI models, SAFE Scores, edge detection. 10 props/session.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F52C;</span><div><div class="tc2-ftxt">Prop Scanner (5 manual)</div><div class="tc2-fdesc">Instant AI analysis on any player prop you enter.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4E1;</span><div><div class="tc2-ftxt">Smart NBA Data</div><div class="tc2-fdesc">Full stats dashboard &mdash; averages, rankings, defensive ratings.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x2699;&#xFE0F;</span><div><div class="tc2-ftxt">Settings</div><div class="tc2-fdesc">Customize platforms, display &amp; notification preferences.</div></div></li>
+  </ul>
+</div>
 
-<div class="tc ts"><div class="th"><div class="tn">&#x1F525; Sharp IQ</div><div class="tp">$9.99/mo &middot; $107.89/yr</div></div>
-<div class="tg">&ldquo;Your IQ just passed the books.&rdquo; &mdash; Everything in Free, plus:</div>
-<ul class="pl">
-<li class="pi"><div class="ph"><span class="pc">&#x26A1;</span><span class="pn">Quantum Analysis Matrix (25 props)</span></div><div class="pb">Expanded to 25 AI-analyzed props per session. More coverage = more edges to find before the books adjust.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F52C;</span><span class="pn">Prop Scanner &mdash; Unlimited + CSV + Live Retrieval</span></div><div class="pb">Scan unlimited props, bulk-upload via CSV, or auto-pull your PrizePicks/DraftKings slips. AI analyzes every line instantly.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F9EC;</span><span class="pn">Entry Builder</span></div><div class="pb">Build optimized PrizePicks &amp; Pick6 entries. AI ranks combinations by expected value, correlation, and SAFE Score to maximize your payout odds.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F6E1;&#xFE0F;</span><span class="pn">Risk Shield</span></div><div class="pb">Portfolio-level risk analysis for your entries. See exposure by player, team, and stat type. Avoid correlated losses before they happen.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F4CB;</span><span class="pn">Game Report</span></div><div class="pb">Deep-dive matchup reports: pace projections, defensive matchup grades, rest advantages, and AI game scripts for every NBA game tonight.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F52E;</span><span class="pn">Player Simulator</span></div><div class="pb">Monte Carlo simulation engine. Run 10,000+ scenarios for any player prop to see hit probability, ceiling/floor, and variance risk.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F4C8;</span><span class="pn">Bet Tracker</span></div><div class="pb">Log every bet and track your ROI, win rate, CLV capture, and bankroll growth over time. See which strategies actually make money.</div></li>
-</ul></div>
+<!-- Sharp IQ -->
+<div class="tc2 ts">
+  <span class="tc2-ico">&#x1F525;</span>
+  <div class="tc2-name">Sharp IQ</div>
+  <div class="tc2-price">$9<span style="font-size:1rem">.99</span> <span class="sm">/ mo</span></div>
+  <span class="tc2-yearly">$107.89 / year &mdash; save 10%</span>
+  <div class="tc2-quote">&ldquo;Your IQ just passed the books.&rdquo;<br>Everything in Free, plus:</div>
+  <ul class="tc2-list">
+    <li class="tc2-feat"><span class="tc2-fico">&#x26A1;</span><div><div class="tc2-ftxt">QAM &mdash; 25 Props</div><div class="tc2-fdesc">More coverage = more edges before books adjust.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F52C;</span><div><div class="tc2-ftxt">Prop Scanner &mdash; Unlimited + CSV + Live</div><div class="tc2-fdesc">Scan unlimited, bulk-upload CSV, or auto-pull slips.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F9EC;</span><div><div class="tc2-ftxt">Entry Builder</div><div class="tc2-fdesc">Build optimized PrizePicks &amp; Pick6 entries by EV.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F6E1;&#xFE0F;</span><div><div class="tc2-ftxt">Risk Shield</div><div class="tc2-fdesc">Portfolio-level exposure analysis by player &amp; team.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4CB;</span><div><div class="tc2-ftxt">Game Report</div><div class="tc2-fdesc">Matchup reports: pace, defense, rest, AI game scripts.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F52E;</span><div><div class="tc2-ftxt">Player Simulator</div><div class="tc2-fdesc">Monte Carlo: 10K+ scenarios for hit probability.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4C8;</span><div><div class="tc2-ftxt">Bet Tracker</div><div class="tc2-fdesc">ROI, win rate, CLV capture, bankroll growth tracking.</div></div></li>
+  </ul>
+</div>
 
-<div class="tc tm"><div class="th"><div class="tn">&#x1F48E; Smart Money</div><div class="tp">$24.99/mo &middot; $269.89/yr</div></div>
-<div class="tg">&ldquo;You are the smart money.&rdquo; &mdash; Everything in Sharp IQ, plus:</div>
-<ul class="pl">
-<li class="pi"><div class="ph"><span class="pc">&#x26A1;</span><span class="pn">Quantum Analysis Matrix &mdash; ALL 300+ Props</span></div><div class="pb">Full, unrestricted access to every prop the AI analyzes tonight. See the complete board &mdash; no limits, no waiting.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F4B0;</span><span class="pn">Smart Money Bets</span></div><div class="pb">See where the sharp money is flowing. AI-detected line movement + volume anomalies show you which side the professionals are on.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F5FA;&#xFE0F;</span><span class="pn">Correlation Matrix</span></div><div class="pb">Visual correlation heatmap between player props. Find hidden +EV parlays where props move together &mdash; or hedge with negative correlations.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F4CA;</span><span class="pn">Proving Grounds</span></div><div class="pb">Backtest any strategy against historical data. See how your filters, SAFE Score thresholds, and entry styles would have performed last season.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F399;&#xFE0F;</span><span class="pn">The Studio</span></div><div class="pb">AI-generated analysis reports with narrative breakdowns, data visualizations, and shareable pick cards for your best plays.</div></li>
-</ul></div>
+<!-- Smart Money -->
+<div class="tc2 tm">
+  <span class="tc2-pop">MOST POPULAR</span>
+  <span class="tc2-ico">&#x1F48E;</span>
+  <div class="tc2-name">Smart Money</div>
+  <div class="tc2-price">$24<span style="font-size:1rem">.99</span> <span class="sm">/ mo</span></div>
+  <span class="tc2-yearly">$269.89 / year &mdash; save 10%</span>
+  <div class="tc2-quote">&ldquo;You are the smart money.&rdquo;<br>Everything in Sharp IQ, plus:</div>
+  <ul class="tc2-list">
+    <li class="tc2-feat"><span class="tc2-fico">&#x26A1;</span><div><div class="tc2-ftxt">QAM &mdash; ALL 300+ Props</div><div class="tc2-fdesc">Full unrestricted access to every prop tonight.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4B0;</span><div><div class="tc2-ftxt">Smart Money Bets</div><div class="tc2-fdesc">AI-detected sharp money flow &amp; line movement.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F5FA;&#xFE0F;</span><div><div class="tc2-ftxt">Correlation Matrix</div><div class="tc2-fdesc">Find hidden +EV parlays with correlation heatmaps.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F4CA;</span><div><div class="tc2-ftxt">Proving Grounds</div><div class="tc2-fdesc">Backtest strategies against historical data.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F399;&#xFE0F;</span><div><div class="tc2-ftxt">The Studio</div><div class="tc2-fdesc">AI narrative reports &amp; shareable pick cards.</div></div></li>
+  </ul>
+</div>
 
-<div class="tc ti"><div class="th"><div class="tn">&#x1F451; Insider Circle</div><div class="tp">$499.99 one-time &middot; lifetime</div></div>
-<div class="tg">&ldquo;You knew before everyone.&rdquo; &mdash; Everything in Smart Money, plus:</div>
-<ul class="pl">
-<li class="pi"><div class="ph"><span class="pc">&#x1F451;</span><span class="pn">Lifetime Access &mdash; Never Pay Again</span></div><div class="pb">One payment, permanent access to every current feature and every future feature we build. No subscriptions, no renewals, no surprise charges.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F680;</span><span class="pn">Early Access to New Tools</span></div><div class="pb">Be the first to test new AI models, pages, and features before they launch to the public. Your feedback shapes what we build next.</div></li>
-<li class="pi"><div class="ph"><span class="pc">&#x1F3C6;</span><span class="pn">Founding Member Status</span></div><div class="pb">Limited to 75 members. Exclusive badge, priority support, and recognition as an original Smart Pick Pro insider.</div></li>
-</ul></div>
+<!-- Insider Circle -->
+<div class="tc2 ti">
+  <span class="tc2-ico">&#x1F451;</span>
+  <div class="tc2-name">Insider Circle</div>
+  <div class="tc2-price">$499<span style="font-size:1rem">.99</span></div>
+  <span class="tc2-yearly">one-time &middot; lifetime access</span>
+  <div class="tc2-quote">&ldquo;You knew before everyone.&rdquo;<br>Everything in Smart Money, plus:</div>
+  <ul class="tc2-list">
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F451;</span><div><div class="tc2-ftxt">Lifetime Access &mdash; Never Pay Again</div><div class="tc2-fdesc">Every current &amp; future feature. No renewals.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F680;</span><div><div class="tc2-ftxt">Early Access to New Tools</div><div class="tc2-fdesc">Test new AI models &amp; pages before launch.</div></div></li>
+    <li class="tc2-feat"><span class="tc2-fico">&#x1F3C6;</span><div><div class="tc2-ftxt">Founding Member Status</div><div class="tc2-fdesc">Limited to 75 members. Exclusive badge &amp; priority support.</div></div></li>
+  </ul>
+</div>
+</div><!-- /pr-grid -->
 
-<div class="tw2"><table class="tt">
-<thead><tr><th>Page / Feature</th><th class="hf">&#x2B50; Free</th><th class="hs">&#x1F525; Sharp</th><th class="hm">&#x1F48E; Smart</th><th class="hi2">&#x1F451; Insider</th></tr></thead>
+<!-- Compare toggle -->
+<details class="pr-compare">
+<summary>&#x1F50D; Compare All Features Side-by-Side <span class="arrow">&#x25BC;</span></summary>
+<div class="pr-tw"><table class="pr-tt">
+<thead><tr><th>Page / Feature</th><th class="hf">&#x2B50; Free</th><th class="hs">&#x1F525; Sharp</th><th class="hm">&#x1F48E; Smart</th><th class="hi">&#x1F451; Insider</th></tr></thead>
 <tbody>
 <tr class="cat"><td colspan="5">Core Pages (All Tiers)</td></tr>
 <tr><td>&#x1F4A6; Live Sweat</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td><td class="y">&#x2713;</td></tr>
@@ -3591,55 +3711,77 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 <tr><td>&#x1F680; Early Access to New Tools</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td></tr>
 <tr><td>&#x1F3C6; Founding Member (75 seats)</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="n">&#x2717;</td><td class="y">&#x2713;</td></tr>
 </tbody></table></div>
-
 </details>
 
-<div class="sv2"><p class="st2">You&rsquo;d pay <span class="big">$1,188/yr</span> for OddsJam alone.</p><p class="ss">Smart Pick Pro gives you more features, more AI, more props &mdash; for $0. Do the math.</p></div>
+<!-- Savings -->
+<div class="pr-save">
+  <span class="pr-save-big">$1,188/yr</span>
+  <p class="pr-save-txt">That&rsquo;s what you&rsquo;d pay for OddsJam alone.</p>
+  <p class="pr-save-sub">Smart Pick Pro gives you more features, more AI, more props &mdash; for <strong style="color:#00D559;">$0</strong>. Do the math.</p>
+</div>
 
-<div class="ic"><div class="ic-f">&#x1F525;</div><div class="ic-h">Founding Member Seats Are Going Fast</div><div class="ic-s">12 <span class="of">of 75 remaining</span></div><div class="ic-sub">Once all 75 seats are claimed, Insider Circle closes permanently. Lifetime access &mdash; one payment, never pay again.</div><div class="ic-pb">&#x1F451; $499.99 &middot; Lifetime</div></div>
+<!-- Insider urgency -->
+<div class="pr-insider">
+  <div class="pr-ins-badge"><span class="dot"></span> LIMITED AVAILABILITY</div>
+  <div class="pr-ins-h">Founding Member Seats Are Going Fast</div>
+  <div class="pr-ins-seats">12 <span class="of">of 75 remaining</span></div>
+  <div class="pr-ins-sub">Once all 75 seats are claimed, Insider Circle closes permanently. Lifetime access &mdash; one payment, never pay again.</div>
+  <div class="pr-ins-price">&#x1F451; $499.99 &middot; Lifetime</div>
+  <div class="pr-ins-bar">
+    <div class="pr-ins-track"><div class="pr-ins-fill"></div></div>
+    <div class="pr-ins-labels"><span>0 claimed</span><span>63 claimed</span><span>75 total</span></div>
+  </div>
+</div>
 """)
 
     # ── Subscription Purchase Section ─────────────────────────
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+@keyframes subBarSlide{0%{background-position:300% 0}100%{background-position:-300% 0}}
+@keyframes subGlow{0%,100%{box-shadow:0 0 0 0 rgba(0,213,89,0.08)}50%{box-shadow:0 0 40px 12px rgba(0,213,89,0.04)}}
 .sub-purchase-section {
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.04) 0%, rgba(45, 158, 255, 0.03) 50%, rgba(192, 132, 252, 0.03) 100%);
-    border: 1px solid rgba(0, 213, 89, 0.15);
-    border-radius: 24px;
-    padding: 40px 24px 32px;
-    margin: 8px 0;
+    background: linear-gradient(168deg, rgba(0, 213, 89, 0.06) 0%, rgba(45, 158, 255, 0.03) 50%, rgba(192, 132, 252, 0.03) 100%);
+    border: 1.5px solid rgba(0, 213, 89, 0.15);
+    border-radius: 28px;
+    padding: 48px 28px 36px;
+    margin: 12px 0;
     position: relative;
     overflow: hidden;
+    animation: subGlow 6s ease infinite;
 }
 .sub-purchase-section::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #00D559, #F9C62B, #00D559, #c084fc);
+    background: linear-gradient(90deg, #00D559, #F9C62B, #2D9EFF, #c084fc, #00D559);
     background-size: 300% 100%;
     animation: subBarSlide 6s ease infinite;
 }
-@keyframes subBarSlide {
-    0%   { background-position: 300% 0; }
-    100% { background-position: -300% 0; }
+.sub-purchase-section::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0, 213, 89, 0.06), transparent 60%);
+    pointer-events: none;
 }
 .sub-purchase-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.8rem;
+    font-size: 2.2rem;
     font-weight: 800;
     text-align: center;
     color: #fff;
-    margin: 0 0 6px;
-    text-transform: uppercase;
-    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    letter-spacing: -0.03em;
+    position: relative;
 }
 .sub-purchase-sub {
     text-align: center;
-    font-size: 0.88rem;
+    font-size: 0.92rem;
     color: rgba(255, 255, 255, 0.4);
-    margin: 0 0 28px;
-    line-height: 1.6;
+    margin: 0 0 32px;
+    line-height: 1.7;
+    position: relative;
 }
 .sub-purchase-sub strong { color: #00D559; }
 .sub-guarantee {
@@ -3651,8 +3793,8 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 .sub-guarantee strong { color: rgba(255, 255, 255, 0.4); }
 </style>
 <div class="sub-purchase-section">
-    <p class="sub-purchase-title">🚀 Get Your Edge Now</p>
-    <p class="sub-purchase-sub">Subscribe instantly — <strong>secure Stripe checkout</strong>, cancel anytime, no commitment.</p>
+    <p class="sub-purchase-title">&#x1F680; Get Your Edge Now</p>
+    <p class="sub-purchase-sub">Subscribe instantly &mdash; <strong>secure Stripe checkout</strong>, cancel anytime, no commitment.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -3739,71 +3881,184 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 🔒 <strong style="color:rgba(255,255,255,0.4);">Secure checkout by Stripe</strong> · Cancel anytime · No hidden fees
 </div>""", unsafe_allow_html=True)
 
+    # ── Section anchor: FAQ ──
+    st.markdown('<div data-section-id="faq" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
+
     # ── Below-fold: Performance, FAQ, CTA, Footer ─────────────
     st.html("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.7)}
+
+@keyframes ftFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ftShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes ftPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,213,89,0.15)}50%{box-shadow:0 0 40px 12px rgba(0,213,89,0.06)}}
+@keyframes ftBarGrow{from{height:4px}to{height:var(--h)}}
+
 .em{background:linear-gradient(135deg,#00D559 0%,#2D9EFF 50%,#c084fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.sh{text-align:center;margin-bottom:24px;position:relative}
-.sh::before{content:'';display:block;width:60px;height:4px;margin:0 auto 18px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:4px}
-.sh h3{font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;color:#fff;margin:0 0 10px;letter-spacing:-0.04em;text-transform:uppercase}
-.sh p{font-size:0.85rem;color:rgba(255,255,255,0.4);margin:0;line-height:1.6}
-/* Performance */
-.pf{margin:0}
-.pf-c{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:18px 16px 14px}
-.pf-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.pf-t{font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.7)}
-.pf-a{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:800;color:#00D559}
-.sk{display:flex;align-items:flex-end;gap:3px;height:50px;width:100%}
-.sb{flex:1;border-radius:3px 3px 0 0;min-height:4px}
-.sb.w{background:linear-gradient(180deg,#00D559,rgba(0,213,89,0.3))}
-.sb.l{background:linear-gradient(180deg,rgba(242,67,54,0.5),rgba(242,67,54,0.15))}
-.sl2{display:flex;justify-content:space-between;margin-top:4px}
-.sl2 span{font-family:'JetBrains Mono',monospace;font-size:0.42rem;color:rgba(255,255,255,0.15);font-weight:600}
-/* FAQ */
-.fq{margin:28px 0 0}
-.fi{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px;margin-bottom:6px}
-.fi summary{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:0.76rem;font-weight:700;color:rgba(255,255,255,0.6);list-style:none}
-.fi summary::-webkit-details-marker{display:none}
-.fi summary::marker{display:none;content:''}
-.fi summary:hover{color:rgba(255,255,255,0.8)}
-.fi summary .fa{display:inline-block;transition:transform 0.3s;color:rgba(0,213,89,0.4);font-size:0.65rem}
-.fi[open] summary .fa{transform:rotate(180deg)}
-.fi-a{padding:0 16px 14px;font-size:0.7rem;color:rgba(255,255,255,0.35);line-height:1.6}
-/* CTA2 */
-.c2{background:linear-gradient(135deg,rgba(0,213,89,0.1),rgba(45,158,255,0.06));border:2px solid rgba(0,213,89,0.2);border-radius:24px;padding:44px 28px;text-align:center;margin:36px 0 0;position:relative;overflow:hidden}
-.c2::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,213,89,0.08) 0%,transparent 60%);pointer-events:none}
-.c2-h{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#fff;margin:0 0 10px;text-transform:uppercase;letter-spacing:-0.03em;position:relative}
-.c2-s{font-size:0.85rem;color:rgba(255,255,255,0.4);margin:0 0 20px;line-height:1.6;position:relative}
-.c2-b{display:inline-block;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;color:#0B0F19;background:linear-gradient(135deg,#00D559,#00B74D);padding:16px 52px;border-radius:16px;text-decoration:none;box-shadow:0 6px 32px rgba(0,213,89,0.35);position:relative}
-.c2-b:hover{transform:translateY(-4px);box-shadow:0 12px 48px rgba(0,213,89,0.5)}
-.c2-t{font-size:0.6rem;color:rgba(255,255,255,0.18);margin-top:14px;position:relative}
-/* Trust + Footer */
-.tr{display:flex;justify-content:center;gap:16px;margin:28px 0 6px;flex-wrap:wrap}
-.tr-i{font-size:0.62rem;font-weight:600;color:rgba(255,255,255,0.22);display:flex;align-items:center;gap:4px}
-.ft{text-align:center;padding:20px 0 40px;font-size:0.55rem;color:rgba(255,255,255,0.1);line-height:1.7}
-.ft a{color:rgba(255,255,255,0.15);text-decoration:underline}
+
+/* ── Performance section ── */
+.ft-perf{margin:0 0 56px;animation:ftFadeUp 0.8s ease both}
+.ft-perf-head{text-align:center;margin-bottom:28px}
+.ft-perf-head::before{content:'';display:block;width:60px;height:4px;margin:0 auto 20px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:6px;background-size:200% 100%;animation:ftShimmer 4s ease infinite}
+.ft-perf-head h2{font-family:'Space Grotesk',sans-serif;font-size:2.4rem;font-weight:800;color:#fff;margin:0 0 8px;letter-spacing:-0.03em}
+.ft-perf-head p{font-size:0.88rem;color:rgba(255,255,255,0.35);margin:0}
+.ft-perf-card{background:linear-gradient(168deg,rgba(255,255,255,0.035) 0%,rgba(255,255,255,0.008) 100%);border:1.5px solid rgba(255,255,255,0.06);border-radius:24px;padding:28px 24px 20px;position:relative;overflow:hidden}
+.ft-perf-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#00D559,#2D9EFF);border-radius:3px 3px 0 0}
+.ft-perf-stats{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.ft-perf-label{font-family:'Space Grotesk',sans-serif;font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.6)}
+.ft-perf-val{display:flex;align-items:baseline;gap:8px}
+.ft-perf-num{font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:800;color:#00D559;text-shadow:0 0 20px rgba(0,213,89,0.2)}
+.ft-perf-tag{font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;color:#0B0F19;background:#00D559;padding:2px 8px;border-radius:100px}
+.ft-bars{display:flex;align-items:flex-end;gap:4px;height:72px;width:100%}
+.ft-bar{flex:1;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.6s cubic-bezier(0.4,0,0.2,1);position:relative}
+.ft-bar.w{background:linear-gradient(180deg,#00D559 0%,rgba(0,213,89,0.2) 100%)}
+.ft-bar.w:hover{background:linear-gradient(180deg,#00ff66 0%,rgba(0,213,89,0.4) 100%);box-shadow:0 -4px 16px rgba(0,213,89,0.2)}
+.ft-bar.l{background:linear-gradient(180deg,rgba(242,67,54,0.5) 0%,rgba(242,67,54,0.1) 100%)}
+.ft-bar.l:hover{background:linear-gradient(180deg,rgba(242,67,54,0.7) 0%,rgba(242,67,54,0.2) 100%)}
+.ft-bar-labels{display:flex;justify-content:space-between;margin-top:6px}
+.ft-bar-labels span{font-family:'JetBrains Mono',monospace;font-size:0.48rem;color:rgba(255,255,255,0.15);font-weight:600}
+.ft-perf-note{text-align:center;margin-top:12px;font-size:0.58rem;color:rgba(255,255,255,0.15);font-style:italic}
+
+/* ── FAQ ── */
+.ft-faq{margin:0 0 56px;animation:ftFadeUp 0.8s ease 0.2s both}
+.ft-faq-head{text-align:center;margin-bottom:28px}
+.ft-faq-head::before{content:'';display:block;width:60px;height:4px;margin:0 auto 20px;background:linear-gradient(90deg,#2D9EFF,#c084fc);border-radius:6px}
+.ft-faq-head h2{font-family:'Space Grotesk',sans-serif;font-size:2.4rem;font-weight:800;color:#fff;margin:0 0 8px;letter-spacing:-0.03em}
+.ft-faq-head p{font-size:0.88rem;color:rgba(255,255,255,0.35);margin:0}
+.ft-qi{background:linear-gradient(168deg,rgba(255,255,255,0.03) 0%,rgba(255,255,255,0.008) 100%);border:1.5px solid rgba(255,255,255,0.06);border-radius:16px;margin-bottom:8px;overflow:hidden;transition:all 0.3s}
+.ft-qi:hover{border-color:rgba(255,255,255,0.1);background:linear-gradient(168deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.012) 100%)}
+.ft-qi summary{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:0.82rem;font-weight:700;color:rgba(255,255,255,0.55);list-style:none;transition:color 0.3s}
+.ft-qi summary::-webkit-details-marker{display:none}
+.ft-qi summary::marker{display:none;content:''}
+.ft-qi summary:hover{color:rgba(255,255,255,0.85)}
+.ft-qi summary .chevron{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(0,213,89,0.06);border:1px solid rgba(0,213,89,0.12);color:#00D559;font-size:0.6rem;transition:all 0.3s;flex-shrink:0}
+.ft-qi[open] summary .chevron{background:rgba(0,213,89,0.12);transform:rotate(180deg)}
+.ft-qi[open] summary{color:#fff}
+.ft-qi-ans{padding:0 22px 18px;font-size:0.74rem;color:rgba(255,255,255,0.35);line-height:1.7}
+
+/* ── Final CTA ── */
+.ft-cta{background:linear-gradient(168deg,rgba(0,213,89,0.08) 0%,rgba(45,158,255,0.04) 50%,rgba(192,132,252,0.04) 100%);border:2px solid rgba(0,213,89,0.15);border-radius:28px;padding:56px 32px;text-align:center;margin:0 0 36px;position:relative;overflow:hidden;animation:ftFadeUp 0.8s ease 0.4s both;animation:ftPulse 4s ease infinite}
+.ft-cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,213,89,0.1) 0%,transparent 50%);pointer-events:none}
+.ft-cta::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#00D559,#2D9EFF,#c084fc,transparent);background-size:200% 100%;animation:ftShimmer 3s ease infinite}
+.ft-cta-h{font-family:'Space Grotesk',sans-serif;font-size:2.6rem;font-weight:800;color:#fff;margin:0 0 12px;letter-spacing:-0.04em;position:relative;line-height:1.2}
+.ft-cta-s{font-size:0.95rem;color:rgba(255,255,255,0.4);margin:0 0 28px;line-height:1.7;position:relative;max-width:480px;margin-left:auto;margin-right:auto}
+.ft-cta-btn{display:inline-block;font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:800;color:#0B0F19;background:linear-gradient(135deg,#00D559,#00B74D);padding:18px 56px;border-radius:16px;text-decoration:none;box-shadow:0 8px 40px rgba(0,213,89,0.35);position:relative;transition:all 0.3s;cursor:pointer;border:none}
+.ft-cta-btn:hover{transform:translateY(-4px);box-shadow:0 16px 56px rgba(0,213,89,0.5)}
+.ft-cta-trust{display:flex;justify-content:center;gap:18px;margin-top:20px;position:relative;flex-wrap:wrap}
+.ft-cta-trust span{font-size:0.65rem;font-weight:600;color:rgba(255,255,255,0.2);display:flex;align-items:center;gap:4px}
+
+/* ── Trust Strip ── */
+.ft-trust{display:flex;justify-content:center;gap:24px;margin:0 0 8px;flex-wrap:wrap;animation:ftFadeUp 0.8s ease 0.5s both}
+.ft-trust-item{font-size:0.65rem;font-weight:700;color:rgba(255,255,255,0.18);display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);padding:6px 14px;border-radius:100px}
+
+/* ── Footer ── */
+.ft-footer{text-align:center;padding:24px 0 48px;font-size:0.58rem;color:rgba(255,255,255,0.1);line-height:1.8;animation:ftFadeUp 0.8s ease 0.6s both}
+.ft-footer a{color:rgba(255,255,255,0.15);text-decoration:underline;transition:color 0.3s}
+.ft-footer a:hover{color:rgba(255,255,255,0.3)}
+.ft-footer-line{width:60px;height:2px;margin:0 auto 16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent);border-radius:2px}
+
+@media(max-width:520px){
+  .ft-perf-head h2,.ft-faq-head h2{font-size:1.8rem}
+  .ft-cta-h{font-size:1.8rem}
+  .ft-cta{padding:36px 20px}
+  .ft-cta-btn{padding:14px 36px;font-size:0.92rem}
+}
 </style>
 
-<div class="pf"><div class="sh"><h3>Recent AI Performance</h3><p>Last 14 days &mdash; SAFE Score 70+ picks</p></div>
-<div class="pf-c"><div class="pf-h"><div class="pf-t">Daily Win Rate</div><div class="pf-a">62.4% avg</div></div>
-<div class="sk"><div class="sb w" style="height:68%"></div><div class="sb w" style="height:54%"></div><div class="sb w" style="height:72%"></div><div class="sb l" style="height:38%"></div><div class="sb w" style="height:80%"></div><div class="sb w" style="height:62%"></div><div class="sb w" style="height:58%"></div><div class="sb l" style="height:42%"></div><div class="sb w" style="height:76%"></div><div class="sb w" style="height:64%"></div><div class="sb w" style="height:70%"></div><div class="sb w" style="height:60%"></div><div class="sb l" style="height:35%"></div><div class="sb w" style="height:74%"></div></div>
-<div class="sl2"><span>14d ago</span><span>7d ago</span><span>Today</span></div></div></div>
-
-<div class="fq"><div class="sh"><h3>Got Questions?</h3><p>We&rsquo;ve got answers</p></div>
-<details class="fi"><summary>Is it really free? What&rsquo;s the catch? <span class="fa">&#x25BC;</span></summary><div class="fi-a">No catch. Smart Rookie gives you 10 AI-analyzed props, Live Sweat, Live Games, and SAFE Scores &mdash; free forever, no credit card required. We make money from optional upgrades (Sharp IQ &amp; Smart Money), not from locking basic features behind paywalls.</div></details>
-<details class="fi"><summary>How does the AI actually work? <span class="fa">&#x25BC;</span></summary><div class="fi-a">Our Quantum Analysis Matrix fuses 6 independent AI models &mdash; each trained on different data (player logs, matchup DNA, pace projections, defensive ratings, line movement, and injury impact). They vote on every prop and produce a SAFE Score from 0-100. Higher score = higher confidence = bigger edge.</div></details>
-<details class="fi"><summary>Can I cancel anytime? <span class="fa">&#x25BC;</span></summary><div class="fi-a">Absolutely. Sharp IQ and Smart Money are month-to-month with no commitment. Cancel from your Settings page in one click &mdash; no emails, no phone calls, no guilt trips. Your data stays yours.</div></details>
-<details class="fi"><summary>What platforms do you support? <span class="fa">&#x25BC;</span></summary><div class="fi-a">Our AI analyzes props from PrizePicks, DraftKings Pick6, Underdog Fantasy, and more. You can also manually enter any prop from any platform into the Prop Scanner for instant AI analysis.</div></details>
-<details class="fi"><summary>How is this better than OddsJam / Action Network? <span class="fa">&#x25BC;</span></summary><div class="fi-a">Those tools charge $60&ndash;$300/mo for basic odds comparison. Smart Pick Pro gives you 6 fused AI models, SAFE Scores, real-time live tracking, edge detection, bankroll tools, and backtesting &mdash; for free. They literally cannot compete on features or price.</div></details>
+<!-- Performance -->
+<div class="ft-perf">
+  <div class="ft-perf-head">
+    <h2>Recent AI <span class="em">Performance</span></h2>
+    <p>Last 14 days &mdash; SAFE Score 70+ picks only</p>
+  </div>
+  <div class="ft-perf-card">
+    <div class="ft-perf-stats">
+      <div class="ft-perf-label">Daily Win Rate</div>
+      <div class="ft-perf-val">
+        <span class="ft-perf-num">62.4%</span>
+        <span class="ft-perf-tag">VERIFIED</span>
+      </div>
+    </div>
+    <div class="ft-bars">
+      <div class="ft-bar w" style="height:68%"></div>
+      <div class="ft-bar w" style="height:54%"></div>
+      <div class="ft-bar w" style="height:72%"></div>
+      <div class="ft-bar l" style="height:38%"></div>
+      <div class="ft-bar w" style="height:80%"></div>
+      <div class="ft-bar w" style="height:62%"></div>
+      <div class="ft-bar w" style="height:58%"></div>
+      <div class="ft-bar l" style="height:42%"></div>
+      <div class="ft-bar w" style="height:76%"></div>
+      <div class="ft-bar w" style="height:64%"></div>
+      <div class="ft-bar w" style="height:70%"></div>
+      <div class="ft-bar w" style="height:60%"></div>
+      <div class="ft-bar l" style="height:35%"></div>
+      <div class="ft-bar w" style="height:74%"></div>
+    </div>
+    <div class="ft-bar-labels"><span>14d ago</span><span>7d ago</span><span>Today</span></div>
+  </div>
+  <div class="ft-perf-note">Win rate calculated from all SAFE 70+ picks tracked in the public Bet Tracker</div>
 </div>
 
-<div class="c2"><div class="c2-h">Ready to <span class="em">Beat the Books?</span></div><p class="c2-s">Join thousands of sharps using AI to find edges the books don&rsquo;t want you to see.</p><a class="c2-b" href="#" onclick="(function(){try{var d=window.parent.document;var tabs=d.querySelectorAll('button[data-baseweb=tab]');for(var i=0;i&lt;tabs.length;i++){if(tabs[i].textContent.indexOf('Create Free Account')!==-1){tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return false;}}var forms=d.querySelectorAll('[data-testid=stForm]');if(forms.length){forms[0].scrollIntoView({behavior:'smooth',block:'center'});return false;}d.querySelector('.main').scrollTo({top:0,behavior:'smooth'});}catch(e){window.parent.scrollTo({top:0,behavior:'smooth'});}return false;})();return false;">&#x26A1; Create Free Account</a><div class="c2-t">&#x1F512; No credit card &middot; &#x23F1;&#xFE0F; 10 second signup &middot; &#x1F6AB; Never sell your data</div></div>
+<!-- FAQ -->
+<div class="ft-faq">
+  <div class="ft-faq-head">
+    <h2>Got <span class="em">Questions?</span></h2>
+    <p>We&rsquo;ve got answers</p>
+  </div>
 
-<div class="tr"><div class="tr-i">&#x1F512; 256-bit Encrypted</div><div class="tr-i">&#x1F4B3; No Credit Card</div><div class="tr-i">&#x1F6AB; Never Sell Data</div></div>
+  <details class="ft-qi">
+    <summary>Is it really free? What&rsquo;s the catch? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">No catch. Smart Rookie gives you 10 AI-analyzed props, Live Sweat, Live Games, and SAFE Scores &mdash; free forever, no credit card required. We make money from optional upgrades (Sharp IQ &amp; Smart Money), not from locking basic features behind paywalls.</div>
+  </details>
 
-<div class="ft">&copy; 2026 Smart Pick Pro &middot; For entertainment &amp; educational purposes only &middot; 21+<br><a href="https://www.ncpgambling.org/" target="_blank">National Council on Problem Gambling &middot; 1-800-GAMBLER</a></div>
+  <details class="ft-qi">
+    <summary>How does the AI actually work? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">Our Quantum Analysis Matrix fuses 6 independent AI models &mdash; each trained on different data (player logs, matchup DNA, pace projections, defensive ratings, line movement, and injury impact). They vote on every prop and produce a SAFE Score from 0&ndash;100. Higher score = higher confidence = bigger edge.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>Can I cancel anytime? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">Absolutely. Sharp IQ and Smart Money are month-to-month with no commitment. Cancel from your Settings page in one click &mdash; no emails, no phone calls, no guilt trips. Your data stays yours.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>What platforms do you support? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">Our AI analyzes props from PrizePicks, DraftKings Pick6, Underdog Fantasy, and more. You can also manually enter any prop from any platform into the Prop Scanner for instant AI analysis.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>How is this better than OddsJam / Action Network? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">Those tools charge $60&ndash;$300/mo for basic odds comparison. Smart Pick Pro gives you 6 fused AI models, SAFE Scores, real-time live tracking, edge detection, bankroll tools, and backtesting &mdash; for free. They literally cannot compete on features or price.</div>
+  </details>
+</div>
+
+<!-- Final CTA -->
+<div class="ft-cta">
+  <div class="ft-cta-h">Ready to <span class="em">Beat the Books?</span></div>
+  <p class="ft-cta-s">Join thousands of sharps using AI to find edges the books don&rsquo;t want you to see.</p>
+  <a class="ft-cta-btn" href="#" onclick="(function(){try{var d=window.parent.document;var tabs=d.querySelectorAll('button[data-baseweb=tab]');for(var i=0;i&lt;tabs.length;i++){if(tabs[i].textContent.indexOf('Create Free Account')!==-1){tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return false;}}var forms=d.querySelectorAll('[data-testid=stForm]');if(forms.length){forms[0].scrollIntoView({behavior:'smooth',block:'center'});return false;}d.querySelector('.main').scrollTo({top:0,behavior:'smooth'});}catch(e){window.parent.scrollTo({top:0,behavior:'smooth'});}return false;})();return false;">&#x26A1; Create Free Account</a>
+  <div class="ft-cta-trust">
+    <span>&#x1F512; No credit card</span>
+    <span>&#x23F1;&#xFE0F; 10 second signup</span>
+    <span>&#x1F6AB; Never sell your data</span>
+  </div>
+</div>
+
+<!-- Trust -->
+<div class="ft-trust">
+  <span class="ft-trust-item">&#x1F512; 256-bit Encrypted</span>
+  <span class="ft-trust-item">&#x1F4B3; No Credit Card</span>
+  <span class="ft-trust-item">&#x1F6AB; Never Sell Data</span>
+</div>
+
+<!-- Footer -->
+<div class="ft-footer">
+  <div class="ft-footer-line"></div>
+  &copy; 2026 Smart Pick Pro &middot; For entertainment &amp; educational purposes only &middot; 21+<br>
+  <a href="https://www.ncpgambling.org/" target="_blank">National Council on Problem Gambling &middot; 1-800-GAMBLER</a>
+</div>
 """)
 
     return False
