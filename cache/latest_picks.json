@@ -1,0 +1,65 @@
+{
+  "date": "2026-04-19",
+  "picks": [
+    {
+      "player_name": "Daniss Jenkins",
+      "team": "DET",
+      "stat_type": "fga",
+      "prop_line": 5.5,
+      "direction": "OVER",
+      "platform": "PrizePicks",
+      "confidence_score": 76.6,
+      "probability_over": 0.768,
+      "edge_percentage": 24.4,
+      "tier": "Gold"
+    },
+    {
+      "player_name": "Victor Wembanyama",
+      "team": "SAS",
+      "stat_type": "defensive_rebounds",
+      "prop_line": 10.0,
+      "direction": "OVER",
+      "platform": "PrizePicks",
+      "confidence_score": 76.0,
+      "probability_over": 0.74,
+      "edge_percentage": 21.6,
+      "tier": "Gold"
+    },
+    {
+      "player_name": "Lu Dort 3-Pointers Made O/U",
+      "team": "",
+      "stat_type": "threes",
+      "prop_line": 1.5,
+      "direction": "UNDER",
+      "platform": "Underdog",
+      "confidence_score": 70.7,
+      "probability_over": 0.313,
+      "edge_percentage": -21.1,
+      "tier": "Gold"
+    },
+    {
+      "player_name": "De'Aaron Fox",
+      "team": "SAS",
+      "stat_type": "fgm",
+      "prop_line": 6.5,
+      "direction": "OVER",
+      "platform": "PrizePicks",
+      "confidence_score": 68.4,
+      "probability_over": 0.688,
+      "edge_percentage": 16.4,
+      "tier": "Gold"
+    },
+    {
+      "player_name": "Jerami Grant",
+      "team": "POR",
+      "stat_type": "fgm",
+      "prop_line": 3.5,
+      "direction": "OVER",
+      "platform": "PrizePicks",
+      "confidence_score": 67.8,
+      "probability_over": 0.753,
+      "edge_percentage": 22.9,
+      "tier": "Gold"
+    }
+  ]
+}

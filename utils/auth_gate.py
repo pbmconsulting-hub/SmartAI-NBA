@@ -28,6 +28,7 @@ import os
 import re
 import secrets
 import sqlite3
+from pathlib import Path
 
 import streamlit as st
 
@@ -112,7 +113,10 @@ def _display_stat_label(raw: str) -> str:
 def _load_top_preview_picks(limit: int = 5) -> list[dict]:
     """Load today's top analysis picks from the database for the landing page preview.
 
-    Falls back to the latest available day if today has no picks yet.
+    Falls back to the JSON cache file (``cache/latest_picks.json``), then
+    to the latest available day in the DB.  This ensures the landing page
+    always shows real picks — even on fresh Railway deploys where the
+    SQLite DB is empty but the cache file shipped with the Docker image.
     Returns a list of dicts with pick data, sorted by confidence descending.
     """
     initialize_database()
@@ -146,7 +150,30 @@ def _load_top_preview_picks(limit: int = 5) -> list[dict]:
                 if rows:
                     return [dict(r) for r in rows]
     except Exception as exc:
-        _logger.debug("_load_top_preview_picks: %s", exc)
+        _logger.debug("_load_top_preview_picks DB: %s", exc)
+
+    # ── JSON cache fallback (survives empty DB on Railway) ──
+    return _load_picks_from_cache(limit)
+
+
+def _load_picks_from_cache(limit: int = 5) -> list[dict]:
+    """Read top picks from ``cache/latest_picks.json``.
+
+    This file is written by ``tracking.database.insert_analysis_picks``
+    every time analysis runs and is also committed to the repo so fresh
+    Docker images always ship with recent picks.
+    """
+    import json as _json
+    try:
+        cache_path = Path(__file__).resolve().parent.parent / "cache" / "latest_picks.json"
+        if cache_path.exists():
+            data = _json.loads(cache_path.read_text(encoding="utf-8"))
+            picks = data.get("picks", [])
+            if picks:
+                _logger.debug("Loaded %d picks from cache/latest_picks.json", len(picks))
+                return picks[:limit]
+    except Exception as exc:
+        _logger.debug("_load_picks_from_cache: %s", exc)
     return []
 
 

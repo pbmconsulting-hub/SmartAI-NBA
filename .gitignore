@@ -46,6 +46,7 @@ logs/*.log.*
 
 # File-based cache — generated at runtime by utils.cache.FileCache
 cache/
+!cache/latest_picks.json
 
 # Environment / secrets — NEVER commit API keys or credentials
 .env

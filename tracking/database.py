@@ -2334,7 +2334,45 @@ def insert_analysis_picks(analysis_results):
             _logger.warning(f"insert_analysis_picks error (non-fatal): {err}")
             break  # non-retryable error
 
+    # Write a JSON cache of today's top picks for the landing page preview.
+    # This ensures the auth-gate landing page shows real picks even when
+    # the DB is empty (e.g. fresh Railway deploy before analysis runs).
+    if inserted > 0:
+        _write_latest_picks_cache(today_str)
+
     return inserted
+
+
+def _write_latest_picks_cache(date_str: str, limit: int = 5) -> None:
+    """Persist today's top analysis picks to ``cache/latest_picks.json``.
+
+    Called automatically after ``insert_analysis_picks`` succeeds.
+    The auth-gate landing page reads this file when the DB query returns
+    nothing (common on Railway ephemeral deploys).
+    """
+    import json as _json
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """SELECT player_name, team, stat_type, prop_line, direction,
+                          platform, confidence_score, probability_over,
+                          edge_percentage, tier
+                   FROM all_analysis_picks
+                   WHERE pick_date = ?
+                   ORDER BY confidence_score DESC
+                   LIMIT ?""",
+                (date_str, limit),
+            ).fetchall()
+            if not rows:
+                return
+            cache_data = {"date": date_str, "picks": [dict(r) for r in rows]}
+            cache_path = Path(__file__).parent.parent / "cache" / "latest_picks.json"
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(_json.dumps(cache_data, indent=2), encoding="utf-8")
+            _logger.debug("Wrote %d picks to %s", len(rows), cache_path)
+    except Exception as exc:
+        _logger.debug("_write_latest_picks_cache: %s", exc)
 
 
 def load_all_analysis_picks(days=30):
