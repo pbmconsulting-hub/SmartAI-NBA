@@ -1770,7 +1770,10 @@ def require_login() -> bool:
       </div>
       <div class="ag-preview-label">&#x2191; This is real. Sign up and see tonight&rsquo;s full board.</div>
     </div>
+    """, unsafe_allow_html=True)
 
+    # ── Below-fold: Winning Picks Carousel ───────────────────
+    st.markdown("""
     <!-- Winning Picks Carousel -->
     <div class="ag-winners">
       <div class="ag-section-head">
@@ -2185,7 +2188,10 @@ def require_login() -> bool:
         <div class="ag-review-author">&mdash; @nightowl_picks</div>
       </div>
     </div>
+    """, unsafe_allow_html=True)
 
+    # ── Below-fold: Bet Tracker transparency ─────────────────
+    st.markdown("""
     <!-- Bet Tracker: Transparency -->
     <div class="ag-tracker">
       <div class="ag-section-head">
@@ -2353,7 +2359,10 @@ def require_login() -> bool:
       </div>
       <div class="ag-tracker-label">&#x2191; Every pick tracked. Every result graded. No hiding.</div>
     </div>
+    """, unsafe_allow_html=True)
 
+    # ── Below-fold: Pricing + rest ───────────────────────────
+    st.markdown("""
     <!-- Pricing -->
     <div class="ag-pricing">
       <div class="ag-section-head">
