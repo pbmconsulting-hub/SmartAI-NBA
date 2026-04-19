@@ -816,8 +816,23 @@ header[data-testid="stHeader"],
 footer { display: none !important; }
 [data-testid="stAppViewContainer"] { padding-top: 0 !important; }
 
+html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+
 .stApp {
     background: #050910 !important;
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+}
+
+.stApp > [data-testid="stAppViewContainer"] {
+    overflow-x: hidden !important;
+}
+
+.stApp > [data-testid="stAppViewContainer"] > section.main {
+    overflow-x: hidden !important;
 }
 
 .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
@@ -826,6 +841,7 @@ footer { display: none !important; }
     margin: 0 auto !important;
     position: relative;
     z-index: 10;
+    overflow-x: hidden !important;
 }
 
 html, body, .stApp, .stApp * {
@@ -1296,6 +1312,8 @@ html, body, .stApp, .stApp * {
     border-bottom: 1px solid rgba(0, 213, 89, 0.06);
     padding: 44px 0;
     margin: 32px 0 0;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 .ag-proof-inner {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
@@ -2903,35 +2921,109 @@ def require_login() -> bool:
     # ── Auth tabs + forms ─────────────────────────────────
     tab_signup, tab_login = st.tabs(["\u26A1  Create Free Account", "\U0001F513  Log In"])
 
-    with tab_signup:
-        with st.form("signup_form", clear_on_submit=False):
-            su_name = st.text_input("Display Name", placeholder="e.g. Joseph", key="_su_name")
-            su_email = st.text_input("Email Address", placeholder="you@example.com", key="_su_email")
-            su_pw = st.text_input("Password", type="password", placeholder="Min 8 chars, 1 letter, 1 number", key="_su_pw")
-            su_pw2 = st.text_input("Confirm Password", type="password", placeholder="Re-enter password", key="_su_pw2")
-            su_submit = st.form_submit_button("\u26A1 Create Free Account", use_container_width=True, type="primary")
+    # ── Session-state for multi-step sign-up ──────────────
+    _SU_STAGE = "_signup_stage"     # 1 = info, 2 = password
+    _SU_EMAIL = "_signup_email"
+    _SU_NAME  = "_signup_name"
+    if _SU_STAGE not in st.session_state:
+        st.session_state[_SU_STAGE] = 1
 
-        if su_submit:
-            if not su_email or not _valid_email(su_email):
-                st.error("Please enter a valid email address.")
-            elif pw_err := _valid_password(su_pw):
-                st.error(pw_err)
-            elif su_pw != su_pw2:
-                st.error("Passwords don't match.")
-            elif _email_exists(su_email):
-                st.error("An account with this email already exists. Please log in instead.")
-            else:
-                ok = _create_user(su_email, su_pw, su_name)
-                if ok:
-                    user = _authenticate_user(su_email, su_pw)
-                    if user:
-                        _set_logged_in(user)
-                        st.success("Account created! Welcome to Smart Pick Pro.")
-                        st.rerun()
-                    else:
-                        st.error("Account created but login failed. Please try logging in.")
+    with tab_signup:
+        _stage = st.session_state[_SU_STAGE]
+
+        # ── Progress indicator ────────────────────────────
+        step1_color = "#00D559" if _stage >= 1 else "rgba(255,255,255,0.15)"
+        step2_color = "#00D559" if _stage >= 2 else "rgba(255,255,255,0.15)"
+        line_color  = "#00D559" if _stage >= 2 else "rgba(255,255,255,0.08)"
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;justify-content:center;gap:0;margin:0 auto 18px;max-width:280px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:{step1_color};display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:0.75rem;font-weight:800;color:#0B0F19;transition:all 0.3s;">1</div>
+            <span style="font-size:0.55rem;font-weight:700;color:{step1_color};font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Info</span>
+          </div>
+          <div style="flex:1;height:2px;background:{line_color};margin:0 10px 16px;border-radius:2px;transition:all 0.3s;"></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:{step2_color};display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:0.75rem;font-weight:800;color:#0B0F19;transition:all 0.3s;">2</div>
+            <span style="font-size:0.55rem;font-weight:700;color:{step2_color};font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Secure</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── STEP 1: Name + Email ──────────────────────────
+        if _stage == 1:
+            st.markdown("""
+            <div style="text-align:center;margin-bottom:14px;">
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:800;color:#fff;margin-bottom:4px;">Let&rsquo;s get you started</div>
+              <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);">Enter your name and email to create your free account.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            with st.form("signup_step1", clear_on_submit=False):
+                su_name  = st.text_input("Display Name", placeholder="e.g. Joseph", key="_su_name")
+                su_email = st.text_input("Email Address", placeholder="you@example.com", key="_su_email")
+                step1_submit = st.form_submit_button("\u27A1 Continue", use_container_width=True, type="primary")
+
+            if step1_submit:
+                if not su_name or len(su_name.strip()) < 2:
+                    st.error("Please enter your display name (at least 2 characters).")
+                elif not su_email or not _valid_email(su_email):
+                    st.error("Please enter a valid email address.")
+                elif _email_exists(su_email):
+                    st.error("An account with this email already exists. Please log in instead.")
                 else:
-                    st.error("Could not create account. Please try again.")
+                    st.session_state[_SU_NAME]  = su_name.strip()
+                    st.session_state[_SU_EMAIL] = su_email.strip().lower()
+                    st.session_state[_SU_STAGE] = 2
+                    st.rerun()
+
+        # ── STEP 2: Password + Create Account ────────────
+        elif _stage == 2:
+            _saved_name  = st.session_state.get(_SU_NAME, "")
+            _saved_email = st.session_state.get(_SU_EMAIL, "")
+
+            st.markdown(f"""
+            <div style="text-align:center;margin-bottom:14px;">
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:800;color:#fff;margin-bottom:4px;">Secure your account</div>
+              <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);">
+                Creating account for <strong style="color:#00D559;">{_saved_email}</strong>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            with st.form("signup_step2", clear_on_submit=False):
+                su_pw  = st.text_input("Password", type="password", placeholder="Min 8 chars, 1 letter, 1 number", key="_su_pw")
+                su_pw2 = st.text_input("Confirm Password", type="password", placeholder="Re-enter password", key="_su_pw2")
+                step2_submit = st.form_submit_button("\u26A1 Create Free Account", use_container_width=True, type="primary")
+
+            col_back, _ = st.columns([1, 3])
+            with col_back:
+                if st.button("\u2190 Back", key="_su_back", use_container_width=True):
+                    st.session_state[_SU_STAGE] = 1
+                    st.rerun()
+
+            if step2_submit:
+                if pw_err := _valid_password(su_pw):
+                    st.error(pw_err)
+                elif su_pw != su_pw2:
+                    st.error("Passwords don't match.")
+                elif _email_exists(_saved_email):
+                    st.error("An account with this email already exists. Please log in instead.")
+                    st.session_state[_SU_STAGE] = 1
+                else:
+                    ok = _create_user(_saved_email, su_pw, _saved_name)
+                    if ok:
+                        user = _authenticate_user(_saved_email, su_pw)
+                        if user:
+                            _set_logged_in(user)
+                            # Clean up sign-up state
+                            for k in (_SU_STAGE, _SU_EMAIL, _SU_NAME):
+                                st.session_state.pop(k, None)
+                            st.success("Account created! Welcome to Smart Pick Pro.")
+                            st.rerun()
+                        else:
+                            st.error("Account created but login failed. Please try logging in.")
+                    else:
+                        st.error("Could not create account. Please try again.")
 
     with tab_login:
         with st.form("login_form", clear_on_submit=False):
