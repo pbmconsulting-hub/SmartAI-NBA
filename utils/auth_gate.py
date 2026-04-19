@@ -380,7 +380,7 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
         f'<div class="pv-titlebar"><div class="pv-dot r"></div><div class="pv-dot y"></div>'
         f'<div class="pv-dot g"></div>'
         f'<div class="pv-url">smartpickpro.com &middot; Quantum Analysis Matrix</div></div>'
-        f'<div class="pv-header"><div class="pv-title">&#9889; Platform AI Picks</div>'
+        f'<div class="pv-header"><div class="pv-title">&#9889; Free Picks Today</div>'
         f'<div class="pv-live">LIVE &middot; {num_picks} Picks</div></div>'
         f'<div class="pv-scroll"><div class="pv-track">{cards_joined}</div></div>'
         f'</div>'
@@ -2336,8 +2336,8 @@ def require_login() -> bool:
     <!-- Product Preview -->
     <div class="ag-preview">
       <div class="ag-section-head">
-        <h3>See What You Get &mdash; <span class="em">Free</span></h3>
-        <p>Live picks from today&rsquo;s Quantum Analysis Matrix</p>
+        <h3><span class="em">Free Picks Today</span></h3>
+        <p>Live AI picks from today&rsquo;s Quantum Analysis Matrix &mdash; updated every game night</p>
       </div>
     </div>
     </div><!-- /ag-section -->
