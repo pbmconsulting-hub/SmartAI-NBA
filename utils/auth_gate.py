@@ -266,29 +266,152 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
         ]
         picks = _fallback
 
-    # NBA headshot lookup
+    # NBA headshot lookup — comprehensive 2024-26 roster
     _PLAYER_IDS: dict[str, str] = {
+        # ── A ──
+        "bam adebayo": "1628389", "ochai agbaji": "1631106", "nickeil alexander-walker": "1629638",
+        "grayson allen": "1628960", "jarrett allen": "1628386", "cole anthony": "1630175",
+        "oc anunoby": "1628384", "og anunoby": "1628384", "d'angelo russell": "1626156",
+        "deandre ayton": "1629028", "marvin bagley iii": "1628963",
+        # ── B ──
+        "scottie barnes": "1630567", "paolo banchero": "1631094",
+        "desmond bane": "1630217", "harrison barnes": "1628397",
+        "lamelo ball": "1630163", "lonzo ball": "1628366",
+        "bradley beal": "203078", "malik beasley": "1627736",
+        "jordan clarkson": "203903", "devin booker": "1626164",
+        "mikal bridges": "1628969", "jaylen brown": "1627759",
+        "jalen brunson": "1628973", "jimmy butler": "202710",
+        "jalen green": "1630224", "dillon brooks": "1628415",
+        # ── C ──
+        "alex caruso": "1627936", "jevon carter": "1628975",
+        "wendell carter jr.": "1628976", "wendell carter jr": "1628976",
+        "brandon clarke": "1629634", "john collins": "1628381",
+        "mike conley": "201144", "cade cunningham": "1630595",
+        "stephen curry": "201939", "seth curry": "203552",
+        "anthony davis": "203076",
+        # ── D ──
+        "demar derozan": "201942", "luguentz dort": "1629652", "lu dort": "1629652",
         "luka dončić": "1629029", "luka doncic": "1629029",
-        "jayson tatum": "1628369", "anthony edwards": "1630162",
-        "shai gilgeous-alexander": "1628983", "nikola jokić": "203999",
-        "nikola jokic": "203999", "trae young": "1629027",
-        "tyrese maxey": "1630178", "cade cunningham": "1630595",
-        "jaylen brown": "1627759", "devin booker": "1626164",
-        "lamelo ball": "1630163", "ja morant": "1629630",
-        "donovan mitchell": "1628378", "stephen curry": "201939",
-        "lebron james": "2544", "kevin durant": "201142",
-        "giannis antetokounmpo": "203507", "joel embiid": "203954",
-        "damian lillard": "203081", "bam adebayo": "1628389",
-        "jimmy butler": "202710", "karl-anthony towns": "1626157",
-        "jalen brunson": "1628973", "paolo banchero": "1631094",
-        "victor wembanyama": "1641705", "darius garland": "1629636",
-        "dejounte murray": "1627749", "franz wagner": "1630532",
+        "kevin durant": "201142", "jalen duren": "1631105",
+        "anthony edwards": "1630162",
+        # ── E-F ──
+        "joel embiid": "203954",
+        "de'aaron fox": "1628368", "deaaron fox": "1628368",
+        "markelle fultz": "1628365", "evan fournier": "203095",
+        "paolo banchero": "1631094",
+        # ── G ──
+        "darius garland": "1629636",
+        "shai gilgeous-alexander": "1628983",
+        "rudy gobert": "203497",
+        "aaron gordon": "203932",
+        "jerami grant": "203924",
+        "josh giddey": "1630581",
+        "paul george": "202331",
+        "taj gibson": "201959",
+        "eric gordon": "201569",
+        "devonte' graham": "1628984",
+        "jalen green": "1630224",
+        "giannis antetokounmpo": "203507",
+        # ── H ──
+        "james harden": "201935", "tobias harris": "203086",
+        "josh hart": "1628404", "tyler herro": "1629639",
+        "buddy hield": "1627741", "jrue holiday": "201950",
+        "chet holmgren": "1631096", "al horford": "201143",
+        "de'andre hunter": "1629631",
+        # ── I-J ──
+        "brandon ingram": "1627742", "kyrie irving": "202681",
+        "jaren jackson jr.": "1628991", "jaren jackson jr": "1628991",
+        "lebron james": "2544", "lebron james jr": "1641730",
+        "cam johnson": "1629661", "keldon johnson": "1629640",
+        "jalen johnson": "1630552", "nikola jokić": "203999",
+        "nikola jokic": "203999", "herbert jones": "1630529",
+        "tre jones": "1630200", "derrick jones jr.": "1627884",
+        "tyus jones": "1626145",
+        # ── K ──
+        "franz wagner": "1630532", "mitch wagner": "1630532",
+        "walker kessler": "1631108",
+        "coby white": "1629632",
+        "karl-anthony towns": "1626157",
+        "kawhi leonard": "202695",
+        "zach lavine": "203897",
+        # ── L ──
+        "anfernee simons": "1629014",
+        "damian lillard": "203081", "nassir little": "1629642",
+        "kevon looney": "1626172", "brook lopez": "201572",
+        "trey murphy iii": "1630530",
+        # ── M ──
+        "terance mann": "1629611", "lauri markkanen": "1628374",
+        "tyrese maxey": "1630178", "bennedict mathurin": "1631097",
+        "donovan mitchell": "1628378", "evan mobley": "1630596",
+        "ja morant": "1629630", "dejounte murray": "1627749",
+        "jamal murray": "1627750", "mike muscala": "203488",
+        "khris middleton": "203114",
+        # ── N-O ──
+        "andrew nembhard": "1631109", "aaron nesmith": "1630174",
+        "josh okogie": "1629006",
+        "victor oladipo": "203506",
+        "kelly oubre jr.": "1626162", "kelly oubre jr": "1626162",
+        # ── P ──
+        "chris paul": "101108", "jordan poole": "1629673",
+        "bobby portis": "1626171", "kristaps porzingis": "204001",
+        "julius randle": "203944", "austin reaves": "1630559",
+        # ── R ──
+        "cam reddish": "1629629",
+        "terry rozier": "1626179",
+        "domantas sabonis": "1627734",
+        # ── S ──
+        "pascal siakam": "1627783", "anfernee simons": "1629014",
+        "jabari smith jr.": "1631095", "jabari smith jr": "1631095",
+        "jalen smith": "1630188",
+        "marcus smart": "203935",
+        "jaden springer": "1630531",
+        "jayson tatum": "1628369",
+        "derrick white": "1628401",
+        # ── T ──
+        "trae young": "1629027", "thaddeus young": "201152",
+        "andrew wiggins": "203952",
+        # ── V-W ──
+        "nikola vučević": "202696", "nikola vucevic": "202696",
+        "moritz wagner": "1629021", "franz wagner": "1630532",
+        "kemba walker": "202689",
+        "victor wembanyama": "1641705",
+        "russell westbrook": "201566",
+        "coby white": "1629632",
+        "derrick white": "1628401",
+        "andrew wiggins": "203952",
+        "zion williamson": "1629627",
+        "jalen williams": "1631114",
+        # ── Y-Z ──
+        "trae young": "1629027",
+        "ivica zubac": "1627826",
+        # ── Rookies / recent call-ups 2025-26 ──
+        "daniss jenkins": "1642250", "zach edey": "1641724",
+        "reed sheppard": "1641722", "dalton knecht": "1641723",
+        "stephon castle": "1641721", "ron holland ii": "1641725",
+        "donovan clingan": "1641726", "rob dillingham": "1641727",
+        "tidjane salaun": "1641728", "ja'kobe walter": "1641729",
+        "matas buzelis": "1641731", "devin carter": "1641732",
+        "carlton carrington": "1641733", "tristan da silva": "1641734",
+        "kel'el ware": "1641735", "bub carrington": "1641733",
+        "alex sarr": "1641720", "yves missi": "1641736",
     }
+
+    # ── Clean player name (strip stat suffixes like "Lu Dort 3-Pointers Made O/U") ──
+    import re as _re_mod
+    _STAT_SUFFIX_RE = _re_mod.compile(
+        r'\s+(?:points|rebounds|assists|steals|blocks|threes|3-pointers?|'
+        r'field goals?|free throws?|turnovers?|fantasy|fpts|pts|reb|ast|'
+        r'stl|blk|fgm|fga|ftm|fta|made|missed|o/?u|over/?under|'
+        r'defensive.rebounds?|offensive.rebounds?).*$',
+        _re_mod.IGNORECASE
+    )
 
     cards_html = []
     for idx, pick in enumerate(picks):
-        name = _html_mod.escape(pick.get("player_name", "Unknown"))
-        name_raw = pick.get("player_name", "Unknown")  # unescaped for dict lookup
+        name_raw_full = pick.get("player_name", "Unknown")
+        # Clean stat suffixes from name (e.g. "Lu Dort 3-Pointers Made O/U" → "Lu Dort")
+        name_raw = _STAT_SUFFIX_RE.sub('', name_raw_full).strip() or name_raw_full
+        name = _html_mod.escape(name_raw)
         team = _html_mod.escape((pick.get("team", "") or "").upper())
         stat_raw = (pick.get("stat_type", "") or "").lower().strip()
         stat_label = _html_mod.escape(_display_stat_label(stat_raw))
@@ -319,8 +442,21 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
         else:
             conf_color = "#60a5fa"
 
-        # Headshot URL (NBA CDN)
+        # Headshot URL (NBA CDN) — try dict, then overrides JSON
         pid = _PLAYER_IDS.get(name_raw.lower(), "")
+        if not pid:
+            # Try player_id_overrides.json as secondary source
+            try:
+                import json as _json_mod
+                _ovr_path = Path(__file__).resolve().parent.parent / "data" / "player_id_overrides.json"
+                if _ovr_path.exists():
+                    _ovr = _json_mod.loads(_ovr_path.read_text(encoding="utf-8"))
+                    for ovr_name, ovr_data in _ovr.items():
+                        if ovr_name.lower() == name_raw.lower():
+                            pid = str(ovr_data.get("id", ""))
+                            break
+            except Exception:
+                pass
         hs_html = ""
         if pid:
             hs_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
@@ -331,12 +467,14 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
                 f'</div>'
             )
         else:
-            # Generic silhouette fallback
+            # Initials fallback — looks cleaner than a silhouette
+            _parts = name_raw.split()
+            _initials = (_parts[0][0] + _parts[-1][0]).upper() if len(_parts) >= 2 else name_raw[0].upper()
             hs_html = (
                 '<div class="pv-hs-wrap">'
-                '<div class="pv-headshot" style="display:inline-block;'
-                'background:linear-gradient(135deg,rgba(192,132,252,.15),rgba(96,165,250,.1));'
-                'line-height:72px;font-size:1.5rem;color:rgba(255,255,255,.12);">&#9917;</div>'
+                '<div class="pv-headshot" style="display:inline-flex;align-items:center;justify-content:center;'
+                'background:linear-gradient(135deg,rgba(0,213,89,.12),rgba(45,158,255,.08));'
+                f'font-family:Space Grotesk,sans-serif;font-size:1.2rem;font-weight:800;color:rgba(255,255,255,.35);letter-spacing:.03em">{_initials}</div>'
                 '</div>'
             )
 
@@ -678,7 +816,7 @@ footer { display: none !important; }
 [data-testid="stAppViewContainer"] { padding-top: 0 !important; }
 
 .stApp {
-    background: #0B0F19 !important;
+    background: #050910 !important;
 }
 
 .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
@@ -729,6 +867,29 @@ html, body, .stApp, .stApp * {
 @keyframes agOrbFloat2 {
     0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
     50%      { transform: translate(-60px, 30px) scale(1.08) rotate(180deg); }
+}
+@keyframes agScanline {
+    0%   { top: -8%; }
+    100% { top: 108%; }
+}
+@keyframes agDataRain {
+    0%   { transform: translateY(-100%); opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.6; }
+    100% { transform: translateY(100vh); opacity: 0; }
+}
+@keyframes agPulseRing {
+    0%   { transform: translate(-50%,-50%) scale(0.8); opacity: 0.4; }
+    100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+}
+@keyframes agHexFloat {
+    0%, 100% { opacity: 0.03; transform: rotate(0deg); }
+    50%      { opacity: 0.07; transform: rotate(3deg); }
+}
+@keyframes agShimmer {
+    0%   { left: -100%; }
+    50%  { left: 150%; }
+    100% { left: 150%; }
 }
 @keyframes agBarSlide {
     0%   { background-position: -200% 0; }
@@ -784,44 +945,78 @@ html, body, .stApp, .stApp * {
 /* ── Background ──────────────────────────────────────────────── */
 .ag-bg {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background: radial-gradient(ellipse at 50% -10%, rgba(0, 213, 89, 0.18) 0%, transparent 50%),
-                radial-gradient(ellipse at 85% 80%, rgba(45, 158, 255, 0.12) 0%, transparent 40%),
-                radial-gradient(ellipse at 15% 55%, rgba(192, 132, 252, 0.08) 0%, transparent 40%),
-                radial-gradient(ellipse at 50% 100%, rgba(0, 213, 89, 0.05) 0%, transparent 35%),
-                #060A14;
+    background: radial-gradient(ellipse at 50% -10%, rgba(0, 213, 89, 0.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 80%, rgba(45, 158, 255, 0.14) 0%, transparent 40%),
+                radial-gradient(ellipse at 15% 55%, rgba(192, 132, 252, 0.09) 0%, transparent 40%),
+                radial-gradient(ellipse at 50% 100%, rgba(0, 213, 89, 0.06) 0%, transparent 35%),
+                #050910;
     overflow: hidden;
 }
+/* Circuit-board grid */
 .ag-bg::before {
     content: ''; position: absolute; inset: 0;
-    background: url("data:image/svg+xml,%3Csvg width='80' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='g' width='80' height='80' patternUnits='userSpaceOnUse'%3E%3Cpath d='M40 0v80M0 40h80' stroke='rgba(0,213,89,0.03)' stroke-width='0.5' fill='none'/%3E%3Ccircle cx='40' cy='40' r='1' fill='rgba(0,213,89,0.04)'/%3E%3Ccircle cx='0' cy='0' r='0.5' fill='rgba(45,158,255,0.03)'/%3E%3Ccircle cx='80' cy='80' r='0.5' fill='rgba(45,158,255,0.03)'/%3E%3C/pattern%3E%3C/defs%3E%3Crect fill='url(%23g)' width='100%25' height='100%25'/%3E%3C/svg%3E");
-    opacity: 0.6;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='g' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M30 0v60M0 30h60' stroke='rgba(0,213,89,0.035)' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 0h15v15H0zM45 45h15v15H45z' stroke='rgba(0,213,89,0.02)' stroke-width='0.3' fill='none'/%3E%3Ccircle cx='30' cy='30' r='1.5' fill='rgba(0,213,89,0.06)'/%3E%3Ccircle cx='0' cy='0' r='1' fill='rgba(45,158,255,0.04)'/%3E%3Ccircle cx='60' cy='60' r='1' fill='rgba(45,158,255,0.04)'/%3E%3Ccircle cx='60' cy='0' r='0.8' fill='rgba(192,132,252,0.03)'/%3E%3Ccircle cx='0' cy='60' r='0.8' fill='rgba(192,132,252,0.03)'/%3E%3C/pattern%3E%3C/defs%3E%3Crect fill='url(%23g)' width='100%25' height='100%25'/%3E%3C/svg%3E");
+    opacity: 0.7;
+}
+/* Scanline sweep */
+.ag-bg::after {
+    content: ''; position: absolute; left: 0; right: 0;
+    height: 120px; top: -8%;
+    background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(0, 213, 89, 0.03) 40%,
+        rgba(0, 213, 89, 0.06) 50%,
+        rgba(0, 213, 89, 0.03) 60%,
+        transparent 100%);
+    animation: agScanline 8s linear infinite;
+    pointer-events: none;
 }
 .ag-orb {
     position: absolute; border-radius: 50%; pointer-events: none;
-    filter: blur(120px); opacity: 0.8;
+    filter: blur(120px); opacity: 0.85;
     animation: agOrbFloat 18s ease-in-out infinite;
 }
 .ag-orb-1 {
     width: 700px; height: 700px; top: -200px; left: -150px;
-    background: rgba(0, 213, 89, 0.2);
+    background: rgba(0, 213, 89, 0.22);
 }
 .ag-orb-2 {
     width: 650px; height: 650px; bottom: -150px; right: -130px;
-    background: rgba(45, 158, 255, 0.15);
+    background: rgba(45, 158, 255, 0.16);
     animation: agOrbFloat2 22s ease-in-out infinite;
 }
 .ag-orb-3 {
     width: 500px; height: 500px; top: 35%; left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 213, 89, 0.06);
+    background: rgba(0, 213, 89, 0.07);
     animation-delay: -12s;
+}
+/* Pulse ring — AI "thinking" radar */
+.ag-pulse-ring {
+    position: absolute; top: 30%; left: 50%;
+    width: 400px; height: 400px; border-radius: 50%;
+    border: 1px solid rgba(0, 213, 89, 0.08);
+    animation: agPulseRing 4s ease-out infinite;
+    pointer-events: none;
+}
+.ag-pulse-ring-2 {
+    position: absolute; top: 30%; left: 50%;
+    width: 400px; height: 400px; border-radius: 50%;
+    border: 1px solid rgba(45, 158, 255, 0.06);
+    animation: agPulseRing 4s 2s ease-out infinite;
+    pointer-events: none;
 }
 
 /* \u2500\u2500 Section divider \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .ag-divider {
-    height: 1px; margin: 48px 40px;
-    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.25), rgba(45, 158, 255, 0.15), transparent);
-    box-shadow: 0 0 20px rgba(0, 213, 89, 0.08);
+    height: 1px; margin: 48px 40px; position: relative;
+    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.3), rgba(45, 158, 255, 0.2), rgba(192, 132, 252, 0.15), transparent);
+    box-shadow: 0 0 20px rgba(0, 213, 89, 0.1), 0 0 60px rgba(0, 213, 89, 0.04);
+}
+.ag-divider::after {
+    content: ''; position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #00D559; box-shadow: 0 0 12px rgba(0, 213, 89, 0.4);
 }
 
 /* ── App Preview Mockup ──────────────────────────────────────── */
@@ -927,21 +1122,22 @@ html, body, .stApp, .stApp * {
 .ag-ticker {
     position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     height: 38px; display: flex; align-items: center;
-    background: rgba(6, 10, 20, 0.98);
+    background: rgba(5, 9, 16, 0.98);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(0, 213, 89, 0.08);
+    border-bottom: 1px solid rgba(0, 213, 89, 0.1);
     overflow: hidden;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
 }
 .ag-ticker::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.2), rgba(45, 158, 255, 0.15), rgba(192, 132, 252, 0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.25), rgba(45, 158, 255, 0.2), rgba(192, 132, 252, 0.12), transparent);
 }
 .ag-ticker::after {
     content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
     background: linear-gradient(90deg, #00D559, #2D9EFF, #c084fc, #F9C62B, #00D559);
     background-size: 400% 100%;
     animation: agBarSlide 6s linear infinite;
-    opacity: 0.6;
+    opacity: 0.7;
 }
 .ag-ticker-track {
     display: flex; align-items: center; white-space: nowrap;
@@ -1007,16 +1203,22 @@ html, body, .stApp, .stApp * {
     position: relative;
 }
 .ag-hero-ai-badge {
-    display: inline-flex; align-items: center; gap: 6px;
+    display: inline-flex; align-items: center; gap: 8px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.58rem; font-weight: 800;
+    font-size: 0.56rem; font-weight: 800;
     color: #00D559; background: rgba(0, 213, 89, 0.06);
-    border: 1px solid rgba(0, 213, 89, 0.2);
-    padding: 6px 18px; border-radius: 100px;
-    text-transform: uppercase; letter-spacing: 0.12em;
+    border: 1px solid rgba(0, 213, 89, 0.25);
+    padding: 7px 20px; border-radius: 100px;
+    text-transform: uppercase; letter-spacing: 0.14em;
     margin-bottom: 16px;
     animation: agHeroTextReveal 0.8s 0.05s cubic-bezier(0.22, 1, 0.36, 1) both;
-    box-shadow: 0 0 20px rgba(0, 213, 89, 0.08);
+    box-shadow: 0 0 30px rgba(0, 213, 89, 0.1), inset 0 0 20px rgba(0, 213, 89, 0.03);
+    position: relative; overflow: hidden;
+}
+.ag-hero-ai-badge::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.08), transparent);
+    animation: agShimmer 3s ease-in-out infinite;
 }
 .ag-hero-ai-badge .ai-dot {
     width: 6px; height: 6px; border-radius: 50%;
@@ -1175,16 +1377,17 @@ html, body, .stApp, .stApp * {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
 }
 .ag-inside-card {
-    background: linear-gradient(168deg, rgba(10, 16, 32, 0.95), rgba(8, 12, 24, 0.98));
-    border: 1px solid rgba(0, 213, 89, 0.06);
+    background: linear-gradient(168deg, rgba(8, 14, 28, 0.97), rgba(5, 9, 16, 0.99));
+    border: 1px solid rgba(0, 213, 89, 0.08);
     border-radius: 18px; padding: 24px 20px 20px;
     position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.02);
 }
 .ag-inside-card:hover {
-    border-color: rgba(0, 213, 89, 0.3);
+    border-color: rgba(0, 213, 89, 0.35);
     transform: translateY(-3px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 213, 89, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 213, 89, 0.08);
 }
 .ag-inside-card::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
@@ -1336,10 +1539,10 @@ html, body, .stApp, .stApp * {
     position: relative;
 }
 .ag-section-head::before {
-    content: ''; display: block; width: 60px; height: 4px; margin: 0 auto 18px;
-    background: linear-gradient(90deg, #00D559, #2D9EFF);
+    content: ''; display: block; width: 80px; height: 3px; margin: 0 auto 18px;
+    background: linear-gradient(90deg, #00D559, #2D9EFF, #c084fc);
     border-radius: 4px;
-    box-shadow: 0 0 16px rgba(0, 213, 89, 0.2);
+    box-shadow: 0 0 20px rgba(0, 213, 89, 0.25), 0 0 60px rgba(0, 213, 89, 0.08);
 }
 .ag-section-head h3 {
     font-family: 'Space Grotesk', sans-serif;
@@ -1347,6 +1550,7 @@ html, body, .stApp, .stApp * {
     color: #fff; margin: 0 0 10px;
     letter-spacing: -0.04em;
     text-transform: uppercase;
+    text-shadow: 0 0 40px rgba(0, 213, 89, 0.06);
 }
 .ag-section-head h3 .em {
     background: linear-gradient(135deg, #00D559 0%, #2D9EFF 50%, #c084fc 100%);
@@ -1451,13 +1655,13 @@ html, body, .stApp, .stApp * {
 /* Our card (the winner) */
 .ag-us {
     display: flex; flex-direction: column; align-items: center;
-    background: linear-gradient(168deg, rgba(0, 213, 89, 0.08), rgba(10, 16, 32, 0.95));
-    border: 2px solid rgba(0, 213, 89, 0.35);
+    background: linear-gradient(168deg, rgba(0, 213, 89, 0.1), rgba(5, 9, 16, 0.97));
+    border: 2px solid rgba(0, 213, 89, 0.4);
     border-radius: 24px; padding: 40px 28px 36px;
     text-align: center; position: relative;
     margin-top: 14px;
     animation: agPulse 3s ease-in-out infinite;
-    box-shadow: 0 0 60px rgba(0, 213, 89, 0.1), 0 24px 64px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 80px rgba(0, 213, 89, 0.12), 0 24px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 213, 89, 0.15);
 }
 .ag-us::before {
     content: ''; position: absolute; inset: 0; border-radius: 28px;
@@ -1655,21 +1859,22 @@ html, body, .stApp, .stApp * {
     animation: agFadeUp 0.6s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-feat {
-    background: linear-gradient(168deg, rgba(10, 16, 32, 0.95), rgba(8, 12, 24, 0.98));
-    border: 1px solid rgba(0, 213, 89, 0.08);
+    background: linear-gradient(168deg, rgba(8, 14, 28, 0.97), rgba(5, 9, 16, 0.99));
+    border: 1px solid rgba(0, 213, 89, 0.1);
     border-radius: 20px; padding: 36px 20px 28px;
     text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.4s, transform 0.4s, box-shadow 0.4s;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.02);
 }
 .ag-feat::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, #00D559, #2D9EFF, #c084fc);
-    opacity: 0.5; transition: opacity 0.4s;
+    opacity: 0.6; transition: opacity 0.4s;
 }
 .ag-feat:hover {
-    border-color: rgba(0, 213, 89, 0.4);
+    border-color: rgba(0, 213, 89, 0.45);
     transform: translateY(-8px);
-    box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 213, 89, 0.1);
+    box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5), 0 0 50px rgba(0, 213, 89, 0.12);
 }
 .ag-feat:hover::before { opacity: 1; }
 .ag-feat-ico {
@@ -1694,10 +1899,16 @@ html, body, .stApp, .stApp * {
 /* ── Metric counters ─── full-bleed stats strip ──────────────── */
 .ag-stats-strip {
     margin: 56px -40px 0; padding: 0 40px;
-    background: linear-gradient(180deg, rgba(0, 213, 89, 0.03) 0%, transparent 100%);
-    border-top: 1px solid rgba(0, 213, 89, 0.1);
-    border-bottom: 1px solid rgba(0, 213, 89, 0.06);
+    background: linear-gradient(180deg, rgba(0, 213, 89, 0.04) 0%, transparent 100%);
+    border-top: 1px solid rgba(0, 213, 89, 0.12);
+    border-bottom: 1px solid rgba(0, 213, 89, 0.08);
     animation: agFadeUp 0.6s 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+    position: relative;
+}
+.ag-stats-strip::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.2), transparent);
+    box-shadow: 0 0 20px rgba(0, 213, 89, 0.08);
 }
 .ag-stats {
     display: grid; grid-template-columns: repeat(6, 1fr); gap: 0;
@@ -1733,12 +1944,13 @@ html, body, .stApp, .stApp * {
 }
 .ag-reviews .ag-section-head { grid-column: 1 / -1; }
 .ag-review {
-    background: linear-gradient(168deg, rgba(10,16,32,0.95), rgba(8,12,24,0.98));
-    border: 1px solid rgba(0,213,89,0.06);
+    background: linear-gradient(168deg, rgba(8,14,28,0.97), rgba(5,9,16,0.99));
+    border: 1px solid rgba(0,213,89,0.08);
     border-radius: 20px; padding: 0;
     position: relative;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
     overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
     display: flex; flex-direction: column;
 }
 @keyframes agReviewSlide { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -2068,20 +2280,21 @@ html, body, .stApp, .stApp * {
     position: relative;
 }
 .ag-how-step {
-    background: linear-gradient(168deg, rgba(10, 16, 32, 0.95), rgba(8, 12, 24, 0.98));
-    border: 1px solid rgba(0, 213, 89, 0.08);
+    background: linear-gradient(168deg, rgba(8, 14, 28, 0.97), rgba(5, 9, 16, 0.99));
+    border: 1px solid rgba(0, 213, 89, 0.1);
     border-radius: 20px; padding: 28px 18px 24px;
     text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.02);
 }
 .ag-how-step:hover {
-    border-color: rgba(0, 213, 89, 0.35);
+    border-color: rgba(0, 213, 89, 0.4);
     transform: translateY(-5px);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 213, 89, 0.08);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 213, 89, 0.1);
 }
 .ag-how-step::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #00D559, #2D9EFF);
+    background: linear-gradient(90deg, #00D559, #2D9EFF, #c084fc);
     opacity: 0; transition: opacity 0.3s;
 }
 .ag-how-step:hover::before { opacity: 1; }
@@ -2647,6 +2860,8 @@ def require_login() -> bool:
       <div class="ag-orb ag-orb-1"></div>
       <div class="ag-orb ag-orb-2"></div>
       <div class="ag-orb ag-orb-3"></div>
+      <div class="ag-pulse-ring"></div>
+      <div class="ag-pulse-ring-2"></div>
     </div>
 
     <div class="ag-ticker">
@@ -2656,16 +2871,18 @@ def require_login() -> bool:
     <div class="ag-logo-section">{_logo_html}<div class="ag-logo-ring"></div></div>
 
     <div class="ag-hero">
-      <div class="ag-hero-ai-badge"><span class="ai-dot"></span> POWERED BY 6 AI MODELS</div>
+      <div class="ag-hero-ai-badge"><span class="ai-dot"></span> NEURAL ENGINE v6.0 &mdash; 6 AI MODELS ACTIVE</div>
       <h1>The House<br><span class="line2">Has a Problem.</span><br><span class="em">It&rsquo;s Us.</span></h1>
       <div class="ag-hero-sub">
         <strong>6 neural networks. 300+ props. Every single night.</strong><br>
-        The only AI platform that fuses machine learning into a single confidence score
+        The only AI platform that fuses machine learning, ensemble modeling &amp;
+        real-time edge detection into a single confidence score
         across PrizePicks, DraftKings &amp; Underdog.
       </div>
       <div class="ag-hero-badges">
         <span class="ag-hero-badge primary"><span class="badge-ico">&#x26A1;</span> Free Forever</span>
-        <span class="ag-hero-badge"><span class="badge-ico">&#x1F9E0;</span> AI-Powered</span>
+        <span class="ag-hero-badge"><span class="badge-ico">&#x1F9E0;</span> 6 Neural Nets</span>
+        <span class="ag-hero-badge"><span class="badge-ico">&#x1F4CA;</span> Real-Time Edge</span>
         <span class="ag-hero-badge"><span class="badge-ico">&#x1F3AF;</span> Instant Access</span>
       </div>
     </div>
