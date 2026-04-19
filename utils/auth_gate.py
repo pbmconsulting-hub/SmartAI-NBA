@@ -2808,88 +2808,171 @@ def require_login() -> bool:
     st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@keyframes navSlideDown{{from{{opacity:0;transform:translateY(-100%)}}to{{opacity:1;transform:translateY(0)}}}}
+@keyframes navPillGlow{{0%,100%{{box-shadow:0 0 0 0 rgba(0,213,89,0)}}50%{{box-shadow:0 0 16px 4px rgba(0,213,89,0.12)}}}}
+@keyframes navLogoSpin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}
+
 .spp-nav-dock{{
-  position:fixed;top:0;left:0;right:0;z-index:999999;
-  display:flex;align-items:center;gap:6px;
-  padding:8px 16px;
-  background:rgba(8,12,24,0.94);
-  backdrop-filter:blur(24px) saturate(1.8);-webkit-backdrop-filter:blur(24px) saturate(1.8);
-  border-bottom:1px solid rgba(255,255,255,0.06);
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999999;
+  display:flex;align-items:center;gap:4px;
+  padding:6px 8px 6px 12px;
+  width:auto;max-width:min(92vw, 960px);
+  background:rgba(8,12,24,0.75);
+  backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:100px;
   scrollbar-width:none;
-  box-shadow:0 4px 24px rgba(0,0,0,0.4);
-  transition:transform 0.35s ease;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  animation:navSlideDown 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  transition:transform 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s, box-shadow 0.3s;
 }}
-.spp-nav-dock.nav-hidden{{transform:translateY(-100%)}}
+.spp-nav-dock:hover{{
+  box-shadow:0 12px 44px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06) inset;
+}}
+.spp-nav-dock.nav-hidden{{transform:translateX(-50%) translateY(-140%);opacity:0}}
 .spp-nav-dock::-webkit-scrollbar{{display:none}}
+
 /* Brand */
 .spp-nav-brand{{
   display:flex;align-items:center;gap:8px;
-  margin-right:auto;flex-shrink:0;cursor:pointer;
+  flex-shrink:0;cursor:pointer;
+  padding:2px 10px 2px 2px;
+  border-right:1px solid rgba(255,255,255,0.06);
+  margin-right:4px;
+  transition:opacity 0.3s;
 }}
-.spp-nav-logo{{width:28px;height:28px;border-radius:8px;object-fit:contain;}}
+.spp-nav-brand:hover{{opacity:0.8}}
+.spp-nav-logo-wrap{{
+  width:32px;height:32px;border-radius:10px;
+  background:linear-gradient(135deg,rgba(0,213,89,0.15),rgba(45,158,255,0.1));
+  border:1px solid rgba(0,213,89,0.2);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;flex-shrink:0;
+  transition:all 0.3s;
+}}
+.spp-nav-brand:hover .spp-nav-logo-wrap{{
+  border-color:rgba(0,213,89,0.4);
+  box-shadow:0 0 16px rgba(0,213,89,0.15);
+}}
+.spp-nav-logo{{width:22px;height:22px;border-radius:6px;object-fit:contain;}}
 .spp-nav-wordmark{{
-  font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:800;
-  color:rgba(255,255,255,0.85);letter-spacing:-0.02em;white-space:nowrap;
+  font-family:'Space Grotesk',sans-serif;font-size:0.82rem;font-weight:800;
+  color:rgba(255,255,255,0.9);letter-spacing:-0.02em;white-space:nowrap;
 }}
-.spp-nav-wordmark span{{color:#00D559}}
+.spp-nav-wordmark .gr{{
+  background:linear-gradient(135deg,#00D559,#2D9EFF);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}}
+
 /* Pills container */
 .spp-nav-pills{{
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;gap:3px;
   overflow-x:auto;scrollbar-width:none;flex:1;justify-content:center;
 }}
 .spp-nav-pills::-webkit-scrollbar{{display:none}}
 .spp-nav-pill{{
   flex-shrink:0;
-  font-family:'Space Grotesk',sans-serif;font-size:0.7rem;font-weight:700;
-  color:rgba(255,255,255,0.45);
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.06);
-  border-radius:100px;padding:7px 16px;
-  cursor:pointer;transition:all 0.3s;
+  font-family:'Space Grotesk',sans-serif;font-size:0.68rem;font-weight:600;
+  color:rgba(255,255,255,0.4);
+  background:transparent;
+  border:1px solid transparent;
+  border-radius:100px;padding:6px 14px;
+  cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);
   text-decoration:none;white-space:nowrap;
   letter-spacing:0.01em;
+  position:relative;
 }}
-.spp-nav-pill:hover,.spp-nav-pill.active{{
-  color:#fff;background:rgba(0,213,89,0.12);
-  border-color:rgba(0,213,89,0.35);
-  box-shadow:0 0 20px rgba(0,213,89,0.15);
+.spp-nav-pill:hover{{
+  color:rgba(255,255,255,0.75);
+  background:rgba(255,255,255,0.05);
+}}
+.spp-nav-pill.active{{
+  color:#fff;
+  background:rgba(0,213,89,0.12);
+  border-color:rgba(0,213,89,0.25);
+  box-shadow:0 0 20px rgba(0,213,89,0.1), 0 0 0 1px rgba(0,213,89,0.08) inset;
+  font-weight:700;
+}}
+.spp-nav-pill .ni{{margin-right:3px;font-size:0.68rem}}
+
+/* CTA pill */
+.spp-nav-cta{{
+  flex-shrink:0;
+  font-family:'Space Grotesk',sans-serif;font-size:0.62rem;font-weight:800;
+  color:#0B0F19;
+  background:linear-gradient(135deg,#00D559,#00C04B);
+  border:none;border-radius:100px;
+  padding:7px 16px;
+  cursor:pointer;text-decoration:none;white-space:nowrap;
+  letter-spacing:0.02em;text-transform:uppercase;
+  box-shadow:0 2px 12px rgba(0,213,89,0.3);
+  transition:all 0.25s;
+  margin-left:4px;
+}}
+.spp-nav-cta:hover{{
   transform:translateY(-1px);
+  box-shadow:0 4px 20px rgba(0,213,89,0.45);
+  background:linear-gradient(135deg,#00E861,#00D559);
 }}
-.spp-nav-pill .ni{{margin-right:4px;font-size:0.72rem}}
+
 /* Back to top */
 .spp-btt{{
   position:fixed;bottom:28px;right:28px;z-index:999998;
-  width:48px;height:48px;border-radius:50%;
+  width:44px;height:44px;border-radius:14px;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(0,213,89,0.15);border:1px solid rgba(0,213,89,0.3);
-  color:#00D559;font-size:1.2rem;cursor:pointer;
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  background:rgba(8,12,24,0.8);
+  border:1px solid rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.5);font-size:1rem;cursor:pointer;
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   box-shadow:0 4px 20px rgba(0,0,0,0.4);
-  transition:all 0.3s;opacity:0;pointer-events:none;
+  transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+  opacity:0;pointer-events:none;
   transform:translateY(12px);
 }}
 .spp-btt.visible{{opacity:1;pointer-events:auto;transform:translateY(0)}}
-.spp-btt:hover{{background:rgba(0,213,89,0.25);transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,213,89,0.3)}}
+.spp-btt:hover{{
+  background:rgba(0,213,89,0.15);
+  border-color:rgba(0,213,89,0.3);
+  color:#00D559;
+  transform:translateY(-3px);
+  box-shadow:0 8px 32px rgba(0,213,89,0.2);
+}}
 @media(max-width:768px){{
-  .spp-nav-dock{{gap:4px;padding:8px 10px}}
-  .spp-nav-pill{{font-size:0.6rem;padding:6px 12px}}
+  .spp-nav-dock{{
+    top:8px;padding:5px 6px 5px 8px;gap:2px;
+    max-width:96vw;border-radius:20px;
+  }}
+  .spp-nav-pill{{font-size:0.58rem;padding:5px 10px}}
   .spp-nav-wordmark{{display:none}}
-  .spp-btt{{width:40px;height:40px;bottom:20px;right:16px;font-size:1rem}}
+  .spp-nav-brand{{padding:2px 6px 2px 2px;margin-right:2px}}
+  .spp-nav-logo-wrap{{width:28px;height:28px;border-radius:8px}}
+  .spp-nav-logo{{width:18px;height:18px}}
+  .spp-nav-cta{{font-size:0.56rem;padding:5px 12px}}
+  .spp-btt{{width:38px;height:38px;bottom:16px;right:12px;font-size:0.9rem;border-radius:12px}}
+}}
+@media(max-width:480px){{
+  .spp-nav-pill .ni{{display:none}}
+  .spp-nav-pill{{padding:5px 8px;font-size:0.54rem}}
+  .spp-nav-cta{{padding:5px 10px;font-size:0.52rem}}
 }}
 </style>
 <nav class="spp-nav-dock" id="spp-nav-dock">
   <div class="spp-nav-brand" id="nav-top-btn">
-    {'<img class="spp-nav-logo" src="data:image/png;base64,' + _logo_b64 + '" alt="SPP">' if _logo_b64 else '<span style="font-size:1.2rem">&#x1F3AF;</span>'}
-    <span class="spp-nav-wordmark">Smart<span>Pick</span>Pro</span>
+    <div class="spp-nav-logo-wrap">
+      {'<img class="spp-nav-logo" src="data:image/png;base64,' + _logo_b64 + '" alt="SPP">' if _logo_b64 else '<span style="font-size:1rem">&#x1F3AF;</span>'}
+    </div>
+    <span class="spp-nav-wordmark">Smart<span class="gr">Pick</span>Pro</span>
   </div>
   <div class="spp-nav-pills">
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-how"><span class="ni">&#x1F3AF;</span>How It Works</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-how"><span class="ni">&#x1F3AF;</span>How</a>
     <a class="spp-nav-pill" href="javascript:void(0)" id="nav-features"><span class="ni">&#x26A1;</span>Features</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-picks"><span class="ni">&#x1F4CA;</span>Free Picks</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-tracker"><span class="ni">&#x1F4C8;</span>Bet Tracker</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-picks"><span class="ni">&#x1F4CA;</span>Picks</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-tracker"><span class="ni">&#x1F4C8;</span>Tracker</a>
     <a class="spp-nav-pill" href="javascript:void(0)" id="nav-pricing"><span class="ni">&#x1F4B0;</span>Pricing</a>
     <a class="spp-nav-pill" href="javascript:void(0)" id="nav-faq"><span class="ni">&#x2753;</span>FAQ</a>
   </div>
+  <a class="spp-nav-cta" href="javascript:void(0)" id="nav-signup-cta">Sign Up Free</a>
 </nav>
 <div class="spp-btt" id="spp-btt" title="Back to top">&#x2191;</div>
 <script>
@@ -2906,6 +2989,20 @@ def require_login() -> bool:
     var btn = document.getElementById(btnId);
     if(btn){{btn.addEventListener('click',function(e){{e.preventDefault();scrollToSection(map[btnId]);}});}}
   }});
+  /* Sign Up CTA scrolls to signup form */
+  var ctaBtn = document.getElementById('nav-signup-cta');
+  if(ctaBtn){{ctaBtn.addEventListener('click',function(e){{
+    e.preventDefault();
+    var tabs = document.querySelectorAll('button[data-baseweb="tab"]');
+    for(var i=0;i<tabs.length;i++){{
+      if(tabs[i].textContent.indexOf('Create')!==-1){{
+        tabs[i].click();
+        tabs[i].scrollIntoView({{behavior:'smooth',block:'center'}});
+        return;
+      }}
+    }}
+    window.scrollTo({{top:0,behavior:'smooth'}});
+  }});}}
   /* Brand logo scrolls to top */
   var brandBtn = document.getElementById('nav-top-btn');
   if(brandBtn){{brandBtn.addEventListener('click',function(){{
@@ -2920,7 +3017,7 @@ def require_login() -> bool:
     main.scrollTo({{top:0,behavior:'smooth'}});
     window.scrollTo({{top:0,behavior:'smooth'}});
   }});}}
-  /* Show/hide back-to-top + active pill highlighting */
+  /* Show/hide back-to-top + active pill highlighting + nav auto-hide */
   var lastScroll = 0;
   var navDock = document.getElementById('spp-nav-dock');
   var sectionIds = ['how-it-works','features','picks','tracker','pricing','faq'];
@@ -2931,6 +3028,11 @@ def require_login() -> bool:
     if(btt){{
       if(scrollY > 600){{btt.classList.add('visible');}}
       else{{btt.classList.remove('visible');}}
+    }}
+    /* Hide nav on scroll down, show on scroll up */
+    if(navDock){{
+      if(scrollY > lastScroll && scrollY > 200){{navDock.classList.add('nav-hidden');}}
+      else{{navDock.classList.remove('nav-hidden');}}
     }}
     /* Active pill */
     var activeId = '';
