@@ -2403,10 +2403,10 @@ def require_login() -> bool:
             <div class="ag-bt-result-icon w">&#x2713;</div>
           </div>
           <div class="ag-bt-row">
-            <div class="ag-bt-player">&#x1F3AF; Dame Lillard PTS</div>
-            <div class="ag-bt-prop ov">O 24.5</div>
-            <div class="ag-bt-actual hit">29</div>
-            <div class="ag-bt-clv pos">+2.6%</div>
+            <div class="ag-bt-player">&#x1F451; LeBron James PTS</div>
+            <div class="ag-bt-prop ov">O 25.5</div>
+            <div class="ag-bt-actual hit">31</div>
+            <div class="ag-bt-clv pos">+3.1%</div>
             <div class="ag-bt-result-icon w">&#x2713;</div>
           </div>
           <div class="ag-bt-row">
