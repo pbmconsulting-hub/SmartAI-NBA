@@ -2839,7 +2839,7 @@ def require_login() -> bool:
 @keyframes navLogoSpin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}
 
 .spp-nav-dock{{
-  position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999999;
+  position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:999999;
   display:flex;align-items:center;gap:4px;
   padding:6px 8px 6px 12px;
   width:auto;max-width:min(92vw, 960px);
@@ -2966,7 +2966,7 @@ def require_login() -> bool:
 }}
 @media(max-width:768px){{
   .spp-nav-dock{{
-    top:8px;padding:5px 6px 5px 8px;gap:2px;
+    top:46px;padding:5px 6px 5px 8px;gap:2px;
     max-width:96vw;border-radius:20px;
   }}
   .spp-nav-pill{{font-size:0.58rem;padding:5px 10px}}
@@ -3001,89 +3001,68 @@ def require_login() -> bool:
   <a class="spp-nav-cta" href="javascript:void(0)" id="nav-signup-cta">Sign Up Free</a>
 </nav>
 <div class="spp-btt" id="spp-btt" title="Back to top">&#x2191;</div>
-<script>
-(function(){{
-  function scrollToSection(sectionId){{
-    var el = document.querySelector('[data-section-id="'+sectionId+'"]');
-    if(el){{el.scrollIntoView({{behavior:'smooth',block:'start'}});}}
-  }}
-  var map = {{
-    'nav-how':'how-it-works','nav-features':'features','nav-picks':'picks',
-    'nav-tracker':'tracker','nav-pricing':'pricing','nav-faq':'faq'
-  }};
-  Object.keys(map).forEach(function(btnId){{
-    var btn = document.getElementById(btnId);
-    if(btn){{btn.addEventListener('click',function(e){{e.preventDefault();scrollToSection(map[btnId]);}});}}
-  }});
-  /* Sign Up CTA scrolls to signup form */
-  var ctaBtn = document.getElementById('nav-signup-cta');
-  if(ctaBtn){{ctaBtn.addEventListener('click',function(e){{
-    e.preventDefault();
-    var tabs = document.querySelectorAll('button[data-baseweb="tab"]');
-    for(var i=0;i<tabs.length;i++){{
-      if(tabs[i].textContent.indexOf('Create')!==-1){{
-        tabs[i].click();
-        tabs[i].scrollIntoView({{behavior:'smooth',block:'center'}});
-        return;
-      }}
-    }}
-    window.scrollTo({{top:0,behavior:'smooth'}});
-  }});}}
-  /* Brand logo scrolls to top */
-  var brandBtn = document.getElementById('nav-top-btn');
-  if(brandBtn){{brandBtn.addEventListener('click',function(){{
-    var main = document.querySelector('section.main .block-container') || document.documentElement;
-    main.scrollTo({{top:0,behavior:'smooth'}});
-    window.scrollTo({{top:0,behavior:'smooth'}});
-  }});}}
-  /* Back to top button */
-  var btt = document.getElementById('spp-btt');
-  if(btt){{btt.addEventListener('click',function(){{
-    var main = document.querySelector('section.main .block-container') || document.documentElement;
-    main.scrollTo({{top:0,behavior:'smooth'}});
-    window.scrollTo({{top:0,behavior:'smooth'}});
-  }});}}
-  /* Show/hide back-to-top + active pill highlighting + nav auto-hide */
-  var lastScroll = 0;
-  var navDock = document.getElementById('spp-nav-dock');
-  var sectionIds = ['how-it-works','features','picks','tracker','pricing','faq'];
-  var pillMap = {{'how-it-works':'nav-how','features':'nav-features','picks':'nav-picks','tracker':'nav-tracker','pricing':'nav-pricing','faq':'nav-faq'}};
-  function onScroll(){{
-    var scrollY = window.pageYOffset || document.documentElement.scrollTop;
-    /* Back to top visibility */
-    if(btt){{
-      if(scrollY > 600){{btt.classList.add('visible');}}
-      else{{btt.classList.remove('visible');}}
-    }}
-    /* Hide nav on scroll down, show on scroll up */
-    if(navDock){{
-      if(scrollY > lastScroll && scrollY > 200){{navDock.classList.add('nav-hidden');}}
-      else{{navDock.classList.remove('nav-hidden');}}
-    }}
-    /* Active pill */
-    var activeId = '';
-    for(var i = sectionIds.length - 1; i >= 0; i--){{
-      var el = document.querySelector('[data-section-id="'+sectionIds[i]+'"]');
-      if(el){{
-        var rect = el.getBoundingClientRect();
-        if(rect.top <= 120){{activeId = sectionIds[i]; break;}}
-      }}
-    }}
-    document.querySelectorAll('.spp-nav-pill').forEach(function(p){{p.classList.remove('active');}});
-    if(activeId && pillMap[activeId]){{
-      var ap = document.getElementById(pillMap[activeId]);
-      if(ap){{ap.classList.add('active');}}
-    }}
-    lastScroll = scrollY;
-  }}
-  window.addEventListener('scroll', onScroll, {{passive:true}});
-  onScroll();
-  /* Add top padding to first content block so hero isn't hidden behind fixed nav */
-  var mainBlock = document.querySelector('section.main .block-container');
-  if(mainBlock){{mainBlock.style.paddingTop='56px';}}
-}})();
-</script>
 """, unsafe_allow_html=True)
+
+    # ── Nav + Back-to-top JS (st.html so <script> actually executes) ──
+    st.html("""<script>
+(function(){
+  setTimeout(function(){
+    var pdoc,pwin;
+    try{pdoc=window.parent.document;pwin=window.parent;}catch(e){return;}
+    function goToSec(id){
+      var el=pdoc.querySelector('[data-section-id="'+id+'"]');
+      if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}
+    }
+    var map={
+      'nav-how':'how-it-works','nav-features':'features','nav-picks':'picks',
+      'nav-tracker':'tracker','nav-pricing':'pricing','nav-faq':'faq'
+    };
+    Object.keys(map).forEach(function(k){
+      var b=pdoc.getElementById(k);
+      if(b){b.addEventListener('click',function(e){e.preventDefault();goToSec(map[k]);});}
+    });
+    var cta=pdoc.getElementById('nav-signup-cta');
+    if(cta){cta.addEventListener('click',function(e){
+      e.preventDefault();
+      var tabs=pdoc.querySelectorAll('button[data-baseweb="tab"]');
+      for(var i=0;i<tabs.length;i++){
+        if(tabs[i].textContent.indexOf('Create')!==-1){
+          tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return;
+        }
+      }
+      pwin.scrollTo({top:0,behavior:'smooth'});
+    });}
+    var brand=pdoc.getElementById('nav-top-btn');
+    if(brand){brand.addEventListener('click',function(){pwin.scrollTo({top:0,behavior:'smooth'});});}
+    var btt=pdoc.getElementById('spp-btt');
+    if(btt){btt.addEventListener('click',function(){pwin.scrollTo({top:0,behavior:'smooth'});});}
+    var lastY=0,dock=pdoc.getElementById('spp-nav-dock');
+    var sIds=['how-it-works','features','picks','tracker','pricing','faq'];
+    var pMap={'how-it-works':'nav-how','features':'nav-features','picks':'nav-picks',
+              'tracker':'nav-tracker','pricing':'nav-pricing','faq':'nav-faq'};
+    function onScroll(){
+      var sy=pwin.pageYOffset||pdoc.documentElement.scrollTop;
+      if(btt){if(sy>600){btt.classList.add('visible');}else{btt.classList.remove('visible');}}
+      if(dock){
+        if(sy>lastY&&sy>200){dock.classList.add('nav-hidden');}
+        else{dock.classList.remove('nav-hidden');}
+      }
+      var aid='';
+      for(var i=sIds.length-1;i>=0;i--){
+        var el=pdoc.querySelector('[data-section-id="'+sIds[i]+'"]');
+        if(el&&el.getBoundingClientRect().top<=120){aid=sIds[i];break;}
+      }
+      pdoc.querySelectorAll('.spp-nav-pill').forEach(function(p){p.classList.remove('active');});
+      if(aid&&pMap[aid]){var ap=pdoc.getElementById(pMap[aid]);if(ap){ap.classList.add('active');}}
+      lastY=sy;
+    }
+    pwin.addEventListener('scroll',onScroll,{passive:true});
+    onScroll();
+    var mb=pdoc.querySelector('section.main .block-container');
+    if(mb){mb.style.paddingTop='100px';}
+  },200);
+})();
+</script>""", height=0)
 
     # ── Section anchor: How It Works ──
     st.markdown('<div data-section-id="how-it-works" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
