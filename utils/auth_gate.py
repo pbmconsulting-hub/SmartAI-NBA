@@ -448,6 +448,155 @@ def _email_exists(email: str) -> bool:
         return False
 
 
+# ── Password Reset ────────────────────────────────────────────
+
+def _generate_reset_token(email: str) -> str | None:
+    """Generate a 6-digit reset code, store its hash, return the code.
+
+    Token expires after 15 minutes. Returns None if email not found.
+    """
+    from datetime import datetime, timezone, timedelta
+    initialize_database()
+    email_lower = email.strip().lower()
+    try:
+        with get_database_connection() as conn:
+            row = conn.execute("SELECT user_id FROM users WHERE email = ?", (email_lower,)).fetchone()
+            if not row:
+                return None
+            code = f"{secrets.randbelow(900000) + 100000}"
+            token_hash = hashlib.sha256(code.encode()).hexdigest()
+            expires = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+            conn.execute(
+                "UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
+                (token_hash, expires, email_lower),
+            )
+            conn.commit()
+            return code
+    except Exception as exc:
+        _logger.error("Failed to generate reset token: %s", exc)
+        return None
+
+
+def _verify_reset_token(email: str, code: str) -> bool:
+    """Check if the reset code is valid and not expired."""
+    from datetime import datetime, timezone
+    initialize_database()
+    email_lower = email.strip().lower()
+    try:
+        with get_database_connection() as conn:
+            row = conn.execute(
+                "SELECT reset_token, reset_token_expires FROM users WHERE email = ?",
+                (email_lower,),
+            ).fetchone()
+            if not row or not row["reset_token"] or not row["reset_token_expires"]:
+                return False
+            token_hash = hashlib.sha256(code.strip().encode()).hexdigest()
+            if not secrets.compare_digest(token_hash, row["reset_token"]):
+                return False
+            expires = datetime.fromisoformat(row["reset_token_expires"])
+            if datetime.now(timezone.utc) > expires:
+                return False
+            return True
+    except Exception:
+        return False
+
+
+def _reset_user_password(email: str, new_password: str) -> bool:
+    """Set a new password and clear the reset token."""
+    initialize_database()
+    email_lower = email.strip().lower()
+    try:
+        pw_hash = _hash_password(new_password)
+        with get_database_connection() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL, "
+                "failed_login_count = 0, lockout_until = NULL WHERE email = ?",
+                (pw_hash, email_lower),
+            )
+            conn.commit()
+        return True
+    except Exception as exc:
+        _logger.error("Failed to reset password: %s", exc)
+        return False
+
+
+# ── Login Rate Limiting ───────────────────────────────────────
+_MAX_LOGIN_ATTEMPTS = 5
+_LOCKOUT_MINUTES = 15
+
+
+def _check_login_lockout(email: str) -> str | None:
+    """Return a lockout message if user is rate-limited, else None."""
+    from datetime import datetime, timezone
+    initialize_database()
+    email_lower = email.strip().lower()
+    try:
+        with get_database_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT failed_login_count, lockout_until FROM users WHERE email = ?",
+                (email_lower,),
+            ).fetchone()
+            if not row:
+                return None
+            lockout_until = row["lockout_until"]
+            if lockout_until:
+                lock_dt = datetime.fromisoformat(lockout_until)
+                now = datetime.now(timezone.utc)
+                if now < lock_dt:
+                    mins_left = max(1, int((lock_dt - now).total_seconds() / 60))
+                    return f"Too many failed attempts. Try again in {mins_left} minute{'s' if mins_left > 1 else ''}."
+                # Lockout expired — reset
+                conn.execute(
+                    "UPDATE users SET failed_login_count = 0, lockout_until = NULL WHERE email = ?",
+                    (email_lower,),
+                )
+                conn.commit()
+    except Exception:
+        pass
+    return None
+
+
+def _record_failed_login(email: str) -> None:
+    """Increment failed login count; lockout after threshold."""
+    from datetime import datetime, timezone, timedelta
+    initialize_database()
+    email_lower = email.strip().lower()
+    try:
+        with get_database_connection() as conn:
+            conn.execute(
+                "UPDATE users SET failed_login_count = COALESCE(failed_login_count, 0) + 1 WHERE email = ?",
+                (email_lower,),
+            )
+            row = conn.execute(
+                "SELECT failed_login_count FROM users WHERE email = ?",
+                (email_lower,),
+            ).fetchone()
+            if row and row[0] >= _MAX_LOGIN_ATTEMPTS:
+                lockout = (datetime.now(timezone.utc) + timedelta(minutes=_LOCKOUT_MINUTES)).isoformat()
+                conn.execute(
+                    "UPDATE users SET lockout_until = ? WHERE email = ?",
+                    (lockout, email_lower),
+                )
+            conn.commit()
+    except Exception:
+        pass
+
+
+def _clear_failed_logins(email: str) -> None:
+    """Reset failed login counter on successful login."""
+    initialize_database()
+    try:
+        with get_database_connection() as conn:
+            conn.execute(
+                "UPDATE users SET failed_login_count = 0, lockout_until = NULL WHERE email = ?",
+                (email.strip().lower(),),
+            )
+            conn.commit()
+    except Exception:
+        pass
+
+
 # ── Validation ────────────────────────────────────────────────
 
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
@@ -666,6 +815,105 @@ html, body, .stApp, .stApp * {
 .ag-divider {
     height: 1px; margin: 48px 40px;
     background: linear-gradient(90deg, transparent, rgba(0, 213, 89, 0.15), rgba(45, 158, 255, 0.1), transparent);
+}
+
+/* ── App Preview Mockup ──────────────────────────────────────── */
+.ag-app-preview { margin: 0 20px 36px; }
+.ag-mockup { max-width: 680px; margin: 0 auto; }
+.ag-mockup-window {
+    background: rgba(8, 12, 24, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.03) inset;
+}
+.ag-mockup-titlebar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.ag-mockup-dot { width: 8px; height: 8px; border-radius: 50%; }
+.ag-mockup-url {
+    flex: 1; text-align: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.48rem;
+    color: rgba(255,255,255,0.2);
+}
+.ag-mockup-body { display: flex; min-height: 280px; }
+.ag-mockup-sidebar {
+    width: 130px; flex-shrink: 0;
+    background: rgba(255,255,255,0.015);
+    border-right: 1px solid rgba(255,255,255,0.04);
+    padding: 10px 0;
+}
+.ag-mockup-sb-item {
+    font-family: 'Space Grotesk', sans-serif; font-size: 0.58rem; font-weight: 600;
+    color: rgba(255,255,255,0.3); padding: 8px 12px;
+    cursor: default; transition: all 0.2s;
+    border-left: 2px solid transparent;
+}
+.ag-mockup-sb-item.active {
+    color: #00D559; background: rgba(0,213,89,0.06);
+    border-left-color: #00D559;
+}
+.ag-mockup-main { flex: 1; padding: 12px; overflow: hidden; }
+.ag-mockup-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+}
+.ag-mockup-badge-live {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.5rem; font-weight: 700;
+    color: #00D559; background: rgba(0,213,89,0.08);
+    border: 1px solid rgba(0,213,89,0.15);
+    padding: 3px 10px; border-radius: 100px;
+}
+.ag-mockup-filter {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.45rem; font-weight: 700;
+    color: #c084fc; background: rgba(192,132,252,0.08);
+    border: 1px solid rgba(192,132,252,0.15);
+    padding: 3px 10px; border-radius: 100px;
+}
+.ag-mockup-table { width: 100%; }
+.ag-mockup-row {
+    display: grid; grid-template-columns: 1.4fr 0.6fr 0.6fr 0.6fr 0.7fr 0.8fr;
+    gap: 4px; padding: 6px 8px; font-size: 0.52rem;
+    font-family: 'JetBrains Mono', monospace;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.5);
+    align-items: center;
+}
+.ag-mockup-row.head {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    color: rgba(255,255,255,0.25); font-size: 0.45rem;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ag-mockup-row .player { color: rgba(255,255,255,0.8); font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+.ag-mockup-row .safe { font-weight: 800; }
+.ag-mockup-row .safe.high { color: #c084fc; }
+.ag-mockup-row .safe.mid { color: #fbbf24; }
+.ag-mockup-row .edge { color: #00D559; font-weight: 700; }
+.ag-mockup-row .over { color: #00D559; font-weight: 800; }
+.ag-mockup-row .under { color: #60a5fa; font-weight: 800; }
+.ag-mockup-footer-note {
+    text-align: center; font-size: 0.42rem; color: rgba(255,255,255,0.15);
+    margin-top: 8px; font-style: italic;
+}
+.ag-mockup-caption {
+    display: flex; justify-content: center; gap: 16px;
+    margin-top: 14px; flex-wrap: wrap;
+}
+.ag-mockup-tag {
+    font-family: 'Space Grotesk', sans-serif; font-size: 0.6rem; font-weight: 600;
+    color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 4px 14px; border-radius: 100px;
+}
+@media (max-width: 520px) {
+    .ag-mockup-sidebar { width: 80px; }
+    .ag-mockup-sb-item { font-size: 0.45rem; padding: 6px 8px; }
+    .ag-mockup-row { font-size: 0.42rem; grid-template-columns: 1.2fr 0.5fr 0.5fr 0.5fr 0.6fr 0.7fr; }
+    .ag-mockup-body { min-height: 220px; }
 }
 
 /* ── Ticker bar ──────────────────────────────────────────────── */
@@ -2468,32 +2716,129 @@ def require_login() -> bool:
             elif not li_pw:
                 st.error("Please enter your password.")
             else:
-                user = _authenticate_user(li_email, li_pw)
-                if user:
-                    _set_logged_in(user)
-                    st.success(f"Welcome back, {user.get('display_name', '')}!")
+                # Check rate limiting
+                lockout_msg = _check_login_lockout(li_email)
+                if lockout_msg:
+                    st.error(f"\U0001F512 {lockout_msg}")
+                else:
+                    user = _authenticate_user(li_email, li_pw)
+                    if user:
+                        _clear_failed_logins(li_email)
+                        _set_logged_in(user)
+                        st.success(f"Welcome back, {user.get('display_name', '')}!")
+                        st.rerun()
+                    else:
+                        _record_failed_login(li_email)
+                        st.error("Invalid email or password.")
+
+        # ── Forgot Password ──
+        st.markdown("---")
+        _reset_state = st.session_state.get("_pw_reset_stage", "idle")
+
+        if _reset_state == "idle":
+            if st.button("\U0001F511 Forgot Password?", key="_btn_forgot", use_container_width=True):
+                st.session_state["_pw_reset_stage"] = "email"
+                st.rerun()
+
+        elif _reset_state == "email":
+            st.info("\U0001F4E7 Enter your email and we'll generate a reset code.")
+            with st.form("reset_email_form", clear_on_submit=False):
+                rst_email = st.text_input("Email Address", placeholder="you@example.com", key="_rst_email")
+                rst_send = st.form_submit_button("\U0001F4E8 Send Reset Code", use_container_width=True)
+            if rst_send:
+                if not rst_email or not _valid_email(rst_email):
+                    st.error("Enter a valid email address.")
+                else:
+                    code = _generate_reset_token(rst_email)
+                    if code:
+                        st.session_state["_pw_reset_stage"] = "code"
+                        st.session_state["_pw_reset_email"] = rst_email.strip().lower()
+                        st.session_state["_pw_reset_code"] = code
+                        st.rerun()
+                    else:
+                        # Don't reveal whether email exists
+                        st.warning("If this email is registered, a reset code has been generated. Check below.")
+                        st.session_state["_pw_reset_stage"] = "idle"
+            if st.button("Cancel", key="_btn_rst_cancel1"):
+                st.session_state["_pw_reset_stage"] = "idle"
+                st.rerun()
+
+        elif _reset_state == "code":
+            _rst_em = st.session_state.get("_pw_reset_email", "")
+            _rst_code = st.session_state.get("_pw_reset_code", "")
+            st.success(f"\U0001F4AC Your reset code: **{_rst_code}**")
+            st.caption(f"Code sent for `{_rst_em}` — expires in 15 minutes")
+            with st.form("reset_code_form", clear_on_submit=False):
+                entered_code = st.text_input("Enter 6-digit code", placeholder="123456", key="_rst_code_input")
+                rst_verify = st.form_submit_button("\u2705 Verify Code", use_container_width=True)
+            if rst_verify:
+                if _verify_reset_token(_rst_em, entered_code):
+                    st.session_state["_pw_reset_stage"] = "newpw"
                     st.rerun()
                 else:
-                    st.error("Invalid email or password.")
+                    st.error("Invalid or expired code. Try again.")
+            if st.button("Cancel", key="_btn_rst_cancel2"):
+                st.session_state["_pw_reset_stage"] = "idle"
+                st.rerun()
+
+        elif _reset_state == "newpw":
+            _rst_em = st.session_state.get("_pw_reset_email", "")
+            st.info(f"\U0001F512 Set a new password for `{_rst_em}`")
+            with st.form("reset_newpw_form", clear_on_submit=False):
+                new_pw = st.text_input("New Password", type="password", placeholder="Min 8 chars, 1 letter, 1 number", key="_rst_new_pw")
+                new_pw2 = st.text_input("Confirm New Password", type="password", placeholder="Re-enter password", key="_rst_new_pw2")
+                rst_save = st.form_submit_button("\U0001F4BE Save New Password", use_container_width=True, type="primary")
+            if rst_save:
+                if pw_err := _valid_password(new_pw):
+                    st.error(pw_err)
+                elif new_pw != new_pw2:
+                    st.error("Passwords don't match.")
+                elif _reset_user_password(_rst_em, new_pw):
+                    st.success("\u2705 Password reset! You can now log in with your new password.")
+                    st.session_state["_pw_reset_stage"] = "idle"
+                    for k in ("_pw_reset_email", "_pw_reset_code"):
+                        st.session_state.pop(k, None)
+                    st.rerun()
+                else:
+                    st.error("Failed to reset password. Try again.")
 
     # ── Sticky Navigation Bar ────────────────────────────────
     # Injected via st.markdown so it lives in the parent DOM (not an iframe)
     # and can use position:fixed to stick to the viewport.
-    st.markdown("""
+    st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
-.spp-nav-dock{
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+.spp-nav-dock{{
   position:fixed;top:0;left:0;right:0;z-index:999999;
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:10px 16px;
-  background:rgba(8,12,24,0.92);
+  display:flex;align-items:center;gap:6px;
+  padding:8px 16px;
+  background:rgba(8,12,24,0.94);
   backdrop-filter:blur(24px) saturate(1.8);-webkit-backdrop-filter:blur(24px) saturate(1.8);
   border-bottom:1px solid rgba(255,255,255,0.06);
-  overflow-x:auto;scrollbar-width:none;
+  scrollbar-width:none;
   box-shadow:0 4px 24px rgba(0,0,0,0.4);
-}
-.spp-nav-dock::-webkit-scrollbar{display:none}
-.spp-nav-pill{
+  transition:transform 0.35s ease;
+}}
+.spp-nav-dock.nav-hidden{{transform:translateY(-100%)}}
+.spp-nav-dock::-webkit-scrollbar{{display:none}}
+/* Brand */
+.spp-nav-brand{{
+  display:flex;align-items:center;gap:8px;
+  margin-right:auto;flex-shrink:0;cursor:pointer;
+}}
+.spp-nav-logo{{width:28px;height:28px;border-radius:8px;object-fit:contain;}}
+.spp-nav-wordmark{{
+  font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:800;
+  color:rgba(255,255,255,0.85);letter-spacing:-0.02em;white-space:nowrap;
+}}
+.spp-nav-wordmark span{{color:#00D559}}
+/* Pills container */
+.spp-nav-pills{{
+  display:flex;align-items:center;gap:6px;
+  overflow-x:auto;scrollbar-width:none;flex:1;justify-content:center;
+}}
+.spp-nav-pills::-webkit-scrollbar{{display:none}}
+.spp-nav-pill{{
   flex-shrink:0;
   font-family:'Space Grotesk',sans-serif;font-size:0.7rem;font-weight:700;
   color:rgba(255,255,255,0.45);
@@ -2503,45 +2848,112 @@ def require_login() -> bool:
   cursor:pointer;transition:all 0.3s;
   text-decoration:none;white-space:nowrap;
   letter-spacing:0.01em;
-}
-.spp-nav-pill:hover{
+}}
+.spp-nav-pill:hover,.spp-nav-pill.active{{
   color:#fff;background:rgba(0,213,89,0.12);
   border-color:rgba(0,213,89,0.35);
   box-shadow:0 0 20px rgba(0,213,89,0.15);
   transform:translateY(-1px);
-}
-.spp-nav-pill .ni{margin-right:4px;font-size:0.72rem}
-@media(max-width:768px){
-  .spp-nav-dock{gap:4px;padding:8px 10px}
-  .spp-nav-pill{font-size:0.6rem;padding:6px 12px}
-}
+}}
+.spp-nav-pill .ni{{margin-right:4px;font-size:0.72rem}}
+/* Back to top */
+.spp-btt{{
+  position:fixed;bottom:28px;right:28px;z-index:999998;
+  width:48px;height:48px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,213,89,0.15);border:1px solid rgba(0,213,89,0.3);
+  color:#00D559;font-size:1.2rem;cursor:pointer;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+  transition:all 0.3s;opacity:0;pointer-events:none;
+  transform:translateY(12px);
+}}
+.spp-btt.visible{{opacity:1;pointer-events:auto;transform:translateY(0)}}
+.spp-btt:hover{{background:rgba(0,213,89,0.25);transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,213,89,0.3)}}
+@media(max-width:768px){{
+  .spp-nav-dock{{gap:4px;padding:8px 10px}}
+  .spp-nav-pill{{font-size:0.6rem;padding:6px 12px}}
+  .spp-nav-wordmark{{display:none}}
+  .spp-btt{{width:40px;height:40px;bottom:20px;right:16px;font-size:1rem}}
+}}
 </style>
 <nav class="spp-nav-dock" id="spp-nav-dock">
-  <a class="spp-nav-pill" href="javascript:void(0)" id="nav-how"><span class="ni">&#x1F3AF;</span>How It Works</a>
-  <a class="spp-nav-pill" href="javascript:void(0)" id="nav-features"><span class="ni">&#x26A1;</span>Features</a>
-  <a class="spp-nav-pill" href="javascript:void(0)" id="nav-picks"><span class="ni">&#x1F4CA;</span>Free Picks</a>
-  <a class="spp-nav-pill" href="javascript:void(0)" id="nav-tracker"><span class="ni">&#x1F4C8;</span>Bet Tracker</a>
-  <a class="spp-nav-pill" href="javascript:void(0)" id="nav-pricing"><span class="ni">&#x1F4B0;</span>Pricing</a>
-  <a class="spp-nav-pill" href="javascript:void(0)" id="nav-faq"><span class="ni">&#x2753;</span>FAQ</a>
+  <div class="spp-nav-brand" id="nav-top-btn">
+    {'<img class="spp-nav-logo" src="data:image/png;base64,' + _logo_b64 + '" alt="SPP">' if _logo_b64 else '<span style="font-size:1.2rem">&#x1F3AF;</span>'}
+    <span class="spp-nav-wordmark">Smart<span>Pick</span>Pro</span>
+  </div>
+  <div class="spp-nav-pills">
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-how"><span class="ni">&#x1F3AF;</span>How It Works</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-features"><span class="ni">&#x26A1;</span>Features</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-picks"><span class="ni">&#x1F4CA;</span>Free Picks</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-tracker"><span class="ni">&#x1F4C8;</span>Bet Tracker</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-pricing"><span class="ni">&#x1F4B0;</span>Pricing</a>
+    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-faq"><span class="ni">&#x2753;</span>FAQ</a>
+  </div>
 </nav>
+<div class="spp-btt" id="spp-btt" title="Back to top">&#x2191;</div>
 <script>
-(function(){
-  function scrollToSection(sectionId){
+(function(){{
+  function scrollToSection(sectionId){{
     var el = document.querySelector('[data-section-id="'+sectionId+'"]');
-    if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}
-  }
-  var map = {
+    if(el){{el.scrollIntoView({{behavior:'smooth',block:'start'}});}}
+  }}
+  var map = {{
     'nav-how':'how-it-works','nav-features':'features','nav-picks':'picks',
     'nav-tracker':'tracker','nav-pricing':'pricing','nav-faq':'faq'
-  };
-  Object.keys(map).forEach(function(btnId){
+  }};
+  Object.keys(map).forEach(function(btnId){{
     var btn = document.getElementById(btnId);
-    if(btn){btn.addEventListener('click',function(e){e.preventDefault();scrollToSection(map[btnId]);});}
-  });
+    if(btn){{btn.addEventListener('click',function(e){{e.preventDefault();scrollToSection(map[btnId]);}});}}
+  }});
+  /* Brand logo scrolls to top */
+  var brandBtn = document.getElementById('nav-top-btn');
+  if(brandBtn){{brandBtn.addEventListener('click',function(){{
+    var main = document.querySelector('section.main .block-container') || document.documentElement;
+    main.scrollTo({{top:0,behavior:'smooth'}});
+    window.scrollTo({{top:0,behavior:'smooth'}});
+  }});}}
+  /* Back to top button */
+  var btt = document.getElementById('spp-btt');
+  if(btt){{btt.addEventListener('click',function(){{
+    var main = document.querySelector('section.main .block-container') || document.documentElement;
+    main.scrollTo({{top:0,behavior:'smooth'}});
+    window.scrollTo({{top:0,behavior:'smooth'}});
+  }});}}
+  /* Show/hide back-to-top + active pill highlighting */
+  var lastScroll = 0;
+  var navDock = document.getElementById('spp-nav-dock');
+  var sectionIds = ['how-it-works','features','picks','tracker','pricing','faq'];
+  var pillMap = {{'how-it-works':'nav-how','features':'nav-features','picks':'nav-picks','tracker':'nav-tracker','pricing':'nav-pricing','faq':'nav-faq'}};
+  function onScroll(){{
+    var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    /* Back to top visibility */
+    if(btt){{
+      if(scrollY > 600){{btt.classList.add('visible');}}
+      else{{btt.classList.remove('visible');}}
+    }}
+    /* Active pill */
+    var activeId = '';
+    for(var i = sectionIds.length - 1; i >= 0; i--){{
+      var el = document.querySelector('[data-section-id="'+sectionIds[i]+'"]');
+      if(el){{
+        var rect = el.getBoundingClientRect();
+        if(rect.top <= 120){{activeId = sectionIds[i]; break;}}
+      }}
+    }}
+    document.querySelectorAll('.spp-nav-pill').forEach(function(p){{p.classList.remove('active');}});
+    if(activeId && pillMap[activeId]){{
+      var ap = document.getElementById(pillMap[activeId]);
+      if(ap){{ap.classList.add('active');}}
+    }}
+    lastScroll = scrollY;
+  }}
+  window.addEventListener('scroll', onScroll, {{passive:true}});
+  onScroll();
   /* Add top padding to first content block so hero isn't hidden behind fixed nav */
   var mainBlock = document.querySelector('section.main .block-container');
-  if(mainBlock){mainBlock.style.paddingTop='56px';}
-})();
+  if(mainBlock){{mainBlock.style.paddingTop='56px';}}
+}})();
 </script>
 """, unsafe_allow_html=True)
 
@@ -2625,6 +3037,67 @@ def require_login() -> bool:
           <div class="ag-inside-name">Matchup DNA + Injury Intel</div>
           <div class="ag-inside-desc">Defensive matchup ratings, pace adjustments, rest-day impacts, and real-time injury reports from CBS and RotoWire. The AI factors all of this into every SAFE Score automatically.</div>
           <div class="ag-inside-tag">CONTEXT</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ag-divider"></div>
+
+    <!-- App Preview Mockup -->
+    <div class="ag-app-preview" data-section-id="app-preview">
+      <div class="ag-section-head">
+        <h3>See It In <span class="em">Action</span></h3>
+        <p>A real look inside the Quantum Analysis Matrix dashboard</p>
+      </div>
+      <div class="ag-mockup">
+        <div class="ag-mockup-window">
+          <div class="ag-mockup-titlebar">
+            <span class="ag-mockup-dot" style="background:#f24336"></span>
+            <span class="ag-mockup-dot" style="background:#F9C62B"></span>
+            <span class="ag-mockup-dot" style="background:#00D559"></span>
+            <span class="ag-mockup-url">smartpickpro.com &mdash; Neural Analysis</span>
+          </div>
+          <div class="ag-mockup-body">
+            <div class="ag-mockup-sidebar">
+              <div class="ag-mockup-sb-item active">&#x26A1; Analysis</div>
+              <div class="ag-mockup-sb-item">&#x1F4CA; Live Sweat</div>
+              <div class="ag-mockup-sb-item">&#x1F4C8; Bet Tracker</div>
+              <div class="ag-mockup-sb-item">&#x1F52C; Prop Scanner</div>
+              <div class="ag-mockup-sb-item">&#x1F3C0; Matchups</div>
+            </div>
+            <div class="ag-mockup-main">
+              <div class="ag-mockup-header">
+                <span class="ag-mockup-badge-live">&#x1F534; LIVE &mdash; 347 Props Analyzed</span>
+                <span class="ag-mockup-filter">SAFE 70+ Only</span>
+              </div>
+              <div class="ag-mockup-table">
+                <div class="ag-mockup-row head">
+                  <span>Player</span><span>Prop</span><span>Line</span><span>SAFE</span><span>Edge</span><span>Pick</span>
+                </div>
+                <div class="ag-mockup-row">
+                  <span class="player">Luka Don&#x10D;i&#x107;</span><span>PTS</span><span>28.5</span><span class="safe high">92</span><span class="edge">+6.2%</span><span class="over">OVER &#x2191;</span>
+                </div>
+                <div class="ag-mockup-row">
+                  <span class="player">SGA</span><span>PTS</span><span>30.5</span><span class="safe high">90</span><span class="edge">+5.3%</span><span class="over">OVER &#x2191;</span>
+                </div>
+                <div class="ag-mockup-row">
+                  <span class="player">Jayson Tatum</span><span>REB</span><span>8.5</span><span class="safe mid">87</span><span class="edge">+4.8%</span><span class="over">OVER &#x2191;</span>
+                </div>
+                <div class="ag-mockup-row">
+                  <span class="player">A. Edwards</span><span>PTS</span><span>26.5</span><span class="safe mid">84</span><span class="edge">+5.1%</span><span class="under">UNDER &#x2193;</span>
+                </div>
+                <div class="ag-mockup-row">
+                  <span class="player">Joki&#x107;</span><span>AST</span><span>9.5</span><span class="safe mid">78</span><span class="edge">+3.4%</span><span class="over">OVER &#x2191;</span>
+                </div>
+              </div>
+              <div class="ag-mockup-footer-note">Showing 5 of 347 analyzed props &mdash; sorted by SAFE Score</div>
+            </div>
+          </div>
+        </div>
+        <div class="ag-mockup-caption">
+          <span class="ag-mockup-tag">&#x2714; Real data</span>
+          <span class="ag-mockup-tag">&#x2714; Updated nightly</span>
+          <span class="ag-mockup-tag">&#x2714; 6 AI models fused</span>
         </div>
       </div>
     </div>
@@ -3815,24 +4288,52 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 """, unsafe_allow_html=True)
 
     _stripe_ready = is_stripe_configured()
+
+    # Inject premium checkout card styles
+    st.markdown("""<style>
+.sub-card{
+  background:linear-gradient(168deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));
+  border:1.5px solid rgba(255,255,255,0.07);
+  border-radius:20px;padding:20px 12px 16px;text-align:center;
+  position:relative;overflow:hidden;transition:all 0.35s;
+}
+.sub-card:hover{border-color:rgba(255,255,255,0.12);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+.sub-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0}
+.sub-card.free::before{background:linear-gradient(90deg,#A0AABE,#6B7280)}
+.sub-card.sharp::before{background:linear-gradient(90deg,#F9C62B,#f59e0b)}
+.sub-card.smart::before{background:linear-gradient(90deg,#00D559,#10b981)}
+.sub-card.insider::before{background:linear-gradient(90deg,#c084fc,#8b5cf6)}
+.sub-card .sc-ico{font-size:2rem;display:block;margin:0 0 6px}
+.sub-card .sc-name{font-family:'Space Grotesk',sans-serif;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em}
+.sub-card .sc-price{font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:900;line-height:1.2;margin:4px 0 2px}
+.sub-card .sc-period{font-size:0.65rem;color:rgba(255,255,255,0.3)}
+.sub-card .sc-pop{position:absolute;top:10px;right:10px;font-size:0.4rem;font-weight:800;color:#0B0F19;background:#00D559;padding:2px 8px;border-radius:100px;letter-spacing:0.06em}
+.sub-card.free .sc-name{color:#A0AABE}
+.sub-card.free .sc-price{color:#A0AABE}
+.sub-card.sharp .sc-name{color:#F9C62B}
+.sub-card.sharp .sc-price{color:#F9C62B}
+.sub-card.smart .sc-name{color:#00D559}
+.sub-card.smart .sc-price{color:#00D559}
+.sub-card.insider .sc-name{color:#c084fc}
+.sub-card.insider .sc-price{color:#c084fc}
+</style>""", unsafe_allow_html=True)
+
     sub_cols = st.columns(4)
     with sub_cols[0]:
-        st.markdown("""
-<div style="text-align:center;padding:8px 0 4px;">
-    <span style="font-size:1.8rem;">⭐</span><br>
-    <span style="font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:800;color:#A0AABE;text-transform:uppercase;letter-spacing:0.06em;">Smart Rookie</span><br>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:900;color:#A0AABE;">$0</span>
-    <span style="font-size:0.7rem;color:rgba(255,255,255,0.3);"> / forever</span>
+        st.markdown("""<div class="sub-card free">
+  <span class="sc-ico">⭐</span>
+  <div class="sc-name">Smart Rookie</div>
+  <div class="sc-price">$0</div>
+  <div class="sc-period">free forever</div>
 </div>""", unsafe_allow_html=True)
         st.success("✅ **Free** — create an account above!")
 
     with sub_cols[1]:
-        st.markdown("""
-<div style="text-align:center;padding:8px 0 4px;">
-    <span style="font-size:1.8rem;">🔥</span><br>
-    <span style="font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:800;color:#F9C62B;text-transform:uppercase;letter-spacing:0.06em;">Sharp IQ</span><br>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:900;color:#F9C62B;">$9<span style="font-size:0.9rem;">.99</span></span>
-    <span style="font-size:0.7rem;color:rgba(255,255,255,0.3);"> / mo</span>
+        st.markdown("""<div class="sub-card sharp">
+  <span class="sc-ico">🔥</span>
+  <div class="sc-name">Sharp IQ</div>
+  <div class="sc-price">$9<span style="font-size:1rem">.99</span></div>
+  <div class="sc-period">per month</div>
 </div>""", unsafe_allow_html=True)
         if _stripe_ready:
             with st.form("gate_checkout_sharp", clear_on_submit=False):
@@ -3849,13 +4350,12 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
             st.info("💳 Stripe checkout — coming soon!")
 
     with sub_cols[2]:
-        st.markdown("""
-<div style="text-align:center;padding:8px 0 4px;">
-    <span style="font-size:1.8rem;">💎</span><br>
-    <span style="font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:800;color:#00D559;text-transform:uppercase;letter-spacing:0.06em;">Smart Money</span>
-    <span style="display:inline-block;font-size:0.45rem;font-weight:800;color:#0B0F19;background:#00D559;padding:1px 6px;border-radius:100px;vertical-align:middle;margin-left:4px;">POPULAR</span><br>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:900;color:#00D559;">$24<span style="font-size:0.9rem;">.99</span></span>
-    <span style="font-size:0.7rem;color:rgba(255,255,255,0.3);"> / mo</span>
+        st.markdown("""<div class="sub-card smart">
+  <span class="sc-pop">POPULAR</span>
+  <span class="sc-ico">💎</span>
+  <div class="sc-name">Smart Money</div>
+  <div class="sc-price">$24<span style="font-size:1rem">.99</span></div>
+  <div class="sc-period">per month</div>
 </div>""", unsafe_allow_html=True)
         if _stripe_ready:
             with st.form("gate_checkout_smart", clear_on_submit=False):
@@ -3872,12 +4372,11 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
             st.info("💳 Stripe checkout — coming soon!")
 
     with sub_cols[3]:
-        st.markdown("""
-<div style="text-align:center;padding:8px 0 4px;">
-    <span style="font-size:1.8rem;">👑</span><br>
-    <span style="font-family:'Space Grotesk',sans-serif;font-size:0.78rem;font-weight:800;color:#c084fc;text-transform:uppercase;letter-spacing:0.06em;">Insider Circle</span><br>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:900;color:#c084fc;">$499<span style="font-size:0.9rem;">.99</span></span>
-    <span style="font-size:0.7rem;color:rgba(255,255,255,0.3);"> lifetime</span>
+        st.markdown("""<div class="sub-card insider">
+  <span class="sc-ico">👑</span>
+  <div class="sc-name">Insider Circle</div>
+  <div class="sc-price">$499<span style="font-size:1rem">.99</span></div>
+  <div class="sc-period">lifetime access</div>
 </div>""", unsafe_allow_html=True)
         if _stripe_ready:
             with st.form("gate_checkout_insider", clear_on_submit=False):
@@ -4072,8 +4571,15 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 <!-- Footer -->
 <div class="ft-footer">
   <div class="ft-footer-line"></div>
-  &copy; 2026 Smart Pick Pro &middot; For entertainment &amp; educational purposes only &middot; 21+<br>
-  <a href="https://www.ncpgambling.org/" target="_blank">National Council on Problem Gambling &middot; 1-800-GAMBLER</a>
+  <div style="display:flex;justify-content:center;gap:16px;margin-bottom:10px;flex-wrap:wrap">
+    <a href="javascript:void(0)" style="color:rgba(255,255,255,0.25);font-size:0.62rem;text-decoration:none;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:1px;transition:color 0.3s" onmouseover="this.style.color='rgba(255,255,255,0.5)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'">Terms of Service</a>
+    <a href="javascript:void(0)" style="color:rgba(255,255,255,0.25);font-size:0.62rem;text-decoration:none;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:1px;transition:color 0.3s" onmouseover="this.style.color='rgba(255,255,255,0.5)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'">Privacy Policy</a>
+    <a href="mailto:support@smartpickpro.com" style="color:rgba(255,255,255,0.25);font-size:0.62rem;text-decoration:none;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:1px;transition:color 0.3s" onmouseover="this.style.color='rgba(255,255,255,0.5)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'">Contact</a>
+    <a href="https://www.ncpgambling.org/" target="_blank" style="color:rgba(255,255,255,0.25);font-size:0.62rem;text-decoration:none;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:1px;transition:color 0.3s" onmouseover="this.style.color='rgba(255,255,255,0.5)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'">Responsible Gaming</a>
+  </div>
+  &copy; 2026 Smart Pick Pro &middot; All rights reserved.<br>
+  For entertainment &amp; educational purposes only &middot; 21+ &middot; <a href="https://www.ncpgambling.org/" target="_blank">1-800-GAMBLER</a><br>
+  <span style="font-size:0.5rem;color:rgba(255,255,255,0.06);margin-top:6px;display:inline-block">Smart Pick Pro is not affiliated with any sportsbook or DFS platform.</span>
 </div>
 """)
 

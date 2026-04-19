@@ -617,6 +617,36 @@ def initialize_database():
                 except sqlite3.OperationalError:
                     pass  # Best-effort â€” app-level dedup still protects
 
+            # ── Password reset token columns on users table ──
+            try:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN reset_token TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN reset_token_expires TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            # ── Login attempt rate-limiting columns on users table ──
+            try:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN failed_login_count INTEGER DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN lockout_until TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass
+
             # Save the changes
             connection.commit()
 
