@@ -214,7 +214,9 @@ footer { display: none !important; }
 [data-testid="stAppViewContainer"] { padding-top: 0 !important; }
 .stApp { background: transparent !important; }
 .stApp > [data-testid="stAppViewContainer"] > section.main .block-container {
-    padding: 0 !important; max-width: 100% !important;
+    padding: 0 20px !important; max-width: 520px !important;
+    margin: 0 auto !important;
+    position: relative; z-index: 9992;
 }
 
 /* ── Keyframes ───────────────────────────────────────────────── */
@@ -504,17 +506,17 @@ footer { display: none !important; }
 }
 
 /* ── FORM ZONE ───────────────────────────────────────────────── */
-/* Tabs */
-.ag-page [data-testid="stTabs"] {
+/* Tabs — selectors are global because st.tabs() renders as a sibling, not child of .ag-page */
+[data-testid="stTabs"] {
     animation: agFadeUp 0.8s 0.35s cubic-bezier(0.22,1,0.36,1) both;
 }
-.ag-page [data-testid="stTabs"] > [data-baseweb="tab-list"] {
+[data-testid="stTabs"] > [data-baseweb="tab-list"] {
     background:rgba(255,255,255,0.03);
     border:1px solid rgba(255,255,255,0.06);
     border-radius:16px; padding:4px; gap:4px;
     justify-content:center; margin-bottom:20px;
 }
-.ag-page [data-testid="stTabs"] [data-baseweb="tab"] {
+[data-testid="stTabs"] [data-baseweb="tab"] {
     border-radius:12px !important; font-weight:800 !important;
     font-size:0.88rem !important; padding:11px 28px !important;
     color:rgba(255,255,255,0.4) !important;
@@ -522,19 +524,19 @@ footer { display: none !important; }
     border:1px solid transparent !important;
     transition:all 0.3s cubic-bezier(0.22,1,0.36,1) !important;
 }
-.ag-page [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
+[data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
     background:linear-gradient(135deg, rgba(0,213,89,0.12), rgba(45,158,255,0.08)) !important;
     color:#fff !important;
     border-color:rgba(0,213,89,0.2) !important;
     box-shadow:0 4px 20px rgba(0,213,89,0.12) !important;
 }
-.ag-page [data-testid="stTabs"] [data-baseweb="tab-highlight"],
-.ag-page [data-testid="stTabs"] [data-baseweb="tab-border"] {
+[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+[data-testid="stTabs"] [data-baseweb="tab-border"] {
     display:none !important;
 }
 
 /* Form card */
-.ag-page [data-testid="stForm"] {
+[data-testid="stForm"] {
     background:linear-gradient(145deg, rgba(10,16,32,0.85), rgba(8,12,26,0.9)) !important;
     border:1px solid rgba(255,255,255,0.06) !important;
     border-radius:22px !important;
@@ -549,7 +551,7 @@ footer { display: none !important; }
     position:relative; overflow:hidden;
 }
 /* Top shimmer bar on form */
-.ag-page [data-testid="stForm"]::before {
+[data-testid="stForm"]::before {
     content:''; position:absolute; top:0; left:0; right:0; height:2px;
     background:linear-gradient(90deg, transparent, #00D559, #2D9EFF, #c084fc, transparent);
     background-size:400% 100%;
@@ -557,7 +559,7 @@ footer { display: none !important; }
 }
 
 /* Inputs */
-.ag-page [data-testid="stForm"] input {
+[data-testid="stForm"] input {
     background:rgba(255,255,255,0.035) !important;
     border:1.5px solid rgba(255,255,255,0.07) !important;
     border-radius:14px !important;
@@ -568,30 +570,30 @@ footer { display: none !important; }
     transition:all 0.3s cubic-bezier(0.22,1,0.36,1) !important;
     caret-color:#00D559 !important;
 }
-.ag-page [data-testid="stForm"] input:focus {
+[data-testid="stForm"] input:focus {
     border-color:rgba(0,213,89,0.5) !important;
     box-shadow:0 0 0 4px rgba(0,213,89,0.08), 0 0 30px rgba(0,213,89,0.06) !important;
     background:rgba(255,255,255,0.05) !important;
     outline:none !important;
 }
-.ag-page [data-testid="stForm"] input::placeholder {
+[data-testid="stForm"] input::placeholder {
     color:rgba(255,255,255,0.22) !important;
     font-weight:400 !important;
 }
-.ag-page [data-testid="stForm"] label {
+[data-testid="stForm"] label {
     color:rgba(255,255,255,0.55) !important;
     font-weight:700 !important; font-size:0.8rem !important;
     letter-spacing:0.03em !important;
     text-transform:uppercase !important;
 }
 /* Password visibility toggles */
-.ag-page [data-testid="stForm"] [data-testid="stTextInputRootElement"] button {
+[data-testid="stForm"] [data-testid="stTextInputRootElement"] button {
     color:rgba(255,255,255,0.3) !important;
 }
 
 /* CTA buttons */
-.ag-page [data-testid="stForm"] button[kind="primaryFormSubmit"],
-.ag-page [data-testid="stForm"] button[type="submit"] {
+[data-testid="stForm"] button[kind="primaryFormSubmit"],
+[data-testid="stForm"] button[type="submit"] {
     background:linear-gradient(135deg, #00D559 0%, #00C04E 50%, #00A843 100%) !important;
     color:#fff !important;
     font-weight:900 !important; font-size:1.05rem !important;
@@ -606,14 +608,14 @@ footer { display: none !important; }
     position:relative; overflow:hidden;
     text-shadow:0 1px 2px rgba(0,0,0,0.2) !important;
 }
-.ag-page [data-testid="stForm"] button[kind="primaryFormSubmit"]::after,
-.ag-page [data-testid="stForm"] button[type="submit"]::after {
+[data-testid="stForm"] button[kind="primaryFormSubmit"]::after,
+[data-testid="stForm"] button[type="submit"]::after {
     content:''; position:absolute; top:0; width:60px; height:100%;
     background:linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
     animation: agShimmer 3s ease-in-out infinite;
 }
-.ag-page [data-testid="stForm"] button[kind="primaryFormSubmit"]:hover,
-.ag-page [data-testid="stForm"] button[type="submit"]:hover {
+[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover,
+[data-testid="stForm"] button[type="submit"]:hover {
     transform:translateY(-3px) scale(1.01) !important;
     box-shadow:
         0 10px 40px rgba(0,213,89,0.45),
@@ -768,7 +770,7 @@ footer { display: none !important; }
     .ag-compare-grid { gap:8px; }
     .ag-compare-col { padding:16px 12px; }
     .ag-pillars { grid-template-columns:repeat(2, 1fr); }
-    .ag-page [data-testid="stForm"] { padding:26px 20px 24px !important; border-radius:18px !important; }
+    [data-testid="stForm"] { padding:26px 20px 24px !important; border-radius:18px !important; }
     .ag-proof-chip { padding:6px 12px; font-size:0.7rem; }
     .ag-urgency { font-size:0.66rem; height:36px; }
 }
