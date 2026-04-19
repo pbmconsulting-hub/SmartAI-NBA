@@ -1354,41 +1354,95 @@ html, body, .stApp, .stApp * {
 .ag-reviews {
     margin: 56px 0 0;
     animation: agFadeUp 0.6s 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+    display: grid; grid-template-columns: 1fr; gap: 18px;
 }
+.ag-reviews .ag-section-head { grid-column: 1 / -1; }
 .ag-review {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 24px; padding: 32px 32px 28px;
-    margin-bottom: 16px; position: relative;
+    background: linear-gradient(168deg, rgba(255,255,255,0.06), rgba(255,255,255,0.012));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px; padding: 0;
+    position: relative;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
     overflow: hidden;
+    display: flex; flex-direction: column;
 }
+@keyframes agReviewSlide { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.ag-review:nth-child(2) { animation: agReviewSlide 0.5s 0.1s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-review:nth-child(3) { animation: agReviewSlide 0.5s 0.2s cubic-bezier(0.22,1,0.36,1) both; }
+.ag-review:nth-child(4) { animation: agReviewSlide 0.5s 0.3s cubic-bezier(0.22,1,0.36,1) both; }
+/* Accent top bar per card */
 .ag-review::before {
-    content: '\u201C'; position: absolute; top: 16px; left: 24px;
-    font-family: Georgia, serif; font-size: 5rem;
-    color: rgba(0, 213, 89, 0.08); line-height: 1;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    border-radius: 24px 24px 0 0;
+}
+.ag-review:nth-child(2)::before { background: linear-gradient(90deg, #00D559, #2D9EFF); }
+.ag-review:nth-child(3)::before { background: linear-gradient(90deg, #2D9EFF, #c084fc); }
+.ag-review:nth-child(4)::before { background: linear-gradient(90deg, #c084fc, #F9C62B); }
+.ag-review:hover {
+    border-color: rgba(0,213,89,0.25);
+    transform: translateY(-6px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35), 0 0 30px rgba(0,213,89,0.06);
+}
+/* Inner content area */
+.ag-review-body {
+    padding: 32px 28px 24px; flex: 1; position: relative;
+}
+/* Decorative quote mark */
+.ag-review-body::before {
+    content: '\u201C'; position: absolute; top: 12px; right: 20px;
+    font-family: Georgia, serif; font-size: 4.5rem;
+    color: rgba(0,213,89,0.06); line-height: 1;
     pointer-events: none;
 }
-.ag-review:hover {
-    border-color: rgba(0, 213, 89, 0.3);
-    transform: translateY(-4px);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3), 0 0 24px rgba(0, 213, 89, 0.05);
+/* Highlight chip — what the review is about */
+.ag-review-chip {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.56rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 4px 12px; border-radius: 100px;
+    margin-bottom: 14px;
+}
+.ag-review:nth-child(2) .ag-review-chip {
+    color: #00D559; background: rgba(0,213,89,0.1); border: 1px solid rgba(0,213,89,0.15);
+}
+.ag-review:nth-child(3) .ag-review-chip {
+    color: #2D9EFF; background: rgba(45,158,255,0.1); border: 1px solid rgba(45,158,255,0.15);
+}
+.ag-review:nth-child(4) .ag-review-chip {
+    color: #c084fc; background: rgba(192,132,252,0.1); border: 1px solid rgba(192,132,252,0.15);
 }
 .ag-review-text {
-    font-size: 1.05rem; color: rgba(255, 255, 255, 0.7);
-    font-style: italic; line-height: 1.75;
-    position: relative; padding-left: 4px;
+    font-size: 1.02rem; color: rgba(255,255,255,0.72);
+    font-style: italic; line-height: 1.8;
+    position: relative;
 }
-.ag-review-meta {
+.ag-review-text strong { color: rgba(255,255,255,0.95); font-weight: 700; font-style: normal; }
+/* Stat callout inside review */
+.ag-review-stat {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(0,213,89,0.08); border: 1px solid rgba(0,213,89,0.12);
+    border-radius: 10px; padding: 6px 14px; margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; font-weight: 700; color: #00D559;
+}
+.ag-review-stat .stat-num {
+    font-size: 1.1rem; font-weight: 800;
+    text-shadow: 0 0 12px rgba(0,213,89,0.2);
+}
+/* Footer / meta area */
+.ag-review-footer {
     display: flex; align-items: center; gap: 12px;
-    margin-top: 16px; position: relative;
+    padding: 16px 28px; position: relative;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.015);
 }
 .ag-review-avatar {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.2), rgba(45, 158, 255, 0.15));
-    border: 2px solid rgba(0, 213, 89, 0.2);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0,213,89,0.2), rgba(45,158,255,0.15));
+    border: 2px solid rgba(0,213,89,0.2);
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.85rem; flex-shrink: 0;
+    font-size: 1rem; flex-shrink: 0;
 }
 .ag-review-info { display: flex; flex-direction: column; }
 .ag-review-author {
@@ -1397,17 +1451,17 @@ html, body, .stApp, .stApp * {
     color: #00D559;
 }
 .ag-review-stars {
-    color: #F9C62B; font-size: 0.78rem; margin-top: 2px;
-    letter-spacing: 2px;
+    color: #F9C62B; font-size: 0.72rem; margin-top: 2px;
+    letter-spacing: 1px;
 }
 .ag-review-verified {
     margin-left: auto;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.52rem; font-weight: 700;
-    color: rgba(0, 213, 89, 0.5);
-    background: rgba(0, 213, 89, 0.06);
-    border: 1px solid rgba(0, 213, 89, 0.1);
-    padding: 3px 10px; border-radius: 100px;
+    color: rgba(0,213,89,0.6);
+    background: rgba(0,213,89,0.08);
+    border: 1px solid rgba(0,213,89,0.12);
+    padding: 4px 12px; border-radius: 100px;
     text-transform: uppercase; letter-spacing: 0.1em;
 }
 
@@ -2125,7 +2179,11 @@ html, body, .stApp, .stApp * {
     .ag-tbl thead th, .ag-tbl tbody td { padding: 12px 8px; }
     .ag-tbl tbody td:first-child .ft-ico { font-size: 0.72rem; margin-right: 5px; }
     .ag-review-text { font-size: 0.92rem; }
-    .ag-review-avatar { width: 30px; height: 30px; font-size: 0.72rem; }
+    .ag-review-avatar { width: 32px; height: 32px; font-size: 0.78rem; }
+    .ag-review-body { padding: 24px 20px 18px; }
+    .ag-review-footer { padding: 14px 20px; }
+    .ag-review-stat { margin-top: 10px; font-size: 0.65rem; }
+    .ag-review-stat .stat-num { font-size: 0.95rem; }
 }
 @media (max-width: 520px) {
     .ag-hero h1 { font-size: 2.2rem; }
@@ -2619,34 +2677,49 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       <div class="ag-section-head">
         <h3>What Sharps Are <span class="em">Saying</span></h3>
       </div>
+
       <div class="ag-review">
-        <div class="ag-review-text">I was paying $99/mo for OddsJam and still losing. Switched to Smart Pick Pro &mdash; free, better AI, and my bankroll is up 22% in two months.</div>
-        <div class="ag-review-meta">
+        <div class="ag-review-body">
+          <span class="ag-review-chip">&#x1F4B0; Bankroll Growth</span>
+          <div class="ag-review-text">I was paying <strong>$99/mo</strong> for OddsJam and still losing. Switched to Smart Pick Pro &mdash; free, better AI, and my bankroll is <strong>up 22%</strong> in two months.</div>
+          <div class="ag-review-stat"><span class="stat-num">+22%</span> bankroll in 60 days</div>
+        </div>
+        <div class="ag-review-footer">
           <div class="ag-review-avatar">&#x1F4B0;</div>
           <div class="ag-review-info">
-            <div class="ag-review-author">&mdash; @sharpbettor_mike</div>
+            <div class="ag-review-author">@sharpbettor_mike</div>
             <div class="ag-review-stars">&#x2B50;&#x2B50;&#x2B50;&#x2B50;&#x2B50;</div>
           </div>
           <span class="ag-review-verified">&#x2713; Verified</span>
         </div>
       </div>
+
       <div class="ag-review">
-        <div class="ag-review-text">SAFE Score is something no other platform has. I only play 80+ rated props now and my win rate went from 48% to 63%.</div>
-        <div class="ag-review-meta">
+        <div class="ag-review-body">
+          <span class="ag-review-chip">&#x1F3AF; SAFE Score</span>
+          <div class="ag-review-text">SAFE Score is something <strong>no other platform</strong> has. I only play 80+ rated props now and my win rate went from <strong>48% to 63%</strong>.</div>
+          <div class="ag-review-stat"><span class="stat-num">63%</span> win rate on 80+ picks</div>
+        </div>
+        <div class="ag-review-footer">
           <div class="ag-review-avatar">&#x1F4CA;</div>
           <div class="ag-review-info">
-            <div class="ag-review-author">&mdash; @datadrivendenver</div>
+            <div class="ag-review-author">@datadrivendenver</div>
             <div class="ag-review-stars">&#x2B50;&#x2B50;&#x2B50;&#x2B50;&#x2B50;</div>
           </div>
           <span class="ag-review-verified">&#x2713; Verified</span>
         </div>
       </div>
+
       <div class="ag-review">
-        <div class="ag-review-text">Live Sweat Mode is addictive. Watching props track in real-time with AI confidence updates &mdash; I cancelled Action Network the same day.</div>
-        <div class="ag-review-meta">
+        <div class="ag-review-body">
+          <span class="ag-review-chip">&#x1F4E1; Live Sweat</span>
+          <div class="ag-review-text">Live Sweat Mode is <strong>addictive</strong>. Watching props track in real-time with AI confidence updates &mdash; I cancelled <strong>Action Network</strong> the same day.</div>
+          <div class="ag-review-stat"><span class="stat-num">Real-Time</span> prop tracking</div>
+        </div>
+        <div class="ag-review-footer">
           <div class="ag-review-avatar">&#x1F3C0;</div>
           <div class="ag-review-info">
-            <div class="ag-review-author">&mdash; @nightowl_picks</div>
+            <div class="ag-review-author">@nightowl_picks</div>
             <div class="ag-review-stars">&#x2B50;&#x2B50;&#x2B50;&#x2B50;&#x2B50;</div>
           </div>
           <span class="ag-review-verified">&#x2713; Verified</span>
