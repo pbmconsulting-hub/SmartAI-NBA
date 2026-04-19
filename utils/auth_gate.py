@@ -992,159 +992,206 @@ html, body, .stApp, .stApp * {
 
 /* Competitor cards */
 .ag-comp-grid {
-    display: grid; grid-template-columns: 1fr; gap: 8px;
-    margin-bottom: 16px;
+    display: grid; grid-template-columns: 1fr; gap: 10px;
+    margin-bottom: 20px;
 }
 .ag-comp {
-    display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px;
-    background: linear-gradient(168deg, rgba(242, 67, 54, 0.04), rgba(242, 67, 54, 0.01));
-    border: 1px solid rgba(242, 67, 54, 0.08);
-    border-radius: 12px; padding: 14px 16px;
-    transition: border-color 0.3s, transform 0.3s;
+    display: grid; grid-template-columns: 1.5fr auto 1.2fr; align-items: center; gap: 14px;
+    background: linear-gradient(168deg, rgba(242, 67, 54, 0.05), rgba(242, 67, 54, 0.015));
+    border: 1px solid rgba(242, 67, 54, 0.1);
+    border-radius: 16px; padding: 18px 22px;
+    transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    position: relative; overflow: hidden;
+}
+.ag-comp::after {
+    content: '\2717'; position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    font-size: 1.2rem; color: rgba(242, 67, 54, 0.12);
+    font-weight: 900; pointer-events: none;
+    display: none;
 }
 .ag-comp:hover {
-    border-color: rgba(242, 67, 54, 0.18);
-    transform: translateY(-1px);
+    border-color: rgba(242, 67, 54, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
 }
 .ag-comp-name {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.78rem; font-weight: 700;
-    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.92rem; font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
 }
 .ag-comp-price {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.82rem; font-weight: 700;
-    color: rgba(242, 67, 54, 0.7);
+    font-size: 1.05rem; font-weight: 800;
+    color: rgba(242, 67, 54, 0.8);
     text-decoration: line-through;
     text-decoration-thickness: 2px;
+    text-decoration-color: rgba(242, 67, 54, 0.5);
 }
 .ag-comp-miss {
-    font-size: 0.62rem; font-weight: 600;
-    color: rgba(255, 255, 255, 0.25);
-    text-align: right; max-width: 130px;
+    font-size: 0.7rem; font-weight: 600;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: right;
 }
 
 /* Our card (the winner) */
 .ag-us {
     display: flex; flex-direction: column; align-items: center;
-    background: linear-gradient(168deg, rgba(0, 213, 89, 0.06), rgba(0, 213, 89, 0.02));
-    border: 2px solid rgba(0, 213, 89, 0.25);
-    border-radius: 16px; padding: 22px 16px;
+    background: linear-gradient(168deg, rgba(0, 213, 89, 0.08), rgba(0, 213, 89, 0.02));
+    border: 2px solid rgba(0, 213, 89, 0.3);
+    border-radius: 24px; padding: 32px 24px;
     text-align: center; position: relative;
-    margin-top: 6px;
+    margin-top: 10px;
     animation: agPulse 3s ease-in-out infinite;
-    box-shadow: 0 0 40px rgba(0, 213, 89, 0.06);
+    box-shadow: 0 0 60px rgba(0, 213, 89, 0.08), 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 .ag-us::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
     background: linear-gradient(90deg, transparent, #00D559, #2D9EFF, transparent);
-    border-radius: 16px 16px 0 0;
+    border-radius: 24px 24px 0 0;
+}
+.ag-us::after {
+    content: 'WINNER'; position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.55rem; font-weight: 800; letter-spacing: 0.15em;
+    color: #0B0F19; background: linear-gradient(135deg, #00D559, #2D9EFF);
+    padding: 4px 16px; border-radius: 100px;
 }
 .ag-us-label {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.6rem; font-weight: 800;
+    font-size: 0.7rem; font-weight: 800;
     text-transform: uppercase; letter-spacing: 0.12em;
-    color: #00D559; margin-bottom: 4px;
+    color: #00D559; margin-bottom: 6px; margin-top: 6px;
 }
 .ag-us-price {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 2rem; font-weight: 800; color: #fff;
-    line-height: 1.1;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.5rem; font-weight: 800; color: #fff;
+    line-height: 1;
 }
 .ag-us-price .free {
     background: linear-gradient(135deg, #00D559, #2D9EFF);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: agGradientShift 6s ease infinite;
 }
 .ag-us-price .p {
-    font-size: 0.6rem; font-weight: 500; color: rgba(255, 255, 255, 0.3);
+    font-size: 0.7rem; font-weight: 500; color: rgba(255, 255, 255, 0.35);
+    font-family: 'Inter', sans-serif;
 }
 .ag-us-detail {
-    font-size: 0.66rem; color: rgba(255, 255, 255, 0.4);
-    margin-top: 4px; line-height: 1.4;
+    font-size: 0.75rem; color: rgba(255, 255, 255, 0.45);
+    margin-top: 8px; line-height: 1.5;
+    max-width: 500px;
 }
-.ag-us-detail strong { color: rgba(255, 255, 255, 0.7); }
+.ag-us-detail strong { color: rgba(255, 255, 255, 0.8); }
 
 /* ── Full comparison table ───────────────────────────────────── */
 .ag-compare {
-    margin: 36px 0 0;
+    margin: 48px 0 0;
     animation: agFadeUp 0.6s 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-tbl {
     width: 100%; border-collapse: separate; border-spacing: 0;
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 16px; overflow: hidden;
-    font-size: 0.72rem;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px; overflow: hidden;
+    font-size: 0.82rem;
 }
 .ag-tbl thead th {
-    padding: 11px 10px; font-size: 0.58rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.3);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 16px 12px; font-size: 0.65rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.35);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.06);
+    font-family: 'Space Grotesk', sans-serif;
 }
-.ag-tbl thead th:first-child { text-align: left; width: 32%; }
+.ag-tbl thead th:first-child { text-align: left; width: 30%; padding-left: 20px; }
 .ag-tbl thead th:not(:first-child) { text-align: center; }
-.ag-tbl thead th:last-child { color: #00D559; background: rgba(0, 213, 89, 0.03); }
+.ag-tbl thead th:last-child {
+    color: #00D559; background: rgba(0, 213, 89, 0.05);
+    position: relative;
+}
+.ag-tbl thead th:last-child::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00D559, #2D9EFF);
+}
 .ag-tbl tbody td {
-    padding: 8px 10px; color: rgba(255, 255, 255, 0.35);
+    padding: 12px 12px; color: rgba(255, 255, 255, 0.35);
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     font-weight: 500; text-align: center;
 }
-.ag-tbl tbody td:first-child { font-weight: 600; color: rgba(255, 255, 255, 0.55); text-align: left; }
-.ag-tbl tbody td:last-child { color: #00D559; background: rgba(0, 213, 89, 0.02); font-weight: 700; }
+.ag-tbl tbody td:first-child {
+    font-weight: 700; color: rgba(255, 255, 255, 0.6); text-align: left; padding-left: 20px;
+    font-family: 'Space Grotesk', sans-serif;
+}
+.ag-tbl tbody td:last-child {
+    color: #00D559; background: rgba(0, 213, 89, 0.03);
+    font-weight: 800; font-family: 'JetBrains Mono', monospace;
+}
 .ag-tbl tbody tr:last-child td { border-bottom: none; }
-.ag-tbl .x { color: rgba(242, 67, 54, 0.35); }
-.ag-tbl .ch { color: #00D559; font-weight: 700; }
-.ag-tbl .hi { background: rgba(0, 213, 89, 0.05); }
+.ag-tbl tbody tr:hover { background: rgba(255, 255, 255, 0.015); }
+.ag-tbl .x { color: rgba(242, 67, 54, 0.4); font-weight: 600; }
+.ag-tbl .ch { color: #00D559; font-weight: 800; }
+.ag-tbl .hi {
+    background: rgba(0, 213, 89, 0.06);
+    border-top: 2px solid rgba(0, 213, 89, 0.15);
+}
+.ag-tbl .hi td { font-size: 0.88rem; padding: 14px 12px; }
+.ag-tbl .hi td:first-child { padding-left: 20px; }
 
 /* ── "Bottom Line" callout ───────────────────────────────────── */
 .ag-bottom-line {
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.08), rgba(45, 158, 255, 0.05));
-    border: 1px solid rgba(0, 213, 89, 0.18);
-    border-radius: 16px; padding: 24px 20px;
-    text-align: center; margin: 28px 0 0;
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.1), rgba(45, 158, 255, 0.06));
+    border: 2px solid rgba(0, 213, 89, 0.2);
+    border-radius: 24px; padding: 36px 28px;
+    text-align: center; margin: 40px 0 0;
     animation: agFadeUp 0.6s 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
     position: relative; overflow: hidden;
-    box-shadow: 0 0 40px rgba(0, 213, 89, 0.04);
+    box-shadow: 0 0 60px rgba(0, 213, 89, 0.06), 0 16px 48px rgba(0, 0, 0, 0.3);
 }
 .ag-bottom-line::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, transparent, #00D559, #2D9EFF, transparent);
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0, 213, 89, 0.08) 0%, transparent 60%);
+    pointer-events: none;
 }
 .ag-bl-headline {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.05rem; font-weight: 800;
-    color: #fff; margin: 0 0 10px;
+    font-size: 1.8rem; font-weight: 800;
+    color: #fff; margin: 0 0 14px;
+    text-transform: uppercase; letter-spacing: -0.03em;
+    position: relative;
 }
 .ag-bl-headline .em {
     background: linear-gradient(135deg, #00D559, #2D9EFF);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: agGradientShift 6s ease infinite;
 }
 .ag-bl-body {
-    font-size: 0.74rem; color: rgba(255, 255, 255, 0.45);
-    line-height: 1.6; margin: 0;
+    font-size: 0.88rem; color: rgba(255, 255, 255, 0.5);
+    line-height: 1.7; margin: 0;
+    max-width: 600px; margin-left: auto; margin-right: auto;
+    position: relative;
 }
-.ag-bl-body strong { color: rgba(255, 255, 255, 0.8); font-weight: 700; }
+.ag-bl-body strong { color: #fff; font-weight: 700; }
 
 /* ── Feature cards (3-col) ───────────────────────────────────── */
 .ag-features {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
-    margin: 32px 0 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    margin: 44px 0 0;
     animation: agFadeUp 0.6s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-feat {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px; padding: 24px 16px 20px;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px; padding: 32px 18px 26px;
     text-align: center; position: relative; overflow: hidden;
     transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
 }
 .ag-feat:hover {
-    border-color: rgba(0, 213, 89, 0.25);
-    transform: translateY(-5px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 24px rgba(0, 213, 89, 0.06);
+    border-color: rgba(0, 213, 89, 0.3);
+    transform: translateY(-6px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 32px rgba(0, 213, 89, 0.08);
 }
 .ag-feat::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
@@ -1154,80 +1201,101 @@ html, body, .stApp, .stApp * {
 .ag-feat:hover::before { opacity: 1; }
 .ag-feat-ico {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 48px; height: 48px; border-radius: 12px;
-    background: linear-gradient(135deg, rgba(0, 213, 89, 0.12), rgba(45, 158, 255, 0.08));
-    border: 1px solid rgba(0, 213, 89, 0.1);
-    font-size: 1.4rem; margin-bottom: 10px;
+    width: 60px; height: 60px; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(0, 213, 89, 0.15), rgba(45, 158, 255, 0.1));
+    border: 1px solid rgba(0, 213, 89, 0.12);
+    font-size: 1.8rem; margin-bottom: 14px;
 }
 .ag-feat-name {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.85rem; font-weight: 700;
-    color: #fff;
-    line-height: 1.2;
+    font-size: 1rem; font-weight: 800;
+    color: #fff; text-transform: uppercase;
+    letter-spacing: -0.02em; line-height: 1.2;
 }
 .ag-feat-desc {
-    font-size: 0.68rem; color: rgba(255, 255, 255, 0.38);
-    margin-top: 6px; line-height: 1.55;
+    font-size: 0.78rem; color: rgba(255, 255, 255, 0.4);
+    margin-top: 8px; line-height: 1.55;
 }
 
 /* ── Metric counters ─────────────────────────────────────────── */
 .ag-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
-    margin: 32px 0 0;
+    margin: 44px 0 0;
     animation: agFadeUp 0.6s 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-stat {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px; padding: 20px 12px 16px;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px; padding: 28px 12px 22px;
     text-align: center; position: relative; overflow: hidden;
-    transition: border-color 0.3s, transform 0.3s;
+    transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+}
+.ag-stat::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 30%, rgba(0, 213, 89, 0.04) 0%, transparent 70%);
+    pointer-events: none;
 }
 .ag-stat:hover {
-    border-color: rgba(0, 213, 89, 0.2);
-    transform: translateY(-3px);
+    border-color: rgba(0, 213, 89, 0.25);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
 }
 .ag-stat-val {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.8rem; font-weight: 700;
-    background: linear-gradient(135deg, #00D559, #2D9EFF);
+    font-size: 2.4rem; font-weight: 800;
+    background: linear-gradient(135deg, #00D559 0%, #2D9EFF 50%, #c084fc 100%);
+    background-size: 200% 200%;
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
-    line-height: 1.1;
+    animation: agGradientShift 6s ease infinite;
+    line-height: 1;
+    position: relative;
 }
 .ag-stat-label {
-    font-size: 0.65rem; color: rgba(255, 255, 255, 0.3);
-    font-weight: 600; margin-top: 4px;
-    text-transform: uppercase; letter-spacing: 0.05em;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.72rem; color: rgba(255, 255, 255, 0.35);
+    font-weight: 700; margin-top: 8px;
+    text-transform: uppercase; letter-spacing: 0.08em;
 }
 
 /* ── Testimonials ────────────────────────────────────────────── */
 .ag-reviews {
-    margin: 36px 0 0;
+    margin: 48px 0 0;
     animation: agFadeUp 0.6s 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .ag-review {
-    background: linear-gradient(168deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 18px; padding: 22px 24px;
-    margin-bottom: 12px; position: relative;
-    transition: border-color 0.3s, transform 0.3s;
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px; padding: 28px 28px;
+    margin-bottom: 14px; position: relative;
+    transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    overflow: hidden;
+}
+.ag-review::before {
+    content: '\u201C'; position: absolute; top: 12px; left: 20px;
+    font-family: Georgia, serif; font-size: 3.5rem;
+    color: rgba(0, 213, 89, 0.1); line-height: 1;
+    pointer-events: none;
 }
 .ag-review:hover {
-    border-color: rgba(0, 213, 89, 0.2);
-    transform: translateY(-2px);
+    border-color: rgba(0, 213, 89, 0.25);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 .ag-review-text {
-    font-size: 0.92rem; color: rgba(255, 255, 255, 0.6);
-    font-style: italic; line-height: 1.6;
+    font-size: 1rem; color: rgba(255, 255, 255, 0.65);
+    font-style: italic; line-height: 1.7;
+    position: relative;
 }
 .ag-review-author {
-    font-size: 0.75rem; font-weight: 700;
-    color: rgba(0, 213, 89, 0.8);
-    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; font-weight: 700;
+    color: #00D559;
+    margin-top: 14px;
 }
 .ag-review-stars {
-    color: #F9C62B; font-size: 0.72rem; margin-top: 4px;
+    color: #F9C62B; font-size: 0.85rem; margin-top: 6px;
+    letter-spacing: 2px;
 }
 
 /* ── Pricing ─────────────────────────────────────────────────── */
@@ -2104,6 +2172,13 @@ html, body, .stApp, .stApp * {
     .ag-inside-grid { grid-template-columns: 1fr; }
     .ag-how-steps { grid-template-columns: 1fr; gap: 12px; }
     .ag-how-arrow { display: none; }
+    .ag-bl-headline { font-size: 1.4rem; }
+    .ag-us-price { font-size: 2.6rem; }
+    .ag-stat-val { font-size: 1.8rem; }
+    .ag-comp { grid-template-columns: 1fr auto; }
+    .ag-comp-miss { display: none; }
+    .ag-tbl { font-size: 0.72rem; }
+    .ag-review-text { font-size: 0.88rem; }
 }
 @media (max-width: 520px) {
     .ag-hero h1 { font-size: 2.2rem; }
@@ -2115,12 +2190,19 @@ html, body, .stApp, .stApp * {
     [data-testid="stForm"] { padding: 22px 18px 20px !important; }
     .ag-proof-big { font-size: 1.8rem; }
     .ag-proof-label { font-size: 0.6rem; }
-    .ag-tbl { font-size: 0.64rem; }
-    .ag-tbl thead th, .ag-tbl tbody td { padding: 7px 6px; }
+    .ag-tbl { font-size: 0.6rem; }
+    .ag-tbl thead th, .ag-tbl tbody td { padding: 8px 6px; }
+    .ag-tbl thead th:first-child, .ag-tbl tbody td:first-child { padding-left: 10px; }
     .ag-cta2-head { font-size: 1.4rem; }
     .ag-pick-card { width: 152px; }
     .ag-pc-line { font-size: 1.2rem; }
     .ag-pc-player { font-size: 0.7rem; }
+    .ag-bl-headline { font-size: 1.2rem; }
+    .ag-us-price { font-size: 2rem; }
+    .ag-stat-val { font-size: 1.6rem; }
+    .ag-feat-ico { width: 48px; height: 48px; font-size: 1.3rem; }
+    .ag-review::before { display: none; }
+    .ag-bottom-line { padding: 24px 18px; }
 }
 </style>
 """
@@ -2437,6 +2519,8 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
     # ── Below-fold: competitor graveyard ─────────────────────
     st.markdown("""
     <div class="ag-section">
+
+    <!-- ── COMPETITOR GRAVEYARD ── -->
     <div class="ag-graveyard">
       <div class="ag-gy-head">
         <h3>They Charge Hundreds.<br><span class="em">We Do It Better &mdash; Free.</span></h3>
@@ -2478,10 +2562,10 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       </div>
     </div>
 
-    <!-- Full feature comparison table -->
+    <!-- ── FEATURE-BY-FEATURE TABLE ── -->
     <div class="ag-compare">
       <div class="ag-section-head">
-        <h3>Feature-by-Feature Breakdown</h3>
+        <h3>Feature-by-Feature <span class="em">Breakdown</span></h3>
         <p>See exactly what they charge for vs. what you get free</p>
       </div>
       <table class="ag-tbl">
@@ -2510,7 +2594,7 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       </table>
     </div>
 
-    <!-- Bottom line callout -->
+    <!-- ── BOTTOM LINE CALLOUT ── -->
     <div class="ag-bottom-line">
       <div class="ag-bl-headline">The math is simple: <span class="em">they can&rsquo;t compete.</span></div>
       <p class="ag-bl-body">
@@ -2520,26 +2604,26 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       </p>
     </div>
 
-    <!-- Feature pillars -->
+    <!-- ── FEATURE PILLARS ── -->
     <div class="ag-features">
       <div class="ag-feat">
         <span class="ag-feat-ico">&#x1F9E0;</span>
         <div class="ag-feat-name">Quantum Engine</div>
-        <div class="ag-feat-desc">6 AI models fused</div>
+        <div class="ag-feat-desc">6 AI models fused into one signal</div>
       </div>
       <div class="ag-feat">
         <span class="ag-feat-ico">&#x1F3AF;</span>
         <div class="ag-feat-name">SAFE Score</div>
-        <div class="ag-feat-desc">0-100 confidence</div>
+        <div class="ag-feat-desc">0-100 confidence on every prop</div>
       </div>
       <div class="ag-feat">
         <span class="ag-feat-ico">&#x1F4E1;</span>
         <div class="ag-feat-name">Live Sweat</div>
-        <div class="ag-feat-desc">Real-time tracking</div>
+        <div class="ag-feat-desc">Real-time in-game tracking</div>
       </div>
     </div>
 
-    <!-- Metric counters -->
+    <!-- ── METRIC COUNTERS ── -->
     <div class="ag-stats">
       <div class="ag-stat">
         <div class="ag-stat-val">62.4%</div>
@@ -2567,10 +2651,10 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       </div>
     </div>
 
-    <!-- Testimonials -->
+    <!-- ── TESTIMONIALS ── -->
     <div class="ag-reviews">
       <div class="ag-section-head">
-        <h3>What Sharps Are Saying</h3>
+        <h3>What Sharps Are <span class="em">Saying</span></h3>
       </div>
       <div class="ag-review">
         <div class="ag-review-text">I was paying $99/mo for OddsJam and still losing. Switched to Smart Pick Pro &mdash; free, better AI, and my bankroll is up 22% in two months.</div>
@@ -2588,6 +2672,7 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
         <div class="ag-review-author">&mdash; @nightowl_picks</div>
       </div>
     </div>
+
     </div><!-- /ag-section graveyard -->
     """, unsafe_allow_html=True)
 
