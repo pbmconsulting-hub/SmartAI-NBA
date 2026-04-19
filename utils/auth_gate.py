@@ -3306,14 +3306,14 @@ def require_login() -> bool:
     <span class="spp-nav-wordmark">Smart<span class="gr">Pick</span>Pro</span>
   </div>
   <div class="spp-nav-pills">
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-how"><span class="ni">&#x1F3AF;</span>How</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-features"><span class="ni">&#x26A1;</span>Features</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-picks"><span class="ni">&#x1F4CA;</span>Picks</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-tracker"><span class="ni">&#x1F4C8;</span>Tracker</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-pricing"><span class="ni">&#x1F4B0;</span>Pricing</a>
-    <a class="spp-nav-pill" href="javascript:void(0)" id="nav-faq"><span class="ni">&#x2753;</span>FAQ</a>
+    <span class="spp-nav-pill" id="nav-how"><span class="ni">&#x1F3AF;</span>How</span>
+    <span class="spp-nav-pill" id="nav-features"><span class="ni">&#x26A1;</span>Features</span>
+    <span class="spp-nav-pill" id="nav-picks"><span class="ni">&#x1F4CA;</span>Picks</span>
+    <span class="spp-nav-pill" id="nav-tracker"><span class="ni">&#x1F4C8;</span>Tracker</span>
+    <span class="spp-nav-pill" id="nav-pricing"><span class="ni">&#x1F4B0;</span>Pricing</span>
+    <span class="spp-nav-pill" id="nav-faq"><span class="ni">&#x2753;</span>FAQ</span>
   </div>
-  <a class="spp-nav-cta" href="javascript:void(0)" id="nav-signup-cta">Sign Up Free</a>
+  <span class="spp-nav-cta" id="nav-signup-cta">Sign Up Free</span>
 </nav>
 <div class="spp-btt" id="spp-btt" title="Back to top">&#x2191;</div>
 """, unsafe_allow_html=True)
