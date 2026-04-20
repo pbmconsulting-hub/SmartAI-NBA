@@ -1248,11 +1248,12 @@ st.session_state.setdefault("joseph_last_commentary", "")
 st.session_state.setdefault("joseph_entry_just_built", False)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
+from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner, inject_sidebar_nav_tooltips
 with st.sidebar:
     render_global_settings()
 st.session_state["joseph_page_context"] = "page_home"
 inject_joseph_floating()
+inject_sidebar_nav_tooltips()
 
 # ============================================================
 # END SECTION: Initialize App on Startup
@@ -1447,10 +1448,67 @@ if _home_one_click:
         if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
             pass
         else:
-            st.error(f"❌ One-Click Setup failed: {_hoc_err}")
+            from utils.components import show_friendly_error
+            show_friendly_error(_hoc_err, context="loading tonight's slate")
 
 # ============================================================
 # END SECTION 1: Cinematic Hero
+# ============================================================
+
+# ============================================================
+# SECTION 1-ONBOARD: First-Time User Getting Started Guide
+# ============================================================
+
+_has_analysis = bool(st.session_state.get("analysis_results"))
+_onboard_dismissed = st.session_state.get("_onboarding_dismissed", False)
+
+if not _has_analysis and not _onboard_dismissed:
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,rgba(0,213,89,0.06),rgba(249,198,43,0.06));
+         border:1px solid rgba(0,213,89,0.2);border-radius:14px;padding:28px 24px;margin:18px 0 24px 0;">
+      <div style="font-size:1.4rem;font-weight:800;color:#F9C62B;margin-bottom:6px;">
+        🚀 Welcome to Smart Pick Pro!
+      </div>
+      <div style="color:#c8d6e5;font-size:0.92rem;margin-bottom:18px;">
+        Get your first AI-powered picks in <strong>3 easy steps</strong>:
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;">
+        <div style="flex:1;min-width:200px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+             border-radius:10px;padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:4px;">1️⃣</div>
+          <div style="color:#00D559;font-weight:700;font-size:0.9rem;">Load Tonight's Slate</div>
+          <div style="color:#8b949e;font-size:0.8rem;margin-top:4px;">
+            Click the <strong>⚡ LOAD TONIGHT'S SLATE</strong> button above. This fetches games, rosters, injuries, and live prop lines automatically.
+          </div>
+        </div>
+        <div style="flex:1;min-width:200px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+             border-radius:10px;padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:4px;">2️⃣</div>
+          <div style="color:#00D559;font-weight:700;font-size:0.9rem;">Run Neural Analysis</div>
+          <div style="color:#8b949e;font-size:0.8rem;margin-top:4px;">
+            Go to the <strong>⚡ Neural Analysis</strong> page in the sidebar and click <strong>Run Analysis</strong>. The AI engine will score every prop.
+          </div>
+        </div>
+        <div style="flex:1;min-width:200px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+             border-radius:10px;padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:4px;">3️⃣</div>
+          <div style="color:#00D559;font-weight:700;font-size:0.9rem;">Review Your Picks</div>
+          <div style="color:#8b949e;font-size:0.8rem;margin-top:4px;">
+            Come back here to see your <strong>Top 3 Tonight</strong> hero cards, or visit <strong>📋 Smart Picks</strong> for the full ranked list.
+          </div>
+        </div>
+      </div>
+      <div style="color:#6b7280;font-size:0.75rem;margin-top:14px;text-align:center;">
+        💡 Tip: Visit <strong>⚙️ Settings</strong> to customize your edge threshold, simulation depth, and platform preferences.
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("✕ Dismiss Guide", key="_dismiss_onboarding"):
+        st.session_state["_onboarding_dismissed"] = True
+        st.rerun()
+
+# ============================================================
+# END SECTION 1-ONBOARD
 # ============================================================
 
 # ============================================================

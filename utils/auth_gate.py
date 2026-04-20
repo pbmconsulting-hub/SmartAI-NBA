@@ -665,6 +665,40 @@ def _reset_user_password(email: str, new_password: str) -> bool:
         return False
 
 
+def change_user_password(email: str, current_password: str, new_password: str) -> tuple[bool, str]:
+    """Change password for a logged-in user after verifying current password.
+
+    Returns (success: bool, message: str).
+    """
+    initialize_database()
+    email_lower = email.strip().lower()
+    try:
+        with get_database_connection() as conn:
+            row = conn.execute(
+                "SELECT password_hash FROM users WHERE email = ?",
+                (email_lower,),
+            ).fetchone()
+            if not row:
+                return False, "Account not found."
+            if not _verify_password(current_password, row["password_hash"]):
+                return False, "Current password is incorrect."
+            pw_err = _valid_password(new_password)
+            if pw_err:
+                return False, pw_err
+            if current_password == new_password:
+                return False, "New password must be different from your current password."
+            pw_hash = _hash_password(new_password)
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE email = ?",
+                (pw_hash, email_lower),
+            )
+            conn.commit()
+        return True, "Password changed successfully!"
+    except Exception as exc:
+        _logger.error("Failed to change password: %s", exc)
+        return False, "An unexpected error occurred. Please try again."
+
+
 # ── Login Rate Limiting ───────────────────────────────────────
 _MAX_LOGIN_ATTEMPTS = 5
 _LOCKOUT_MINUTES = 15

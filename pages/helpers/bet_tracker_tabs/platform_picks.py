@@ -60,7 +60,12 @@ def render(platform_selections, player_search, date_range, direction_filter):
         ai_bets = [b for b in ai_bets if (b.get("bet_type") or "standard").lower() in _bt_set]
 
     if not ai_bets:
-        st.info("📭 No Smart Pick Pro platform picks yet. Run **⚡ Neural Analysis**.")
+        from utils.components import render_empty_state
+        render_empty_state(
+            "🤖", "No Platform Picks Yet",
+            "AI-generated platform picks will appear here after you run Neural Analysis.",
+            "💡 Go to ⚡ Quantum Analysis Matrix → Run Analysis to generate picks.",
+        )
         return
 
     ai_resolved = [b for b in ai_bets if b.get("result") in ("WIN", "LOSS", "EVEN")]

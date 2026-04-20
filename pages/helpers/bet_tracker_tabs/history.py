@@ -125,7 +125,12 @@ def render(platform_selections, player_search, date_range, direction_filter):
         for _b in all_hist:
             _bd.setdefault(_b.get("bet_date", "Unknown"), []).append(_b)
         if not _bd:
-            st.info("📭 No bets logged yet.")
+            from utils.components import render_empty_state
+            render_empty_state(
+                "📅", "No Betting History",
+                "Your daily bet history will appear here once you log or auto-track your first bets.",
+                "💡 Run analysis on the ⚡ Quantum Analysis page to get started.",
+            )
         else:
             _sorted_dates = sorted(_bd.keys(), reverse=True)
             for _idx, _date in enumerate(_sorted_dates):

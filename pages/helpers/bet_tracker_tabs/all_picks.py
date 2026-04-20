@@ -112,7 +112,12 @@ def render(platform_selections, player_search, date_range, direction_filter):
         if load_analysis_picks_for_date(_rbd_today) or st.session_state.get("analysis_results"):
             _rbd_dates = [_rbd_today] + _rbd_dates
     if not _rbd_dates:
-        st.info("ℹ️ No pick history found in the last 30 days.")
+        from utils.components import render_empty_state
+        render_empty_state(
+            "📋", "No Pick History Yet",
+            "Your daily pick history (last 30 days) will appear here after running Neural Analysis.",
+            "💡 Load tonight's slate → Run Analysis → picks are saved automatically.",
+        )
     else:
         _rbd_sel = st.selectbox("📅 Select date", _rbd_dates, index=0, key="rbd_date_selectbox")
         _rbd_picks = load_analysis_picks_for_date(_rbd_sel)

@@ -120,7 +120,12 @@ def render(platform_selections, player_search, date_range, direction_filter):
     )
 
     if total_h == 0:
-        st.info("📝 No resolved picks found. Use **➕ Log a Bet** or run analysis, then record results.")
+        from utils.components import render_empty_state
+        render_empty_state(
+            "📊", "No Model Health Data Yet",
+            "Win rates, tier breakdowns, and calibration charts will appear here once you have resolved bets.",
+            "💡 Run analysis → auto-resolve after games finish → see model performance here.",
+        )
 
     # ── Notifications ─────────────────────────────────────────
     if total_h > 0:

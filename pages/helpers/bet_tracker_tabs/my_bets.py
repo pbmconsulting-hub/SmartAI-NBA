@@ -79,7 +79,12 @@ def render(platform_selections, player_search, date_range, direction_filter):
     )
 
     if _summary.get("total", 0) == 0:
-        st.info("No bets match the current filters.")
+        from utils.components import render_empty_state
+        render_empty_state(
+            "📋", "No Bets Yet",
+            "Your tracked bets will appear here once you run Neural Analysis or log a bet manually.",
+            "💡 Go to ⚡ Quantum Analysis Matrix → Run Analysis to auto-log your first picks.",
+        )
         return
 
     _pc1, _pc2, _pc3 = st.columns([1, 1, 3])

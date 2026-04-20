@@ -360,8 +360,45 @@ def _inject_session_keepalive():
             /* When the user returns to the tab after it was hidden,
                fire an immediate ping to re-establish activity. */
             document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) _ping();
+                if (!document.hidden) { _ping(); _resetIdleTimer(); }
             });
+
+            /* ── Session Idle Warning ─────────────────────────────
+               Show a non-blocking toast after 8 min of no interaction.
+               Dismiss automatically once the user moves the mouse,
+               taps, scrolls, or presses a key. */
+            var _idleTimer = null;
+            var _IDLE_WARN_MS = 8 * 60 * 1000;  /* 8 minutes */
+            var _toastEl = null;
+
+            function _showIdleToast() {
+                if (_toastEl) return;
+                _toastEl = document.createElement('div');
+                _toastEl.id = 'spp-idle-toast';
+                _toastEl.innerHTML = '⏰ <strong>Still there?</strong> Your session will stay active while this tab is open. Click anywhere to dismiss.';
+                _toastEl.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:99999;' +
+                    'background:linear-gradient(135deg,#1a2332,#14192b);color:#c8d6e5;' +
+                    'border:1px solid rgba(249,198,43,0.4);border-radius:12px;padding:14px 20px;' +
+                    'font-size:0.85rem;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.5);' +
+                    'animation:lpFadeInUp 0.4s ease;cursor:pointer;';
+                _toastEl.onclick = function() { _dismissIdleToast(); };
+                document.body.appendChild(_toastEl);
+            }
+
+            function _dismissIdleToast() {
+                if (_toastEl) { _toastEl.remove(); _toastEl = null; }
+            }
+
+            function _resetIdleTimer() {
+                _dismissIdleToast();
+                clearTimeout(_idleTimer);
+                _idleTimer = setTimeout(_showIdleToast, _IDLE_WARN_MS);
+            }
+
+            ['mousemove','mousedown','keydown','touchstart','scroll'].forEach(function(evt) {
+                document.addEventListener(evt, _resetIdleTimer, {passive:true});
+            });
+            _resetIdleTimer();
 
             /* ── Mobile sidebar toggle fix ────────────────────────
                Streamlit sometimes hides the sidebar toggle button
@@ -539,3 +576,112 @@ def _persist_settings():
         save_user_settings(st.session_state)
     except Exception as exc:
         _components_logger.debug("_persist_settings failed (non-fatal): %s", exc)
+
+
+# ── Friendly Error Display ────────────────────────────────────────
+
+_ERROR_MAP = {
+    "ConnectionError": ("🌐 Connection Problem", "We couldn't reach the data source. Check your internet connection and try again."),
+    "TimeoutError": ("⏱️ Request Timed Out", "The data source took too long to respond. Please try again in a moment."),
+    "Timeout": ("⏱️ Request Timed Out", "The data source took too long to respond. Please try again in a moment."),
+    "JSONDecodeError": ("📦 Data Format Error", "The data we received was in an unexpected format. This is usually temporary — try again."),
+    "OperationalError": ("🗄️ Database Busy", "The database is temporarily busy. Please wait a moment and try again."),
+    "WebSocketClosedError": ("🔄 Session Reconnecting", "Your session briefly disconnected. The page will reload automatically."),
+    "StreamClosedError": ("🔄 Session Reconnecting", "Your session briefly disconnected. The page will reload automatically."),
+    "RateLimitError": ("⏳ Rate Limited", "Too many requests. Please wait a minute before trying again."),
+    "HTTPError": ("🌐 Server Error", "The external service returned an error. This is usually temporary — try again."),
+}
+
+
+def show_friendly_error(exc: Exception, context: str = "") -> None:
+    """Display a user-friendly error message instead of raw tracebacks.
+
+    Args:
+        exc: The caught exception.
+        context: Optional description of what was happening (e.g. "loading props").
+    """
+    exc_type = type(exc).__name__
+    title, message = _ERROR_MAP.get(exc_type, ("❌ Something Went Wrong", ""))
+    if not message:
+        # Generic fallback — hide raw traceback from users
+        message = "An unexpected error occurred. Please try again or reload the page."
+    if context:
+        message = f"Error while {context}: {message}"
+    st.error(f"**{title}**\n\n{message}")
+    _components_logger.error("Friendly error (%s): %s — %s", context or "general", exc_type, exc)
+
+
+# ── Designed Empty State ──────────────────────────────────────────
+
+def render_empty_state(icon: str, title: str, message: str, cta: str = "") -> None:
+    """Render a styled empty-state card with icon, title, message, and optional CTA hint."""
+    _cta_html = f'<div style="color:#00D559;font-size:0.82rem;font-weight:600;margin-top:12px;">{cta}</div>' if cta else ""
+    st.markdown(
+        f'<div style="text-align:center;padding:48px 24px;background:rgba(255,255,255,0.02);'
+        f'border:1px dashed rgba(255,255,255,0.08);border-radius:14px;margin:16px 0;">'
+        f'<div style="font-size:2.8rem;margin-bottom:10px;opacity:0.5;">{icon}</div>'
+        f'<div style="font-size:1.05rem;font-weight:700;color:#c8d6e5;margin-bottom:6px;">{title}</div>'
+        f'<div style="font-size:0.85rem;color:#6B7A9A;max-width:420px;margin:0 auto;line-height:1.5;">{message}</div>'
+        f'{_cta_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ── Sidebar Nav Tooltips ─────────────────────────────────────────
+
+_SIDEBAR_NAV_DESCRIPTIONS = {
+    "Live Games": "Load tonight's schedule & rosters",
+    "Prop Scanner": "Enter or pull live prop lines",
+    "Quantum Analysis Matrix": "Run AI analysis on all props",
+    "Smart Money Bets": "See top-ranked picks tonight",
+    "The Studio": "Joseph's AI commentary room",
+    "Game Report": "Full game-by-game breakdowns",
+    "Player Simulator": "What-if stat simulations",
+    "Entry Builder": "Build optimized DFS entries",
+    "Risk Shield": "Identify risky props to avoid",
+    "Smart NBA Data": "Player stats & team standings",
+    "Correlation Matrix": "Find correlated prop combos",
+    "Bet Tracker": "Track bets, ROI & model health",
+    "Proving Grounds": "Backtest & validate accuracy",
+    "Settings": "Tune engine + manage account",
+    "Subscription Level": "Manage your premium plan",
+    "Live Sweat": "Track active bets in real-time",
+}
+
+
+def inject_sidebar_nav_tooltips() -> None:
+    """Inject CSS-based tooltips on sidebar nav items via JavaScript."""
+    if st.session_state.get("_nav_tooltips_injected"):
+        return
+    st.session_state["_nav_tooltips_injected"] = True
+
+    # Build JS map of page name → tooltip
+    import json as _json_mod
+    _map_js = _json_mod.dumps(_SIDEBAR_NAV_DESCRIPTIONS)
+    _tooltip_script = (
+        '<script>\n'
+        '(function() {\n'
+        '    if (window.__sppNavTooltips) return;\n'
+        '    window.__sppNavTooltips = true;\n'
+        '    var map = ' + _map_js + ';\n'
+        '    function addTooltips() {\n'
+        '        var links = document.querySelectorAll(\'[data-testid="stSidebarNav"] a span\');\n'
+        '        links.forEach(function(span) {\n'
+        '            var text = (span.textContent || "").trim();\n'
+        '            var clean = text.replace(/^\\S+\\s*/, "").trim();\n'
+        '            if (!clean) clean = text;\n'
+        '            var tip = map[clean];\n'
+        '            if (tip && !span.parentElement.getAttribute("title")) {\n'
+        '                span.parentElement.setAttribute("title", tip);\n'
+        '            }\n'
+        '        });\n'
+        '    }\n'
+        '    setTimeout(addTooltips, 1500);\n'
+        '    var obs = new MutationObserver(function() { setTimeout(addTooltips, 300); });\n'
+        '    var sidebar = document.querySelector(\'[data-testid="stSidebar"]\');\n'
+        '    if (sidebar) obs.observe(sidebar, { childList: true, subtree: true });\n'
+        '})();\n'
+        '</script>'
+    )
+    st.markdown(_tooltip_script, unsafe_allow_html=True)

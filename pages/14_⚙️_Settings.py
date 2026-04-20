@@ -448,3 +448,121 @@ save_user_settings(st.session_state)
 # ============================================================
 # END SECTION: Display Current Settings Summary
 # ============================================================
+
+st.divider()
+
+# ============================================================
+# SECTION: Account Management — Change Password + Edit Profile
+# ============================================================
+
+st.subheader("👤 Account Management")
+
+from utils.auth_gate import get_logged_in_email, change_user_password
+from tracking.database import load_user_profile, save_user_profile
+
+_acct_email = get_logged_in_email()
+
+_acct_tab_pw, _acct_tab_profile = st.tabs(["🔒 Change Password", "✏️ Edit Profile"])
+
+# ── Change Password ───────────────────────────────────────────
+with _acct_tab_pw:
+    st.markdown("Update your account password. You'll need to enter your current password first.")
+    with st.form("change_password_form", clear_on_submit=True):
+        _cp_current = st.text_input("Current Password", type="password", key="_cp_current")
+        _cp_new = st.text_input("New Password", type="password", key="_cp_new",
+                                help="At least 8 characters, must include a letter and a number.")
+        _cp_confirm = st.text_input("Confirm New Password", type="password", key="_cp_confirm")
+        _cp_submit = st.form_submit_button("🔒 Change Password", type="primary", use_container_width=True)
+
+    if _cp_submit:
+        if not _cp_current or not _cp_new or not _cp_confirm:
+            st.error("Please fill in all fields.")
+        elif _cp_new != _cp_confirm:
+            st.error("New passwords do not match.")
+        elif _acct_email:
+            _ok, _msg = change_user_password(_acct_email, _cp_current, _cp_new)
+            if _ok:
+                st.success(f"✅ {_msg}")
+            else:
+                st.error(_msg)
+        else:
+            st.error("You must be logged in to change your password.")
+
+# ── Edit Profile ──────────────────────────────────────────────
+with _acct_tab_profile:
+    _existing_profile = load_user_profile(_acct_email) if _acct_email else None
+    if not _existing_profile:
+        st.info("No profile found yet. Complete the fields below to create one.")
+        _existing_profile = {}
+
+    _nba_teams = [
+        "", "Atlanta Hawks", "Boston Celtics", "Brooklyn Nets", "Charlotte Hornets",
+        "Chicago Bulls", "Cleveland Cavaliers", "Dallas Mavericks", "Denver Nuggets",
+        "Detroit Pistons", "Golden State Warriors", "Houston Rockets", "Indiana Pacers",
+        "LA Clippers", "Los Angeles Lakers", "Memphis Grizzlies", "Miami Heat",
+        "Milwaukee Bucks", "Minnesota Timberwolves", "New Orleans Pelicans",
+        "New York Knicks", "Oklahoma City Thunder", "Orlando Magic", "Philadelphia 76ers",
+        "Phoenix Suns", "Portland Trail Blazers", "Sacramento Kings", "San Antonio Spurs",
+        "Toronto Raptors", "Utah Jazz", "Washington Wizards",
+    ]
+    _exp_levels = ["Beginner", "Intermediate", "Advanced", "Professional"]
+    _bet_styles = ["Conservative", "Balanced", "Aggressive"]
+    _budget_opts = ["$0-$25", "$25-$50", "$50-$100", "$100-$250", "$250+"]
+    _platform_opts = ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"]
+
+    with st.form("edit_profile_form"):
+        _ep_name = st.text_input(
+            "Display Name",
+            value=_existing_profile.get("display_name", ""),
+            max_chars=50,
+        )
+        _ep_team_idx = 0
+        _existing_team = _existing_profile.get("favorite_team", "")
+        if _existing_team in _nba_teams:
+            _ep_team_idx = _nba_teams.index(_existing_team)
+        _ep_team = st.selectbox("Favorite Team", _nba_teams, index=_ep_team_idx)
+
+        _existing_platforms = _existing_profile.get("preferred_platforms", "")
+        _default_platforms = [p.strip() for p in _existing_platforms.split(",") if p.strip()] if _existing_platforms else []
+        _ep_platforms = st.multiselect("Preferred Platforms", _platform_opts, default=_default_platforms)
+
+        _ep_exp_idx = 0
+        _existing_exp = _existing_profile.get("experience_level", "")
+        if _existing_exp in _exp_levels:
+            _ep_exp_idx = _exp_levels.index(_existing_exp)
+        _ep_exp = st.selectbox("Experience Level", _exp_levels, index=_ep_exp_idx)
+
+        _ep_style_idx = 0
+        _existing_style = _existing_profile.get("betting_style", "")
+        if _existing_style in _bet_styles:
+            _ep_style_idx = _bet_styles.index(_existing_style)
+        _ep_style = st.selectbox("Betting Style", _bet_styles, index=_ep_style_idx)
+
+        _ep_budget_idx = 0
+        _existing_budget = _existing_profile.get("daily_budget", "")
+        if _existing_budget in _budget_opts:
+            _ep_budget_idx = _budget_opts.index(_existing_budget)
+        _ep_budget = st.selectbox("Daily Budget", _budget_opts, index=_ep_budget_idx)
+
+        _ep_submit = st.form_submit_button("💾 Save Profile", type="primary", use_container_width=True)
+
+    if _ep_submit and _acct_email:
+        _profile_data = {
+            "display_name": _ep_name.strip(),
+            "favorite_team": _ep_team,
+            "preferred_platforms": ", ".join(_ep_platforms),
+            "experience_level": _ep_exp,
+            "betting_style": _ep_style,
+            "daily_budget": _ep_budget,
+        }
+        if save_user_profile(_acct_email, _profile_data):
+            st.success("✅ Profile updated successfully!")
+            st.rerun()
+        else:
+            st.error("Failed to save profile. Please try again.")
+    elif _ep_submit and not _acct_email:
+        st.error("You must be logged in to edit your profile.")
+
+# ============================================================
+# END SECTION: Account Management
+# ============================================================
