@@ -47,6 +47,13 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
+# ─── Seed admin account from env vars (idempotent) ────────────
+try:
+    from utils.auth_gate import seed_admin_account as _seed_admin
+    _seed_admin()
+except Exception:
+    pass
+
 # ─── Login / Signup Gate — must be before ANY content ─────────
 from utils.auth_gate import require_login as _require_login
 if not _require_login():
@@ -91,13 +98,6 @@ try:
     _start_etl_scheduler()
 except Exception:
     pass  # non-critical — staleness guard above is the safety net
-
-# ─── Seed admin account from env vars (idempotent) ────────────
-try:
-    from utils.auth_gate import seed_admin_account as _seed_admin
-    _seed_admin()
-except Exception:
-    pass
 
 # ─── Auto-seed picks & props into session on first load ───────
 if not st.session_state.get("_picks_seeded"):
