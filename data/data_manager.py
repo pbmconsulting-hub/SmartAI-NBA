@@ -59,7 +59,7 @@ INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 # SECTION: CSV Loading Functions
 # ============================================================
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_players_data():
     """
     Load all player data.
@@ -190,7 +190,7 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
     return result
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_props_data():
     """
     Load all prop lines from the props.csv file.
@@ -206,7 +206,7 @@ def load_props_data():
     return _load_csv_file(PROPS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_teams_data():
     """
     Load all 30 NBA teams.
@@ -227,7 +227,7 @@ def load_teams_data():
     return _load_csv_file(TEAMS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_defensive_ratings_data():
     """
     Load team defensive ratings by position.
@@ -248,7 +248,7 @@ def load_defensive_ratings_data():
     return _load_csv_file(DEFENSIVE_RATINGS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_injury_status():
     """
     Load the persisted player injury/availability status map from disk.

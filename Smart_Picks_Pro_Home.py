@@ -42,6 +42,39 @@ from utils.auth_gate import require_login as _require_login
 if not _require_login():
     st.stop()
 
+# ─── Background ETL staleness guard (once per session) ────────
+# If the ETL database is more than 1 day stale, kick off an
+# incremental update in a background thread so users always
+# see fresh data — without blocking the UI.
+if not st.session_state.get("_etl_staleness_checked"):
+    st.session_state["_etl_staleness_checked"] = True
+    try:
+        import sqlite3 as _sq
+        from pathlib import Path as _Path
+        from datetime import date as _date, datetime as _dt, timedelta as _td
+        _etl_db = _Path(os.environ.get(
+            "DB_DIR", str(_Path(__file__).resolve().parent / "db")
+        )) / "smartpicks.db"
+        if _etl_db.exists():
+            _conn = _sq.connect(str(_etl_db))
+            _row = _conn.execute("SELECT MAX(game_date) FROM Games").fetchone()
+            _conn.close()
+            _last = _dt.strptime(_row[0], "%Y-%m-%d").date() if _row and _row[0] else None
+            if _last is None or (_date.today() - _last) > _td(days=1):
+                import threading as _thr
+                def _bg_etl_refresh():
+                    try:
+                        from etl.data_updater import run_update
+                        run_update()
+                    except Exception:
+                        pass  # non-critical background task
+                _thr.Thread(target=_bg_etl_refresh, daemon=True).start()
+                logging.getLogger(__name__).info(
+                    "ETL staleness guard: DB last_date=%s — background refresh started.", _last
+                )
+    except Exception:
+        pass  # never block the UI for a staleness check
+
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
 

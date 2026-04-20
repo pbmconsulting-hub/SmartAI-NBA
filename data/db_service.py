@@ -1503,7 +1503,7 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
     return result
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_players_data() -> list:
     """
     Load all player data.
@@ -1523,13 +1523,13 @@ def load_players_data() -> list:
     return _load_csv_file(PLAYERS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_props_data():
     """Load all prop lines from props.csv."""
     return _load_csv_file(PROPS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_teams_data() -> list:
     """Load all 30 NBA teams — tries ETL database first, then CSV fallback."""
     try:
@@ -1542,7 +1542,7 @@ def load_teams_data() -> list:
     return _load_csv_file(TEAMS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_defensive_ratings_data():
     """Load team defensive ratings by position — tries ETL database first, then CSV fallback."""
     try:
@@ -1555,7 +1555,7 @@ def load_defensive_ratings_data():
     return _load_csv_file(DEFENSIVE_RATINGS_CSV_PATH)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def load_injury_status():
     """Load the persisted player injury/availability status map from disk."""
     if not INJURY_STATUS_JSON_PATH.exists():
@@ -2337,7 +2337,30 @@ def get_box_score_matchups(game_id: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_all_players(active_only: bool = True) -> list[dict]:
-    """Fetch all players via nba_api CommonAllPlayers (for player_profile_service)."""
+    """Return all players — ETL DB first, nba_api fallback only if DB is empty."""
+    # ── DB-first path (no API call) ──────────────────────────────────────
+    try:
+        from data.etl_data_service import get_all_players as _etl_all
+        etl_rows = _etl_all()
+        if etl_rows:
+            players = [
+                {
+                    "id": int(p.get("player_id", 0)),
+                    "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                    "first_name": str(p.get("first_name", "")),
+                    "last_name": str(p.get("last_name", "")),
+                    "is_active": True,
+                    "team_id": p.get("team_id"),
+                    "team_abbreviation": str(p.get("team_abbreviation", "")),
+                }
+                for p in etl_rows
+            ]
+            _logger.info("get_all_players: loaded %d player(s) from ETL DB.", len(players))
+            return players
+    except Exception as exc:
+        _logger.debug("get_all_players ETL path failed: %s", exc)
+
+    # ── Fallback: live nba_api (only when DB has no players) ─────────────
     try:
         from nba_api.stats.endpoints import commonallplayers
         import time
@@ -2369,7 +2392,43 @@ def get_all_players(active_only: bool = True) -> list[dict]:
 
 
 def get_player_info(player_id: int) -> dict:
-    """Fetch player bio/info via nba_api CommonPlayerInfo."""
+    """Return player bio — ETL DB first, nba_api fallback only if DB miss."""
+    # ── DB-first path (no API call) ──────────────────────────────────────
+    conn = _get_conn()
+    if conn is not None:
+        try:
+            row = conn.execute(
+                "SELECT player_id, first_name, last_name, team_id, "
+                "team_abbreviation, position FROM Players WHERE player_id = ?",
+                (int(player_id),),
+            ).fetchone()
+            if row:
+                d = dict(row)
+                _logger.info("get_player_info(%s): served from DB.", player_id)
+                return {
+                    "id": d.get("player_id", player_id),
+                    "full_name": f"{d.get('first_name', '')} {d.get('last_name', '')}".strip(),
+                    "position": d.get("position", "") or "",
+                    "height": "",
+                    "weight": "",
+                    "country": "",
+                    "birthdate": "",
+                    "draft_year": None,
+                    "draft_round": None,
+                    "draft_number": None,
+                    "school": "",
+                    "team_id": d.get("team_id"),
+                    "team_abbreviation": d.get("team_abbreviation", "") or "",
+                    "jersey": "",
+                    "from_year": None,
+                    "to_year": None,
+                }
+        except Exception as exc:
+            _logger.debug("get_player_info DB path failed: %s", exc)
+        finally:
+            conn.close()
+
+    # ── Fallback: live nba_api (only when player not in DB) ──────────────
     try:
         from nba_api.stats.endpoints import commonplayerinfo
         import time

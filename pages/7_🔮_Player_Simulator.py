@@ -288,10 +288,8 @@ if _auto_load_logs and selected_names:
             if _al_pid:
                 try:
                     from data.nba_data_service import get_player_game_log as _al_gl_fn
-                    from data.game_log_cache import save_game_logs_to_cache as _al_gl_save
                     _al_logs = _al_gl_fn(_al_pid, last_n_games=20)
-                    if _al_logs:
-                        _al_gl_save(_al_name, _al_logs)
+                    # Logs come straight from the DB — no API call, no file cache needed
                 except Exception:
                     pass
             st.session_state["auto_loaded_players"].add(_al_name)
@@ -399,10 +397,9 @@ if _load_logs_btn and selected_names:
             try:
                 from data.nba_data_service import get_player_game_log as _ldf_gl
                 from data.nba_data_service import get_player_recent_form as _ldf_form
-                from data.game_log_cache import save_game_logs_to_cache as _gl_save
+                # All reads come from the ETL DB — no live API calls
                 _logs = _ldf_gl(_gl_player_id, last_n_games=20)
                 if _logs:
-                    _gl_save(_gl_pname, _logs)
                     _gl_loaded += 1
                 # Also get recent form trend for the player
                 try:
