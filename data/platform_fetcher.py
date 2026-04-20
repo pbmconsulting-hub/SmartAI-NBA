@@ -928,6 +928,57 @@ def fetch_prizepicks_props(league="NBA"):
 # ============================================================
 
 
+# ── Underdog title cleanup ──────────────────────────────────
+# Underdog's "title" field on over_under_lines contains the full prop
+# description, e.g. "LeBron James Points O/U".  We need just the player
+# name.  Known stat display suffixes are stripped in longest-first order
+# so "Points + Rebounds" is matched before "Points".
+import re as _re
+
+_UD_TITLE_SUFFIX_RE = _re.compile(
+    r"\s+(?:"
+    r"Pts\s*\+\s*Rebs\s*\+\s*Asts"
+    r"|Points\s*\+\s*Rebounds\s*\+\s*Assists"
+    r"|Points\s*\+\s*Rebounds"
+    r"|Points\s*\+\s*Assists"
+    r"|Rebounds\s*\+\s*Assists"
+    r"|Fantasy\s+Points"
+    r"|3-Pointers\s+Made"
+    r"|FG\s+Attempted"
+    r"|FT\s+Made"
+    r"|Points"
+    r"|Rebounds"
+    r"|Assists"
+    r"|Steals"
+    r"|Blocks"
+    r"|Turnovers"
+    r"|Double\s+Double"
+    r"|Triple\s+Double"
+    r"|Blks\s*\+\s*Stls"
+    r")\s*O/U\s*$",
+    _re.IGNORECASE,
+)
+
+
+def _strip_underdog_title(title: str) -> str:
+    """Remove stat-type + 'O/U' suffix from an Underdog prop title.
+
+    >>> _strip_underdog_title("LeBron James Points O/U")
+    'LeBron James'
+    >>> _strip_underdog_title("Lu Dort 3-Pointers Made O/U")
+    'Lu Dort'
+    >>> _strip_underdog_title("LeBron James")
+    'LeBron James'
+    """
+    if not title:
+        return title
+    # Fast path: no " O/U" → return as-is
+    if "O/U" not in title:
+        return title
+    cleaned = _UD_TITLE_SUFFIX_RE.sub("", title).strip()
+    return cleaned if cleaned else title
+
+
 # ============================================================
 # SECTION: Underdog Fantasy Fetcher
 # ============================================================
@@ -1022,12 +1073,8 @@ def fetch_underdog_props(league="NBA"):
         # Player name may be directly on line_item, or nested under
         # "over_under" (newer API versions nest the data).
         over_under = line_item.get("over_under", {}) or {}
-        player_name = (
-            line_item.get("title", "").strip()
-            or over_under.get("title", "").strip()
-        )
 
-        # Try to get team from the appearance object
+        # Resolve appearance data FIRST — it carries the clean player name.
         ap_id = (
             line_item.get("appearance_id", "")
             or over_under.get("appearance_id", "")
@@ -1035,12 +1082,24 @@ def fetch_underdog_props(league="NBA"):
         ap_data = appearances.get(ap_id, {})
         team = ap_data.get("team_abbreviation", ap_data.get("team", "")).strip().upper()
 
+        # Prefer appearance data for the player name (clean, no stat suffix).
+        # The line_item "title" field is the full prop title and may contain
+        # the stat description + "O/U" suffix (e.g. "LeBron James Points O/U").
+        player_name = ""
+        if ap_data:
+            player_name = (
+                ap_data.get("display_name", "").strip()
+                or ap_data.get("title", "").strip()
+            )
         if not player_name:
-            # Last resort: try the appearance lookup by name
-            if ap_data:
-                player_name = ap_data.get("title", ap_data.get("display_name", "")).strip()
-            if not player_name:
-                continue  # Skip entries with no player name
+            _raw_title = (
+                line_item.get("title", "").strip()
+                or over_under.get("title", "").strip()
+            )
+            # Strip " ... O/U" suffix that Underdog appends to prop titles.
+            player_name = _strip_underdog_title(_raw_title)
+        if not player_name:
+            continue  # Skip entries with no player name
 
         # Normalize stat type — check nested over_under as well
         appearance_stat = over_under.get("appearance_stat", {}) or {}

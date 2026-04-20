@@ -221,6 +221,46 @@ def _is_segment_prop(stat_type: str) -> bool:
     lower = stat_type.lower()
     return any(pattern in lower for pattern in _SEGMENT_PROP_PATTERNS)
 
+
+import re as _re_bt
+
+# Regex to strip Underdog-style " Stat Description O/U" suffix from
+# player names stored with corrupted data.  Longest patterns first so
+# "Points + Rebounds" matches before "Points".
+_UD_NAME_SUFFIX_RE = _re_bt.compile(
+    r"\s+(?:"
+    r"Pts\s*\+\s*Rebs\s*\+\s*Asts"
+    r"|Points\s*\+\s*Rebounds\s*\+\s*Assists"
+    r"|Points\s*\+\s*Rebounds"
+    r"|Points\s*\+\s*Assists"
+    r"|Rebounds\s*\+\s*Assists"
+    r"|Fantasy\s+Points"
+    r"|3-Pointers\s+Made"
+    r"|FG\s+Attempted"
+    r"|FT\s+Made"
+    r"|Points"
+    r"|Rebounds"
+    r"|Assists"
+    r"|Steals"
+    r"|Blocks"
+    r"|Turnovers"
+    r"|Double\s+Double"
+    r"|Triple\s+Double"
+    r"|Blks\s*\+\s*Stls"
+    r")\s*O/U\s*$",
+    _re_bt.IGNORECASE,
+)
+
+
+def _clean_player_name(name: str) -> str:
+    """Strip stat-type + 'O/U' suffix from player names that were stored
+    with the full Underdog prop title (e.g. 'LeBron James Points O/U'
+    → 'LeBron James').  No-op if the name is already clean."""
+    if not name or "O/U" not in name:
+        return name
+    cleaned = _UD_NAME_SUFFIX_RE.sub("", name).strip()
+    return cleaned if cleaned else name
+
 # ============================================================
 # END SECTION: Unified Stat Column Mapping
 # ============================================================
@@ -1392,7 +1432,7 @@ def auto_resolve_bet_results(date_str=None):
 
     for bet in pending_bets:
         bet_id      = bet.get("bet_id")
-        player_name = bet.get("player_name", "")
+        player_name = _clean_player_name(bet.get("player_name", ""))
         stat_type   = bet.get("stat_type", "").lower()
         prop_line   = float(bet.get("prop_line", 0) or 0)
         direction   = (bet.get("direction") or "OVER").upper()
@@ -1724,7 +1764,7 @@ def resolve_todays_bets():
 
     for bet in todays_pending:
         bet_id      = bet.get("id") or bet.get("bet_id")
-        player_name = bet.get("player_name", "")
+        player_name = _clean_player_name(bet.get("player_name", ""))
         stat_type   = str(bet.get("stat_type", "")).lower()
         prop_line   = float(bet.get("prop_line") or 0)
         direction   = str(bet.get("direction") or "OVER").upper()
@@ -2331,7 +2371,7 @@ def resolve_all_pending_bets():
 
         for bet in bets:
             bet_id      = bet.get("bet_id") or bet.get("id")
-            player_name = bet.get("player_name", "")
+            player_name = _clean_player_name(bet.get("player_name", ""))
             stat_type   = str(bet.get("stat_type", "")).lower()
             prop_line   = float(bet.get("prop_line") or 0)
             direction   = str(bet.get("direction") or "OVER").upper()
@@ -2471,6 +2511,11 @@ def resolve_all_pending_bets():
                         summary["errors"].append(f"#{bet_id} {player_name}: VOID update failed")
                         summary["pending"] += 1
                 else:
+                    _last = logs[0].get("game_date", "N/A") if logs else "N/A"
+                    summary["errors"].append(
+                        f"#{bet_id} {player_name}: no game found on {date_str} "
+                        f"(last game: {_last})"
+                    )
                     summary["pending"] += 1
                 continue
 
@@ -2656,7 +2701,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
         for pick in picks:
             pick_id     = pick.get("pick_id")
-            player_name = pick.get("player_name", "")
+            player_name = _clean_player_name(pick.get("player_name", ""))
             stat_type   = str(pick.get("stat_type", "")).lower()
             prop_line   = float(pick.get("prop_line") or 0)
             direction   = str(pick.get("direction") or "OVER").upper()
@@ -2805,6 +2850,11 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                         summary["errors"].append(f"#{pick_id} {player_name}: VOID update failed")
                         summary["pending"] += 1
                 else:
+                    _last = logs[0].get("game_date", "N/A") if logs else "N/A"
+                    summary["errors"].append(
+                        f"#{pick_id} {player_name}: no game found on {_loop_date} "
+                        f"(last game: {_last})"
+                    )
                     summary["pending"] += 1
                 continue
 
@@ -3030,7 +3080,7 @@ def get_live_bet_status(bets_list):
 
     for bet in bets_list:
         bet_copy = dict(bet)
-        player_name = bet.get("player_name", "")
+        player_name = _clean_player_name(bet.get("player_name", ""))
         stat_type   = str(bet.get("stat_type") or "").lower()
         prop_line   = float(bet.get("prop_line") or 0)
         direction   = str(bet.get("direction") or "OVER").upper()
