@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""start.py – Railway entrypoint: run daily ETL update then launch Streamlit."""
+"""start.py – Railway entrypoint: seed persistent volume, run daily ETL update, launch Streamlit."""
 
+import os
+import shutil
 import subprocess
 import sys
 import logging
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,6 +14,31 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 _logger = logging.getLogger("start")
+
+_APP_DB_DIR = Path("/app/db")
+_VOLUME_DIR = Path(os.environ.get("DB_DIR", ""))
+
+
+def _seed_volume():
+    """Copy seed databases from the Docker image to the persistent volume if missing."""
+    if not _VOLUME_DIR or not _VOLUME_DIR.is_absolute():
+        _logger.info("DB_DIR not set — using local db/ (non-persistent)")
+        return
+
+    _VOLUME_DIR.mkdir(parents=True, exist_ok=True)
+
+    for db_name in ("smartpicks.db", "smartai_nba.db"):
+        src = _APP_DB_DIR / db_name
+        dst = _VOLUME_DIR / db_name
+        if dst.exists():
+            _logger.info("Volume already has %s (%.1f MB)", db_name, dst.stat().st_size / 1e6)
+            continue
+        if src.exists():
+            _logger.info("Seeding %s to volume...", db_name)
+            shutil.copy2(str(src), str(dst))
+            _logger.info("Seeded %s (%.1f MB)", db_name, dst.stat().st_size / 1e6)
+        else:
+            _logger.info("No seed %s in image — will be created on first use", db_name)
 
 
 def _run_daily_update():
@@ -25,6 +53,7 @@ def _run_daily_update():
 
 
 if __name__ == "__main__":
+    _seed_volume()
     _run_daily_update()
 
     # Launch Streamlit

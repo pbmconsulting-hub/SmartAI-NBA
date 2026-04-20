@@ -16,6 +16,7 @@ followed by initial_pull.py).
 """
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = str(_REPO_ROOT / "db" / "smartpicks.db")
+DB_PATH = str(Path(os.environ.get("DB_DIR", str(_REPO_ROOT / "db"))) / "smartpicks.db")
 
 CREATE_PLAYERS = """
 CREATE TABLE IF NOT EXISTS Players (

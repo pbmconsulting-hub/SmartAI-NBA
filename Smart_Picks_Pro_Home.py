@@ -877,7 +877,7 @@ initialize_database()
 # Warn if running in production mode with the default SQLite path.
 # SQLite is not ideal for multi-user cloud deployments.
 if os.environ.get("SMARTAI_PRODUCTION", "").lower() in ("true", "1", "yes"):
-    _db_path = os.environ.get("DB_PATH", "db/smartai_nba.db")
+    _db_path = os.environ.get("DB_PATH", os.path.join(os.environ.get("DB_DIR", "db"), "smartai_nba.db"))
     if os.path.basename(_db_path) == "smartai_nba.db":
         logging.getLogger(__name__).warning(
             "Running in production mode with SQLite (%s). "

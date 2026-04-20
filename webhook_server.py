@@ -41,7 +41,7 @@ except ImportError:
 # ── Configuration ─────────────────────────────────────────────
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-DB_PATH = os.environ.get("DB_PATH", str(Path(__file__).parent / "db" / "smartai_nba.db"))
+DB_PATH = os.environ.get("DB_PATH", str(Path(os.environ.get("DB_DIR", str(Path(__file__).parent / "db"))) / "smartai_nba.db"))
 
 stripe.api_key = STRIPE_SECRET_KEY
 

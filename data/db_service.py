@@ -19,6 +19,7 @@ import datetime
 import json
 import logging
 import math
+import os
 import re
 import sqlite3
 import threading as _threading
@@ -49,7 +50,7 @@ except ImportError:
 # ── DB path ───────────────────────────────────────────────────────────────────
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = _REPO_ROOT / "db" / "smartpicks.db"
+DB_PATH = Path(os.environ.get("DB_DIR", str(_REPO_ROOT / "db"))) / "smartpicks.db"
 
 
 # ── Connection helper ─────────────────────────────────────────────────────────

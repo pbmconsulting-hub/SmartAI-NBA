@@ -32,7 +32,7 @@ except ImportError:
 # ── DB path ───────────────────────────────────────────────────────────────────
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = _REPO_ROOT / "db" / "smartpicks.db"
+DB_PATH = Path(os.environ.get("DB_DIR", str(_REPO_ROOT / "db"))) / "smartpicks.db"
 
 
 # ── Connection helper ─────────────────────────────────────────────────────────

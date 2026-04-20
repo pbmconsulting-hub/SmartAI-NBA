@@ -17,7 +17,7 @@ _COMBO_STATS = ["pts+reb", "pts+ast", "pts+reb+ast", "blk+stl"]
 _ALL_STATS = _SIMPLE_STATS + _COMBO_STATS
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_DB_PATH = os.path.join(_REPO_ROOT, "db", "smartpicks.db")
+_DB_PATH = os.path.join(os.environ.get("DB_DIR", os.path.join(_REPO_ROOT, "db")), "smartpicks.db")
 
 
 def _build_game_context_map() -> dict:

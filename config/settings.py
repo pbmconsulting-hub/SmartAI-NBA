@@ -64,7 +64,7 @@ class _Settings:
     # ── Database ──────────────────────────────────────────────
     DB_PATH: str = os.environ.get(
         "DB_PATH",
-        str(_PROJECT_ROOT / "db" / "smartai_nba.db"),
+        str(Path(os.environ.get("DB_DIR", str(_PROJECT_ROOT / "db"))) / "smartai_nba.db"),
     )
 
     # ── Stripe / Payments ─────────────────────────────────────

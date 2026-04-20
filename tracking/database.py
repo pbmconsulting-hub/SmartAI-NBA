@@ -36,7 +36,8 @@ except ImportError:
 
 # Path to the SQLite database file
 # It will be created automatically on first run
-DB_DIRECTORY = Path(__file__).parent.parent / "db"
+# Use DB_DIR env var (set on Railway to the persistent volume) or default to local db/
+DB_DIRECTORY = Path(os.environ.get("DB_DIR", str(Path(__file__).parent.parent / "db")))
 DB_FILE_PATH = DB_DIRECTORY / "smartai_nba.db"
 
 # Automatic backup configuration.

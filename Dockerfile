@@ -18,8 +18,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Ensure the app user owns writable directories
-RUN mkdir -p /app/db /app/logs /app/cache \
-    && chown -R appuser:appuser /app/db /app/logs /app/cache
+RUN mkdir -p /app/db /app/logs /app/cache /data \
+    && chown -R appuser:appuser /app/db /app/logs /app/cache /data
+
+# Set DB_DIR so the app reads/writes databases on the persistent volume
+ENV DB_DIR=/data
 
 EXPOSE 8501 8000
 
