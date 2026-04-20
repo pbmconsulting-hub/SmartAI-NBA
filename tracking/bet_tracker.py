@@ -8,6 +8,7 @@
 
 # Standard library imports only
 import datetime  # For getting today's date
+import os        # For DB_DIR environment variable
 import time      # For retry delays in resolve_todays_bets
 import logging
 
@@ -745,9 +746,93 @@ def _fetch_all_boxscores_espn(date_str: str) -> dict:
         return {}
 
 
+def _fetch_bulk_boxscores_etl(date_str: str) -> dict:
+    """
+    TIER 0: Fetch all player box scores for a date from the local ETL database.
+
+    Queries Player_Game_Logs joined with Games on game_date.  Returns the
+    same format as `_fetch_all_boxscores_nba_api` so callers are unaffected.
+
+    Returns:
+        dict: {player_name_lower: {pts, reb, ast, stl, blk, tov, fg3m, ...}}
+              Empty dict if DB unavailable or no rows for this date.
+    """
+    try:
+        import sqlite3 as _sqlite3
+        from pathlib import Path as _Path
+
+        _repo_root = _Path(__file__).resolve().parent.parent
+        _db_path = _Path(
+            os.environ.get("DB_DIR", str(_repo_root / "db"))
+        ) / "smartpicks.db"
+        if not _db_path.exists():
+            return {}
+
+        conn = _sqlite3.connect(f"file:{_db_path}?mode=ro", uri=True)
+        conn.row_factory = _sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT p.first_name, p.last_name,
+                   l.pts, l.reb, l.ast, l.stl, l.blk, l.tov,
+                   l.fg3m, l.fg3a, l.fgm, l.fga, l.ftm, l.fta,
+                   l.oreb, l.dreb, l.pf, l.min
+            FROM Player_Game_Logs l
+            JOIN Games g ON l.game_id = g.game_id
+            JOIN Players p ON l.player_id = p.player_id
+            WHERE g.game_date = ?
+            """,
+            (date_str,),
+        ).fetchall()
+        conn.close()
+
+        if not rows:
+            return {}
+
+        lookup: dict = {}
+        for row in rows:
+            d = dict(row)
+            first = str(d.get("first_name") or "").strip()
+            last = str(d.get("last_name") or "").strip()
+            pname = f"{first} {last}".lower().strip()
+            if not pname:
+                continue
+            # Parse minutes
+            min_raw = str(d.get("min") or "0")
+            try:
+                if ":" in min_raw:
+                    mins = float(min_raw.split(":")[0])
+                else:
+                    mins = float(min_raw)
+            except (ValueError, TypeError):
+                mins = 0.0
+            lookup[pname] = {
+                "pts":     float(d.get("pts") or 0),
+                "reb":     float(d.get("reb") or 0),
+                "ast":     float(d.get("ast") or 0),
+                "stl":     float(d.get("stl") or 0),
+                "blk":     float(d.get("blk") or 0),
+                "tov":     float(d.get("tov") or 0),
+                "fg3m":    float(d.get("fg3m") or 0),
+                "fg3a":    float(d.get("fg3a") or 0),
+                "fgm":     float(d.get("fgm") or 0),
+                "fga":     float(d.get("fga") or 0),
+                "ftm":     float(d.get("ftm") or 0),
+                "fta":     float(d.get("fta") or 0),
+                "oreb":    float(d.get("oreb") or 0),
+                "dreb":    float(d.get("dreb") or 0),
+                "pf":      float(d.get("pf") or 0),
+                "minutes": mins,
+            }
+        return lookup
+
+    except Exception as exc:
+        _logger.debug("[BetTracker] Tier 0 (ETL DB) failed for %s: %s", date_str, exc)
+        return {}
+
+
 def _fetch_bulk_boxscores(date_str: str) -> dict:
     """
-    Orchestrator: Try Tier 1 (nba_api BoxScore), Tier 2 (ESPN), then Tier 3 (bbref).
+    Orchestrator: Try Tier 0 (ETL DB), Tier 1 (nba_api BoxScore), Tier 2 (ESPN), then Tier 3 (bbref).
 
     Returns the first non-empty lookup dict, or {} if all tiers fail
     (callers then fall through to the legacy Tier 4 per-player path).
@@ -755,6 +840,15 @@ def _fetch_bulk_boxscores(date_str: str) -> dict:
     Returns:
         dict: {player_name_lower: {pts, reb, ast, ...}} or {}
     """
+    # ── Tier 0: ETL database (instant, no network) ───────────────────────
+    lookup = _fetch_bulk_boxscores_etl(date_str)
+    if lookup:
+        _logger.info(
+            f"[BetTracker] Tier 0 (ETL DB) succeeded for {date_str}: "
+            f"{len(lookup)} players"
+        )
+        return lookup
+
     lookup = _fetch_all_boxscores_nba_api(date_str)
     if lookup:
         _logger.info(

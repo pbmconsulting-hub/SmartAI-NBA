@@ -2,7 +2,8 @@ name: Daily ETL Refresh
 
 on:
   schedule:
-    - cron: "0 12 * * *"   # Noon UTC — after previous night's games are final
+    - cron: "0 12 * * *"   # Noon UTC (8 AM ET) — catches previous night's late games
+    - cron: "0 7 * * *"    # 7 AM UTC (3 AM ET) — catches West Coast games that end ~2 AM ET
   workflow_dispatch:        # Manual trigger
 
 jobs:

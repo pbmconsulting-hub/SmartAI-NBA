@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import time
 from typing import Any
 
@@ -125,7 +126,7 @@ except ImportError:
 
 def get_all_players(active_only: bool = True) -> list[dict]:
     """
-    Return all NBA players from nba_api's CommonAllPlayers endpoint.
+    Return all NBA players — ETL DB first, nba_api live fallback only if DB empty.
 
     Parameters
     ----------
@@ -143,6 +144,30 @@ def get_all_players(active_only: bool = True) -> list[dict]:
     if cached is not None:
         return cached
 
+    # ── DB-first path (no API call) ──────────────────────────────────────
+    try:
+        from data.etl_data_service import get_all_players as _etl_all
+        etl_rows = _etl_all()
+        if etl_rows:
+            players = [
+                {
+                    "id": int(p.get("player_id", 0)),
+                    "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                    "first_name": str(p.get("first_name", "")),
+                    "last_name": str(p.get("last_name", "")),
+                    "is_active": True,
+                    "team_id": p.get("team_id"),
+                    "team_abbreviation": str(p.get("team_abbreviation", "")),
+                }
+                for p in etl_rows
+            ]
+            _cache_set(cache_key, players)
+            _logger.info("get_all_players: %d players from ETL DB (no API call)", len(players))
+            return players
+    except Exception as exc:
+        _logger.debug("get_all_players ETL path failed: %s", exc)
+
+    # ── Fallback: live nba_api (only when DB has no players) ─────────────
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         _logger.warning("get_all_players: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
@@ -177,7 +202,7 @@ def get_all_players(active_only: bool = True) -> list[dict]:
         ]
 
         _cache_set(cache_key, players)
-        _logger.info("get_all_players: %d players in %.1f ms", len(players), elapsed)
+        _logger.info("get_all_players: %d players in %.1f ms (live API fallback)", len(players), elapsed)
         return players
 
     except Exception as exc:
@@ -189,7 +214,7 @@ def get_player_info(player_id: int) -> dict:
     """
     Return bio / draft / physical info for a single player.
 
-    Uses nba_api's CommonPlayerInfo endpoint.
+    ETL DB first, nba_api live fallback only if DB miss.
 
     Returns
     -------
@@ -205,6 +230,48 @@ def get_player_info(player_id: int) -> dict:
     if cached is not None:
         return cached
 
+    # ── DB-first path (no API call) ──────────────────────────────────────
+    try:
+        import sqlite3 as _sqlite3
+        from pathlib import Path as _Path
+        _repo_root = _Path(__file__).resolve().parent.parent
+        _db_path = _Path(os.environ.get("DB_DIR", str(_repo_root / "db"))) / "smartpicks.db"
+        if _db_path.exists():
+            _conn = _sqlite3.connect(f"file:{_db_path}?mode=ro", uri=True)
+            _conn.row_factory = _sqlite3.Row
+            row = _conn.execute(
+                "SELECT player_id, first_name, last_name, team_id, "
+                "team_abbreviation, position FROM Players WHERE player_id = ?",
+                (int(player_id),),
+            ).fetchone()
+            _conn.close()
+            if row:
+                d = dict(row)
+                info = {
+                    "id": d.get("player_id", player_id),
+                    "full_name": f"{d.get('first_name', '')} {d.get('last_name', '')}".strip(),
+                    "position": d.get("position", "") or "",
+                    "height": "",
+                    "weight": "",
+                    "country": "",
+                    "birthdate": "",
+                    "draft_year": None,
+                    "draft_round": None,
+                    "draft_number": None,
+                    "school": "",
+                    "team_id": d.get("team_id"),
+                    "team_abbreviation": d.get("team_abbreviation", "") or "",
+                    "jersey": "",
+                    "from_year": None,
+                    "to_year": None,
+                }
+                _cache_set(cache_key, info)
+                _logger.info("get_player_info(%s): served from ETL DB", player_id)
+                return info
+    except Exception as exc:
+        _logger.debug("get_player_info ETL path failed: %s", exc)
+
+    # ── Fallback: live nba_api ───────────────────────────────────────────
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         _logger.warning("get_player_info: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
@@ -244,7 +311,7 @@ def get_player_info(player_id: int) -> dict:
         }
 
         _cache_set(cache_key, info)
-        _logger.info("get_player_info(%s): ok in %.1f ms", player_id, elapsed)
+        _logger.info("get_player_info(%s): ok in %.1f ms (live API fallback)", player_id, elapsed)
         return info
 
     except Exception as exc:

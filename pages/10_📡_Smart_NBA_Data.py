@@ -677,6 +677,7 @@ with tab_props:
             summarize_props_by_platform,
             find_new_players_from_props,
             build_cross_platform_comparison,
+            refresh_props_if_stale,
         )
         from data.data_manager import (
             save_platform_props_to_session,
@@ -687,6 +688,13 @@ with tab_props:
     except ImportError as _pf_err:
         _SPORTSBOOK_SERVICE_AVAILABLE = False
         st.warning(f"⚠️ Platform service not available: {_pf_err}")
+
+    # ── Auto-refresh stale props on page load ─────────────────
+    if _SPORTSBOOK_SERVICE_AVAILABLE:
+        try:
+            refresh_props_if_stale(st.session_state)
+        except Exception:
+            pass  # Best-effort
 
     if _SPORTSBOOK_SERVICE_AVAILABLE:
         _dk_on = st.session_state.get("load_draftkings_enabled", True)

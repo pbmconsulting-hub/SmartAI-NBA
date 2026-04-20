@@ -75,6 +75,61 @@ if not st.session_state.get("_etl_staleness_checked"):
     except Exception:
         pass  # never block the UI for a staleness check
 
+# ─── Recurring ETL scheduler (daemon thread, runs once per process) ───
+try:
+    from etl.scheduler import start as _start_etl_scheduler
+    _start_etl_scheduler()
+except Exception:
+    pass  # non-critical — staleness guard above is the safety net
+
+# ─── Auto-seed picks & props into session on first load ───────
+if not st.session_state.get("_picks_seeded"):
+    st.session_state["_picks_seeded"] = True
+    try:
+        # 1) Seed props from live_props.csv → session state
+        from data.data_manager import load_platform_props_from_csv as _load_csv_props
+        _csv_props = _load_csv_props()
+        if _csv_props:
+            st.session_state.setdefault("current_props", _csv_props)
+            st.session_state.setdefault("platform_props", _csv_props)
+    except Exception:
+        pass
+    try:
+        # 2) Seed analysis picks from DB/cache → session state
+        from tracking.database import initialize_database as _init_db
+        _init_db()
+        import sqlite3 as _sq2
+        from pathlib import Path as _P2
+        from datetime import date as _d2
+        _db2 = _P2(os.environ.get(
+            "DB_DIR", str(_P2(__file__).resolve().parent / "db")
+        )) / "smartpicks.db"
+        if _db2.exists():
+            _conn2 = _sq2.connect(str(_db2), check_same_thread=False)
+            _conn2.row_factory = _sq2.Row
+            _today2 = _d2.today().isoformat()
+            _rows2 = _conn2.execute(
+                "SELECT * FROM all_analysis_picks WHERE pick_date = ? "
+                "ORDER BY confidence_score DESC",
+                (_today2,),
+            ).fetchall()
+            _conn2.close()
+            if _rows2:
+                _picks2 = [dict(r) for r in _rows2]
+                if not st.session_state.get("analysis_results"):
+                    st.session_state["analysis_results"] = _picks2
+        # Fallback: cache/latest_picks.json
+        if not st.session_state.get("analysis_results"):
+            import json as _j2
+            _cache2 = _P2(__file__).resolve().parent / "cache" / "latest_picks.json"
+            if _cache2.exists():
+                _cdata = _j2.loads(_cache2.read_text(encoding="utf-8"))
+                _cpicks = _cdata.get("picks", [])
+                if _cpicks:
+                    st.session_state["analysis_results"] = _cpicks
+    except Exception:
+        pass
+
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
 

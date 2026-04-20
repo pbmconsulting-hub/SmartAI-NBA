@@ -154,6 +154,7 @@ try:
         summarize_props_by_platform,
         find_new_players_from_props,
         extract_active_players_from_props,
+        refresh_props_if_stale,
     )
     from data.data_manager import (
         save_platform_props_to_session,
@@ -163,6 +164,16 @@ try:
     SPORTSBOOK_SERVICE_AVAILABLE = True
 except ImportError:
     SPORTSBOOK_SERVICE_AVAILABLE = False
+
+# ── Auto-refresh stale props on page load ─────────────────────
+if SPORTSBOOK_SERVICE_AVAILABLE:
+    try:
+        _auto_props = refresh_props_if_stale(st.session_state)
+        if _auto_props:
+            from data.data_manager import save_props_to_session as _save_current_props
+            _save_current_props(_auto_props, st.session_state)
+    except Exception:
+        pass  # Best-effort — never block page render
 
 # ── Load current props & injury data once ─────────────────────
 current_props = load_props_from_session(st.session_state)
