@@ -677,6 +677,28 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+            # ── Analytics events table ──
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    session_id TEXT,
+                    user_email TEXT,
+                    event_name TEXT NOT NULL,
+                    page TEXT,
+                    event_data TEXT,
+                    ip_hash TEXT,
+                    user_agent TEXT
+                )
+            """)
+            try:
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ae_timestamp ON analytics_events (timestamp)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ae_event_name ON analytics_events (event_name)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ae_user ON analytics_events (user_email)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ae_page ON analytics_events (page)")
+            except sqlite3.OperationalError:
+                pass
+
             # Save the changes
             connection.commit()
 

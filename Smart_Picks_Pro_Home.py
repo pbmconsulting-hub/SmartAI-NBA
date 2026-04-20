@@ -59,6 +59,11 @@ from utils.auth_gate import require_login as _require_login
 if not _require_login():
     st.stop()
 
+# ─── Analytics: GA4 injection + server-side page view ─────────
+from utils.analytics import inject_ga4, track_page_view
+inject_ga4()
+track_page_view("Home")
+
 # ─── Background ETL staleness guard (once per session) ────────
 # If the ETL database is more than 1 day stale, kick off an
 # incremental update in a background thread so users always

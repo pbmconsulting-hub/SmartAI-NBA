@@ -22,6 +22,11 @@ from utils.auth_gate import require_login as _require_login
 if not _require_login():
     st.stop()
 
+# ── Analytics ─────────────────────────────────────────────────
+from utils.analytics import inject_ga4, track_page_view
+inject_ga4()
+track_page_view("Smart Money Bets")
+
 # ── Tier Gate ─────────────────────────────────────────────────
 from utils.tier_gate import require_tier
 if not require_tier():

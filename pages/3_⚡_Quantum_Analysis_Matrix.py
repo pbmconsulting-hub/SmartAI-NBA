@@ -278,6 +278,11 @@ from utils.auth_gate import require_login as _require_login
 if not _require_login():
     st.stop()
 
+# ── Analytics ─────────────────────────────────────────────────
+from utils.analytics import inject_ga4, track_page_view
+inject_ga4()
+track_page_view("Quantum Analysis")
+
 # Inject global CSS + QDS CSS
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)

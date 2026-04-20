@@ -3142,6 +3142,12 @@ def require_login() -> bool:
                         user = _authenticate_user(_saved_email, su_pw)
                         if user:
                             _set_logged_in(user)
+                            # Analytics: track signup
+                            try:
+                                from utils.analytics import track_signup
+                                track_signup(_saved_email)
+                            except Exception:
+                                pass
                             # Clean up sign-up state
                             for k in (_SU_STAGE, _SU_EMAIL, _SU_NAME):
                                 st.session_state.pop(k, None)
@@ -3173,6 +3179,12 @@ def require_login() -> bool:
                     if user:
                         _clear_failed_logins(li_email)
                         _set_logged_in(user)
+                        # Analytics: track login
+                        try:
+                            from utils.analytics import track_login
+                            track_login(li_email)
+                        except Exception:
+                            pass
                         st.success(f"Welcome back, {user.get('display_name', '')}!")
                         st.rerun()
                     else:

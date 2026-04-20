@@ -64,6 +64,11 @@ from utils.auth_gate import require_login as _require_login
 if not _require_login():
     st.stop()
 
+# ── Analytics ─────────────────────────────────────────────────
+from utils.analytics import inject_ga4, track_page_view
+inject_ga4()
+track_page_view("Smart NBA Data")
+
 from styles.theme import (
     get_global_css,
     get_neural_header_html,
