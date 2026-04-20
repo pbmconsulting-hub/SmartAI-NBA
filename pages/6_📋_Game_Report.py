@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/4_📋_Game_Report.py
 # PURPOSE: Generate a comprehensive QDS-styled game betting
 #          report using SmartBetPro's AI analysis results.

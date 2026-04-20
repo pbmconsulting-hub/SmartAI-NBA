@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/13_⚙️_Settings.py
 # PURPOSE: Configure the SmartBetPro NBA engine settings:
 #          simulation depth, edge thresholds, platform selection,

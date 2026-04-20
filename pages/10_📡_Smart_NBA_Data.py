@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/9_📡_Smart_NBA_Data.py
 # PURPOSE: Streamlit page — Smart NBA Data hub.
 #          Consolidated data refresh control panel with readiness

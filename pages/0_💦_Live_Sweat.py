@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/0_💦_Live_Sweat.py
 # PURPOSE: Live Sweat in-game dashboard.  Tracks locked pre-game
 #          bets against real-time NBA box scores with auto-refresh,

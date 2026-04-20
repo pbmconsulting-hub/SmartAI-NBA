@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/6_🧬_Entry_Builder.py
 # PURPOSE: Build optimal parlay entries for sportsbook platforms
 #          (PrizePicks, Underdog Fantasy, DraftKings Pick6). Calculates EV.

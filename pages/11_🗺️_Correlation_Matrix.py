@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/10_🗺️_Correlation_Matrix.py
 # PURPOSE: Visualize pairwise Pearson correlations between
 #          players' Quantum Matrix simulation arrays.  Renders an

@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/15_👹_Goblin_Demon_Zone.py
 # PURPOSE: EASY MONEY (Goblin) & SMART RISK (Demon) — dedicated
 #          spotlight for extreme-value alt-line props.

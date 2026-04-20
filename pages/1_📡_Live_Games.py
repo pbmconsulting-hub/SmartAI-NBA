@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/1_🏀_Todays_Games.py
 # PURPOSE: Show tonight's NBA matchups as rich visual game cards.
 #          Auto-loads games and lets user enter Vegas lines.

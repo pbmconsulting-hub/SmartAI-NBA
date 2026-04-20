@@ -1,4 +1,4 @@
-﻿# pages/12_📊_Proving_Grounds.py
+# pages/12_📊_Proving_Grounds.py
 # Historical backtesting UI for Smart Pick Pro ("Proving Grounds").
 # Runs the prediction model against historical game log data to validate accuracy.
 

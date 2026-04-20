@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/2_🔬_Prop_Scanner.py
 # PURPOSE: Prop Scanner — enter, upload, or pull live prop lines,
 #          then scan, filter, and analyse them with Smart Scan
@@ -780,12 +780,12 @@ with tab_load:
 
                 replace_col, add_col, _ = st.columns([1, 1, 2])
                 with replace_col:
-                    if st.button("🔄 Replace All Props", type="primary"):
+                    if st.button("🔄 Replace All Props", type="primary", key="btn_csv_replace"):
                         save_props_to_session(parsed_props, st.session_state)
                         st.success(f"Replaced all props with {len(parsed_props)} from upload!")
                         st.rerun()
                 with add_col:
-                    if st.button("➕ Add to Existing"):
+                    if st.button("➕ Add to Existing", key="btn_csv_add"):
                         existing = load_props_from_session(st.session_state)
                         combined = existing + parsed_props
                         save_props_to_session(combined, st.session_state)

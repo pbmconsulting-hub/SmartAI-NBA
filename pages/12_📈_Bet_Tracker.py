@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/11_📈_Bet_Tracker.py
 # PURPOSE: Thin shell — page setup, global filters, tab routing.
 #          All tab logic lives in pages/helpers/bet_tracker_tabs/.

@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FILE: pages/3_⚡_Quantum_Analysis_Matrix.py
 # PURPOSE: The main analysis page. Runs Quantum Matrix Engine 5.6 simulation
 #          for each prop and shows probability, edge, tier, and
@@ -2161,7 +2161,7 @@ def _render_results_fragment():
         )
 
     if st.session_state.get("selected_picks"):
-        if st.button("🗑️ Clear Selected Picks"):
+        if st.button("🗑️ Clear Selected Picks", key="btn_clear_selected_picks"):
             st.session_state["selected_picks"] = []
             st.toast("🗑️ Selected picks cleared.")
 
