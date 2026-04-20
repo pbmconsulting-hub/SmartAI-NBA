@@ -1493,13 +1493,15 @@ html, body, .stApp, .stApp * {
     animation: agFadeUp 0.6s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
     max-width: 520px; margin: 0 auto;
 }
-[data-testid="stTabs"] > [data-baseweb="tab-list"] {
+[data-testid="stTabs"] > [data-baseweb="tab-list"],
+[data-testid="stTabs"] > [role="tablist"] {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px; padding: 3px; gap: 3px;
     justify-content: center; margin-bottom: 16px;
 }
-[data-testid="stTabs"] [data-baseweb="tab"] {
+[data-testid="stTabs"] [data-baseweb="tab"],
+[data-testid="stTabs"] button[role="tab"] {
     border-radius: 9px !important;
     font-family: 'Space Grotesk', sans-serif !important;
     font-weight: 700 !important;
@@ -1510,7 +1512,8 @@ html, body, .stApp, .stApp * {
     border: 1px solid transparent !important;
     transition: all 0.25s ease !important;
 }
-[data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
+[data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"],
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
     background: rgba(0, 213, 89, 0.08) !important;
     color: #fff !important;
     border-color: rgba(0, 213, 89, 0.2) !important;
@@ -3434,7 +3437,10 @@ a.spp-nav-pill, a.spp-nav-cta, a.spp-btt {{
     var cta=pdoc.getElementById('nav-signup-cta');
     if(cta){cta.addEventListener('click',function(e){
       e.preventDefault();
-      var tabs=pdoc.querySelectorAll('button[data-baseweb="tab"]');
+      var sel='button[data-baseweb="tab"], button[role="tab"], button[data-testid="stTab"]';
+      var tabs=pdoc.querySelectorAll(sel);
+      /* Walk up if no tabs found (nested iframe edge case) */
+      if(!tabs.length){try{tabs=(pwin.parent||pwin).document.querySelectorAll(sel);}catch(e2){}}
       for(var i=0;i<tabs.length;i++){
         if(tabs[i].textContent.indexOf('Create')!==-1){
           tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return;
@@ -5965,18 +5971,21 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 document.getElementById('ctaScrollBtn').addEventListener('click',function(e){
   e.preventDefault();
   try{
-    var p=window.parent;
-    if(p&&p.document){
-      var tabs=p.document.querySelectorAll('button[data-baseweb="tab"]');
-      for(var i=0;i<tabs.length;i++){
-        if(tabs[i].textContent.indexOf('Create')!==-1){
-          tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return;
-        }
-      }
-      p.scrollTo({top:0,behavior:'smooth'});
+    var sel='button[data-baseweb="tab"], button[role="tab"], button[data-testid="stTab"]';
+    var doc=window.parent.document;
+    var tabs=doc.querySelectorAll(sel);
+    /* Walk up if the immediate parent has no tabs (nested iframe) */
+    if(!tabs.length){
+      try{doc=window.parent.parent.document;tabs=doc.querySelectorAll(sel);}catch(e2){}
     }
-  }catch(err){
+    for(var i=0;i<tabs.length;i++){
+      if(tabs[i].textContent.indexOf('Create')!==-1){
+        tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return;
+      }
+    }
     window.parent.scrollTo({top:0,behavior:'smooth'});
+  }catch(err){
+    try{window.parent.scrollTo({top:0,behavior:'smooth'});}catch(e3){}
   }
 });
 </script>
