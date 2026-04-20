@@ -13,6 +13,16 @@ import os
 import base64
 import logging
 
+# ─── Load .env into os.environ early (before any env var reads) ───
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    from pathlib import Path as _DotenvPath
+    _env_file = _DotenvPath(__file__).resolve().parent / ".env"
+    if _env_file.exists():
+        _load_dotenv(_env_file)
+except ImportError:
+    pass
+
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.nba_data_service import load_last_updated
 from tracking.database import initialize_database, load_user_settings, load_page_state
@@ -81,6 +91,13 @@ try:
     _start_etl_scheduler()
 except Exception:
     pass  # non-critical — staleness guard above is the safety net
+
+# ─── Seed admin account from env vars (idempotent) ────────────
+try:
+    from utils.auth_gate import seed_admin_account as _seed_admin
+    _seed_admin()
+except Exception:
+    pass
 
 # ─── Auto-seed picks & props into session on first load ───────
 if not st.session_state.get("_picks_seeded"):

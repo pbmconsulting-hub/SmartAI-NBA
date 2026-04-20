@@ -553,13 +553,82 @@ def _create_user(email: str, password: str, display_name: str = "") -> bool:
         return False
 
 
+# ── Admin account helpers ─────────────────────────────────────
+
+def seed_admin_account() -> None:
+    """Create or update the admin account from environment variables.
+
+    Reads ``ADMIN_EMAIL`` and ``ADMIN_PASSWORD`` from the environment.
+    If both are set, ensures an admin user exists in the DB with the
+    ``is_admin`` flag set to 1.  If the account already exists, the
+    password hash and admin flag are updated.
+
+    Call this once at app startup (idempotent).
+    """
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    if not admin_email or not admin_password:
+        return  # No admin env vars configured — nothing to do
+    if len(admin_password) < 8:
+        _logger.warning("ADMIN_PASSWORD is too short (< 8 chars) — skipping admin seed.")
+        return
+    initialize_database()
+    pw_hash = _hash_password(admin_password)
+    try:
+        with get_database_connection() as conn:
+            existing = conn.execute(
+                "SELECT user_id FROM users WHERE email = ?",
+                (admin_email,),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE users SET password_hash = ?, is_admin = 1 WHERE email = ?",
+                    (pw_hash, admin_email),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO users (email, password_hash, display_name, is_admin) "
+                    "VALUES (?, ?, ?, 1)",
+                    (admin_email, pw_hash, "Admin"),
+                )
+            conn.commit()
+        _logger.info("Admin account seeded for %s", admin_email)
+    except Exception as exc:
+        _logger.error("Failed to seed admin account: %s", exc)
+
+
+def is_admin_user() -> bool:
+    """Return True if the currently logged-in user has the admin flag."""
+    if not is_logged_in():
+        return False
+    # Fast path: cached in session state
+    cached = st.session_state.get("_auth_is_admin")
+    if cached is not None:
+        return bool(cached)
+    # Check DB
+    email = get_logged_in_email()
+    if not email:
+        return False
+    try:
+        with get_database_connection() as conn:
+            row = conn.execute(
+                "SELECT is_admin FROM users WHERE email = ?",
+                (email,),
+            ).fetchone()
+            is_adm = bool(row and row[0])
+            st.session_state["_auth_is_admin"] = is_adm
+            return is_adm
+    except Exception:
+        return False
+
+
 def _authenticate_user(email: str, password: str) -> dict | None:
     """Verify credentials. Returns user dict on success, None on failure."""
     initialize_database()
     try:
         with get_database_connection() as conn:
             cursor = conn.execute(
-                "SELECT user_id, email, password_hash, display_name FROM users WHERE email = ?",
+                "SELECT user_id, email, password_hash, display_name, is_admin FROM users WHERE email = ?",
                 (email.strip().lower(),),
             )
             row = cursor.fetchone()
@@ -803,6 +872,7 @@ def _set_logged_in(user: dict) -> None:
     st.session_state[_SS_USER_EMAIL] = user.get("email", "")
     st.session_state[_SS_USER_NAME]  = user.get("display_name", "")
     st.session_state[_SS_USER_ID]    = user.get("user_id", 0)
+    st.session_state["_auth_is_admin"] = bool(user.get("is_admin", 0))
 
 
 def is_logged_in() -> bool:
@@ -817,7 +887,7 @@ def get_logged_in_email() -> str:
 
 def logout_user() -> None:
     """Clear the login session."""
-    for key in (_SS_LOGGED_IN, _SS_USER_EMAIL, _SS_USER_NAME, _SS_USER_ID):
+    for key in (_SS_LOGGED_IN, _SS_USER_EMAIL, _SS_USER_NAME, _SS_USER_ID, "_auth_is_admin"):
         st.session_state.pop(key, None)
 
 

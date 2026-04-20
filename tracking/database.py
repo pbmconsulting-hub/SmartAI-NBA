@@ -669,6 +669,14 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass
 
+            # ── Admin role column on users table ──
+            try:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
             # Save the changes
             connection.commit()
 
