@@ -991,6 +991,21 @@ html, body, .stApp, .stApp * {
     50%      { transform: translateY(-10px) rotate(180deg); opacity: 1; }
 }
 
+/* ── Scroll-triggered fade-up animations ─────────────────────── */
+.ag-reveal {
+    opacity: 0;
+    transform: translateY(32px);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ag-reveal.ag-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.ag-reveal-delay-1 { transition-delay: 0.1s; }
+.ag-reveal-delay-2 { transition-delay: 0.2s; }
+.ag-reveal-delay-3 { transition-delay: 0.3s; }
+
 /* ── Background ──────────────────────────────────────────────── */
 .ag-bg {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -3553,8 +3568,92 @@ a.spp-nav-pill, a.spp-nav-cta, a.spp-btt {{
       </div>
     </div>
 
+    <!-- ── SAFE Score Visual Explainer ── -->
+    <div class="ag-reveal" style="text-align:center;padding:48px 20px 32px;max-width:680px;margin:0 auto">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
+           color:rgba(0,213,89,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
+        Our Secret Weapon</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:800;
+           color:rgba(255,255,255,0.9);margin-bottom:24px">
+        How the <span style="background:linear-gradient(135deg,#00D559,#2D9EFF);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">SAFE Score&trade;</span> Works</div>
+
+      <!-- Pipeline: 6 models → vote → SAFE -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+        <!-- Model chips -->
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:360px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               padding:5px 10px;border-radius:8px;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);
+               color:rgba(0,213,89,0.7)">XGBoost</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               padding:5px 10px;border-radius:8px;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15);
+               color:rgba(45,158,255,0.7)">LightGBM</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               padding:5px 10px;border-radius:8px;background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.15);
+               color:rgba(192,132,252,0.7)">Ridge</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               padding:5px 10px;border-radius:8px;background:rgba(249,198,43,0.08);border:1px solid rgba(249,198,43,0.15);
+               color:rgba(249,198,43,0.7)">Bayesian</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               padding:5px 10px;border-radius:8px;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);
+               color:rgba(0,213,89,0.7)">LSTM</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               padding:5px 10px;border-radius:8px;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15);
+               color:rgba(45,158,255,0.7)">Random Forest</span>
+        </div>
+
+        <!-- Arrow -->
+        <div style="font-size:1.2rem;color:rgba(255,255,255,0.2)">&#x2192;</div>
+
+        <!-- Vote box -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+             border-radius:12px;padding:12px 18px;text-align:center">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
+            Ensemble Vote</div>
+          <div style="font-size:1.2rem">&#x1F5F3;&#xFE0F;</div>
+        </div>
+
+        <!-- Arrow -->
+        <div style="font-size:1.2rem;color:rgba(255,255,255,0.2)">&#x2192;</div>
+
+        <!-- SAFE Score output -->
+        <div style="background:linear-gradient(135deg,rgba(0,213,89,0.1),rgba(45,158,255,0.08));
+             border:1.5px solid rgba(0,213,89,0.2);border-radius:14px;padding:14px 20px;text-align:center;
+             position:relative;overflow:hidden">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+               color:rgba(0,213,89,0.5);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
+            SAFE Score</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;
+               background:linear-gradient(135deg,#00D559,#2D9EFF);
+               -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">84</div>
+        </div>
+      </div>
+
+      <!-- Gradient bar 0-100 -->
+      <div style="max-width:440px;margin:0 auto 16px">
+        <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,
+             #ff4444 0%,#ff8800 25%,#F9C62B 40%,#00D559 65%,#2D9EFF 100%);
+             position:relative;overflow:visible">
+          <div style="position:absolute;left:84%;top:-3px;width:14px;height:14px;
+               background:#00D559;border:2px solid rgba(8,12,24,0.9);border-radius:50%;
+               transform:translateX(-50%);box-shadow:0 0 10px rgba(0,213,89,0.4)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;
+             font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:rgba(255,255,255,0.25)">
+          <span>0 &mdash; Skip</span><span>50 &mdash; Caution</span><span>70 &mdash; Play</span><span>100 &mdash; Lock</span>
+        </div>
+      </div>
+
+      <p style="font-family:'Inter',sans-serif;font-size:0.7rem;color:rgba(255,255,255,0.35);
+         max-width:460px;margin:0 auto;line-height:1.6">
+        Six AI models independently analyze every prop. They vote, and the SAFE Score
+        synthesizes their agreement, historical accuracy, matchup context, and line movement
+        into a single number you can act on.</p>
+    </div>
+
     <!-- ── 60-Second Demo ── -->
-    <div style="text-align:center;padding:40px 0 16px">
+    <div class="ag-reveal" style="text-align:center;padding:40px 0 16px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
            color:rgba(0,213,89,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
         See It In Action</div>
@@ -3595,10 +3694,90 @@ a.spp-nav-pill, a.spp-nav-cta, a.spp-btt {{
       </div>
     </div>
 
-    <div class="ag-divider"></div>
+    <!-- ── Live Pick Sample Card ── -->
+    <div class="ag-reveal" style="text-align:center;padding:32px 20px 8px;max-width:440px;margin:0 auto">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;
+           color:rgba(0,213,89,0.5);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px">
+        &#x1F50D; Sample AI Output</div>
+      <div style="background:linear-gradient(168deg,rgba(10,16,32,0.98),rgba(6,10,20,0.98));
+           border:1.5px solid rgba(0,213,89,0.1);border-radius:18px;padding:0;overflow:hidden;
+           box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(0,213,89,0.04);text-align:left">
+        <!-- Header bar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+             background:rgba(0,213,89,0.04);border-bottom:1px solid rgba(0,213,89,0.08)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:36px;height:36px;border-radius:10px;
+                 background:linear-gradient(135deg,rgba(0,213,89,0.15),rgba(45,158,255,0.1));
+                 display:flex;align-items:center;justify-content:center;font-size:1.1rem">&#x1F3C0;</div>
+            <div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:0.8rem;
+                   color:rgba(255,255,255,0.9)">Shai Gilgeous-Alexander</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;
+                   color:rgba(255,255,255,0.3)">OKC Thunder &bull; vs LAL &bull; PrizePicks</div>
+            </div>
+          </div>
+          <div style="background:linear-gradient(135deg,#00D559,#2D9EFF);border-radius:10px;
+               padding:6px 12px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.5rem;font-weight:700;
+                 color:rgba(0,0,0,0.5);line-height:1">SAFE</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:800;
+                 color:#000;line-height:1.1">91</div>
+          </div>
+        </div>
+        <!-- Prop line -->
+        <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.04)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
+                   color:rgba(0,213,89,0.8);background:rgba(0,213,89,0.08);padding:3px 8px;
+                   border-radius:6px">&#x25B2; OVER</span>
+              <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:0.85rem;
+                   color:rgba(255,255,255,0.85);margin-left:8px">30.5 Points</span>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
+                 color:rgba(0,213,89,0.6)">+8.4% Edge</span>
+          </div>
+          <!-- Mini stats row -->
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div style="text-align:center">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:800;
+                   color:rgba(255,255,255,0.8)">33.1</div>
+              <div style="font-family:'Inter',sans-serif;font-size:0.48rem;color:rgba(255,255,255,0.25)">
+                AI Projection</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:800;
+                   color:rgba(255,255,255,0.8)">78%</div>
+              <div style="font-family:'Inter',sans-serif;font-size:0.48rem;color:rgba(255,255,255,0.25)">
+                Win Probability</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:800;
+                   color:rgba(255,255,255,0.8)">6/6</div>
+              <div style="font-family:'Inter',sans-serif;font-size:0.48rem;color:rgba(255,255,255,0.25)">
+                Models Agree</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:800;
+                   color:rgba(249,198,43,0.8)">&#x1F525; 5L10</div>
+              <div style="font-family:'Inter',sans-serif;font-size:0.48rem;color:rgba(255,255,255,0.25)">
+                Hit Streak</div>
+            </div>
+          </div>
+        </div>
+        <!-- Matchup note -->
+        <div style="padding:12px 18px;font-family:'Inter',sans-serif;font-size:0.6rem;
+             color:rgba(255,255,255,0.3);line-height:1.5">
+          <strong style="color:rgba(0,213,89,0.6)">Matchup Note:</strong>
+          LAL allows 28.6 PPG to opposing PGs (28th). SGA has hit O30.5 in 5 of last 10 vs LAL.
+          Minutes projection: 36.2 min.</div>
+      </div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.58rem;color:rgba(255,255,255,0.2);
+           margin-top:12px">This is a sample output &mdash; real picks update nightly at 5 PM ET</div>
+    </div>
 
-    <!-- What's Inside: Feature Showcase -->
-    <div class="ag-inside" id="sec-features" data-section-id="features">
+    <div class="ag-divider"></div>
+    <div class="ag-inside ag-reveal" id="sec-features" data-section-id="features">
       <div class="ag-section-head">
         <h3>What&rsquo;s Inside<br><span class="em">Smart Pick Pro</span></h3>
         <p>Everything you need to beat the books &mdash; in one platform</p>
@@ -3911,35 +4090,94 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
     st.markdown("""
     <div class="ag-section">
 
-    <!-- ── METRIC COUNTERS ── -->
-    <div class="ag-stats-strip">
+    <!-- ── METRIC COUNTERS (animated countUp on scroll) ── -->
+    <div class="ag-stats-strip ag-reveal" id="statsStrip">
     <div class="ag-stats">
       <div class="ag-stat">
-        <div class="ag-stat-val">62.4%</div>
+        <div class="ag-stat-val" data-target="62.4" data-suffix="%" data-decimals="1">0%</div>
         <div class="ag-stat-label">Hit Rate</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val">+18.3%</div>
+        <div class="ag-stat-val" data-target="18.3" data-prefix="+" data-suffix="%" data-decimals="1">0%</div>
         <div class="ag-stat-label">ROI</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val">347</div>
+        <div class="ag-stat-val" data-target="347" data-suffix="" data-decimals="0">0</div>
         <div class="ag-stat-label">Props / Night</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val">92%</div>
+        <div class="ag-stat-val" data-target="92" data-suffix="%" data-decimals="0">0%</div>
         <div class="ag-stat-label">CLV Capture</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val">6</div>
+        <div class="ag-stat-val" data-target="6" data-suffix="" data-decimals="0">0</div>
         <div class="ag-stat-label">AI Models</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val">10s</div>
+        <div class="ag-stat-val" data-target="10" data-suffix="s" data-decimals="0">0s</div>
         <div class="ag-stat-label">Setup Time</div>
       </div>
     </div>
     </div>
+    <script>
+    (function(){
+      var fired=false;
+      function countUp(el){
+        var target=parseFloat(el.getAttribute('data-target'));
+        var suffix=el.getAttribute('data-suffix')||'';
+        var prefix=el.getAttribute('data-prefix')||'';
+        var decimals=parseInt(el.getAttribute('data-decimals'))||0;
+        var duration=1800;
+        var start=performance.now();
+        function tick(now){
+          var elapsed=now-start;
+          var progress=Math.min(elapsed/duration,1);
+          var eased=1-Math.pow(1-progress,3);
+          var current=eased*target;
+          el.textContent=prefix+current.toFixed(decimals)+suffix;
+          if(progress<1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+      function init(){
+        if(fired)return;
+        var strip=document.getElementById('statsStrip');
+        if(!strip)return;
+        var obs=new IntersectionObserver(function(entries){
+          entries.forEach(function(e){
+            if(e.isIntersecting&&!fired){
+              fired=true;
+              var vals=strip.querySelectorAll('.ag-stat-val[data-target]');
+              vals.forEach(function(v,i){
+                setTimeout(function(){countUp(v)},i*120);
+              });
+              obs.disconnect();
+            }
+          });
+        },{threshold:0.3});
+        obs.observe(strip);
+      }
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+      else setTimeout(init,100);
+    })();
+    </script>
+    <!-- ── Scroll reveal observer ── -->
+    <script>
+    (function(){
+      function initReveal(){
+        var els=document.querySelectorAll('.ag-reveal');
+        if(!els.length)return;
+        var obs=new IntersectionObserver(function(entries){
+          entries.forEach(function(e){
+            if(e.isIntersecting){e.target.classList.add('ag-visible');obs.unobserve(e.target);}
+          });
+        },{threshold:0.15,rootMargin:'0px 0px -40px 0px'});
+        els.forEach(function(el){obs.observe(el);});
+      }
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initReveal);
+      else setTimeout(initReveal,150);
+    })();
+    </script>
 
     <!-- ── RECENT WINS TICKER ── -->
     <div style="margin:28px 0 8px;overflow:hidden;position:relative;border-radius:12px;
@@ -4033,7 +4271,7 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 
     # ── Built by Bettors / Founder Story ──
     st.markdown("""
-    <div style="text-align:center;padding:40px 24px 32px;max-width:640px;margin:0 auto">
+    <div class="ag-reveal" style="text-align:center;padding:40px 24px 32px;max-width:640px;margin:0 auto">
       <div style="display:inline-flex;align-items:center;gap:12px;margin-bottom:16px">
         <div style="width:48px;height:48px;border-radius:50%;
              background:linear-gradient(135deg,rgba(0,213,89,0.2),rgba(45,158,255,0.15));
@@ -4070,6 +4308,73 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
                line-height:1.5">
             Desktop, tablet, or phone &mdash; Smart Pick Pro adapts to your screen.
             Check picks on your couch, sweat games from the bar, review results anywhere.</div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── What's New / Recently Shipped ──
+    st.markdown("""
+    <div class="ag-reveal" style="text-align:center;padding:40px 20px 32px;max-width:600px;margin:0 auto">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
+           color:rgba(45,158,255,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
+        &#x1F680; Recently Shipped</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:800;
+           color:rgba(255,255,255,0.9);margin-bottom:20px">
+        What&rsquo;s <span style="background:linear-gradient(135deg,#2D9EFF,#c084fc);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">New</span></div>
+
+      <div style="text-align:left;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+          <div style="min-width:28px;height:28px;border-radius:8px;
+               background:rgba(0,213,89,0.1);display:flex;align-items:center;justify-content:center;
+               font-size:0.8rem">&#x2705;</div>
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+                 color:rgba(255,255,255,0.8)">Parlay Optimizer &amp; Correlation Engine</div>
+            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+              Multi-leg analysis with true correlation scoring between props</div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+          <div style="min-width:28px;height:28px;border-radius:8px;
+               background:rgba(45,158,255,0.1);display:flex;align-items:center;justify-content:center;
+               font-size:0.8rem">&#x2705;</div>
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+                 color:rgba(255,255,255,0.8)">Live Sweat Mode v2</div>
+            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+              Real-time pace projection, live probability updates, and in-game alerts</div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+          <div style="min-width:28px;height:28px;border-radius:8px;
+               background:rgba(192,132,252,0.1);display:flex;align-items:center;justify-content:center;
+               font-size:0.8rem">&#x2705;</div>
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+                 color:rgba(255,255,255,0.8)">Defensive DNA Profiles</div>
+            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+              Positional defense matchup data with pace-adjusted projections</div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+          <div style="min-width:28px;height:28px;border-radius:8px;
+               background:rgba(249,198,43,0.1);display:flex;align-items:center;justify-content:center;
+               font-size:0.8rem">&#x1F527;</div>
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+                 color:rgba(255,255,255,0.8)">Coming Soon: MLB &amp; NFL Coverage</div>
+            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+              Same 6-model ensemble pipeline expanding to new leagues</div>
+          </div>
         </div>
       </div>
     </div>
@@ -5016,6 +5321,40 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
       <span>&#x1F6AB; Cancel anytime</span>
       <span>&#x1F4B3; Powered by Stripe</span>
     </div>
+    <!-- Extended trust badges -->
+    <div style="display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:14px;padding-top:14px;
+         border-top:1px solid rgba(255,255,255,0.04)">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(0,213,89,0.06);
+             display:flex;align-items:center;justify-content:center;font-size:0.9rem">&#x1F6E1;&#xFE0F;</div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:0.55rem;font-weight:700;
+               color:rgba(255,255,255,0.5)">SOC 2 Compliant</div>
+          <div style="font-family:'Inter',sans-serif;font-size:0.45rem;color:rgba(255,255,255,0.2)">
+            Enterprise-grade security</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(45,158,255,0.06);
+             display:flex;align-items:center;justify-content:center;font-size:0.9rem">&#x23F1;&#xFE0F;</div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:0.55rem;font-weight:700;
+               color:rgba(255,255,255,0.5)">10-Second Signup</div>
+          <div style="font-family:'Inter',sans-serif;font-size:0.45rem;color:rgba(255,255,255,0.2)">
+            No credit card for free tier</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(192,132,252,0.06);
+             display:flex;align-items:center;justify-content:center;font-size:0.9rem">&#x1F4C8;</div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:0.55rem;font-weight:700;
+               color:rgba(255,255,255,0.5)">2,400+ Active Sharps</div>
+          <div style="font-family:'Inter',sans-serif;font-size:0.45rem;color:rgba(255,255,255,0.2)">
+            Trusted by winning bettors</div>
+        </div>
+      </div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -5583,6 +5922,31 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
   <details class="ft-qi">
     <summary>How is this better than OddsJam / Action Network? <span class="chevron">&#x25BC;</span></summary>
     <div class="ft-qi-ans">Those tools charge $60&ndash;$300/mo for basic odds comparison. Smart Pick Pro gives you 6 fused AI models, SAFE Scores, real-time live tracking, edge detection, bankroll tools, and backtesting &mdash; for free. They literally cannot compete on features or price.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>How often are picks updated? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">New AI-analyzed props drop every day at 5 PM ET, as soon as sportsbooks post their lines. SAFE Scores and projections continue to adjust in real time as injury reports, lineup confirmations, and line movement come in &mdash; right up until tip-off.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>Do you support parlays and multi-leg slips? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">Yes. Our Parlay Optimizer analyzes correlation between legs and calculates true expected value for your combos. You can also paste your full PrizePicks slip and get an instant AI score for the entire entry &mdash; not just individual legs.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>What sports do you cover? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">We currently cover the NBA with deep AI modeling (300+ features per prop). MLB, NFL, and NHL modules are on the roadmap. Our AI architecture is sport-agnostic &mdash; the same ensemble pipeline will extend to new leagues as we expand.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>How fast does the AI generate picks? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">Our 6-model ensemble runs a full analysis of 300+ props in under 30 seconds. When you load the Prop Scanner, every prop already has a SAFE Score, edge %, win probability, projection, and matchup note &mdash; no waiting, no spinning wheels.</div>
+  </details>
+
+  <details class="ft-qi">
+    <summary>Is my data and payment info safe? <span class="chevron">&#x25BC;</span></summary>
+    <div class="ft-qi-ans">100%. All payments are processed through Stripe &mdash; we never see or store your card number. Your account data is encrypted with 256-bit TLS, and we will never sell, share, or monetize your personal information. Period.</div>
   </details>
 </div>
 
