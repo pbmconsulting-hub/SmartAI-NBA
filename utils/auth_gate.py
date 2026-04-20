@@ -3457,79 +3457,52 @@ a.spp-nav-pill, a.spp-nav-cta, a.spp-btt {{
 <a class="spp-btt" id="spp-btt" href="#" title="Back to top">&#x2191;</a>
 """, unsafe_allow_html=True)
 
-    # ── Nav + Back-to-top JS (enhancement: active pill + hide-on-scroll) ──
-    # Uses st.html() which runs in an iframe.  The script tries to reach the
-    # parent document for scroll-spy & active-pill highlighting.  If cross-frame
-    # access is blocked (production sandboxed iframes), the <a href> anchor
-    # links still handle navigation natively — JS is only an enhancement.
+    # ── Nav + Back-to-top JS ──
+    # Injects a <script> into the parent document so handlers run in the
+    # correct DOM context — avoids cross-frame access limitations.
     st.html("""<script>
 (function(){
-  var MAX_TRIES=50, INTERVAL=100, tries=0;
+  try{
+    var pdoc=window.parent.document;
+    if(!pdoc||!pdoc.body) return;
+    /* Avoid double-injection */
+    if(pdoc.getElementById('spp-nav-js')) return;
+    var s=pdoc.createElement('script');
+    s.id='spp-nav-js';
+    s.textContent=`
+(function(){
+  var MAX_TRIES=60, INTERVAL=120, tries=0;
   function init(){
-    var pdoc,pwin;
-    try{
-      pdoc=window.parent.document;
-      pwin=window.parent;
-      // verify access actually works
-      if(!pdoc||!pdoc.getElementById){throw new Error('no access');}
-    }catch(e){return;}
-    var dock=pdoc.getElementById('spp-nav-dock');
-    if(!dock){
-      if(++tries<MAX_TRIES){setTimeout(init,INTERVAL);}
-      return;
-    }
-    // Scroll helper — find the real Streamlit scroll container
-    var sc=pdoc.querySelector('[data-testid="stMain"]')
-        ||pdoc.querySelector('section.main')
-        ||pdoc.querySelector('[data-testid="stAppViewContainer"]');
-    function getScrollY(){
-      if(sc) return sc.scrollTop;
-      return pwin.pageYOffset||pdoc.documentElement.scrollTop;
-    }
-    function smoothTo(el){
-      if(!el) return;
-      if(sc){sc.scrollTo({top:el.offsetTop-80,behavior:'smooth'});}
-      else{el.scrollIntoView({behavior:'smooth',block:'start'});}
-    }
-    function scrollTop(){
-      if(sc){sc.scrollTo({top:0,behavior:'smooth'});}
-      else{pwin.scrollTo({top:0,behavior:'smooth'});}
-    }
-    // Nav pill click → smooth-scroll the right container
-    var map={
-      'nav-how':'sec-how-it-works','nav-features':'sec-features','nav-picks':'sec-picks',
-      'nav-tracker':'sec-tracker','nav-pricing':'sec-pricing','nav-faq':'sec-faq'
-    };
-    Object.keys(map).forEach(function(k){
-      var b=pdoc.getElementById(k);
-      if(b){b.addEventListener('click',function(e){
-        e.preventDefault();
-        var t=pdoc.getElementById(map[k]);
-        if(t) smoothTo(t);
-      });}
-    });
-    // Sign Up Free → scroll to top & click Create tab
-    var cta=pdoc.getElementById('nav-signup-cta');
-    if(cta){cta.addEventListener('click',function(e){
-      e.preventDefault();
+    var dock=document.getElementById('spp-nav-dock');
+    if(!dock){if(++tries<MAX_TRIES){setTimeout(init,INTERVAL);}return;}
+    var sc=document.querySelector('[data-testid="stMain"]')
+        ||document.querySelector('section.main')
+        ||document.querySelector('[data-testid="stAppViewContainer"]');
+    function getScrollY(){return sc?sc.scrollTop:(window.pageYOffset||document.documentElement.scrollTop);}
+    function smoothTo(el){if(!el)return;if(sc){sc.scrollTo({top:el.offsetTop-80,behavior:'smooth'});}else{el.scrollIntoView({behavior:'smooth',block:'start'});}}
+    function scrollTop(){if(sc){sc.scrollTo({top:0,behavior:'smooth'});}else{window.scrollTo({top:0,behavior:'smooth'});}}
+    function clickCreateTab(){
       var sel='button[data-baseweb="tab"], button[role="tab"], button[data-testid="stTab"]';
-      var tabs=pdoc.querySelectorAll(sel);
-      /* Walk up if no tabs found (nested iframe edge case) */
-      if(!tabs.length){try{tabs=(pwin.parent||pwin).document.querySelectorAll(sel);}catch(e2){}}
+      var tabs=document.querySelectorAll(sel);
       for(var i=0;i<tabs.length;i++){
         if(tabs[i].textContent.indexOf('Create')!==-1){
-          tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return;
+          tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return true;
         }
       }
-      scrollTop();
-    });}
-    // Brand → top
-    var brand=pdoc.getElementById('nav-top-btn');
+      return false;
+    }
+    var map={'nav-how':'sec-how-it-works','nav-features':'sec-features','nav-picks':'sec-picks',
+             'nav-tracker':'sec-tracker','nav-pricing':'sec-pricing','nav-faq':'sec-faq'};
+    Object.keys(map).forEach(function(k){
+      var b=document.getElementById(k);
+      if(b){b.addEventListener('click',function(e){e.preventDefault();var t=document.getElementById(map[k]);if(t)smoothTo(t);});}
+    });
+    var cta=document.getElementById('nav-signup-cta');
+    if(cta){cta.addEventListener('click',function(e){e.preventDefault();if(!clickCreateTab())scrollTop();});}
+    var brand=document.getElementById('nav-top-btn');
     if(brand){brand.addEventListener('click',function(e){e.preventDefault();scrollTop();});}
-    // Back-to-top
-    var btt=pdoc.getElementById('spp-btt');
+    var btt=document.getElementById('spp-btt');
     if(btt){btt.addEventListener('click',function(e){e.preventDefault();scrollTop();});}
-    // Scroll-spy: active pill + hide dock + show/hide BTT
     var lastY=0;
     var sIds=['how-it-works','features','picks','tracker','pricing','faq'];
     var pMap={'how-it-works':'nav-how','features':'nav-features','picks':'nav-picks',
@@ -3537,24 +3510,24 @@ a.spp-nav-pill, a.spp-nav-cta, a.spp-btt {{
     function onScroll(){
       var sy=getScrollY();
       if(btt){if(sy>600){btt.classList.add('visible');}else{btt.classList.remove('visible');}}
-      if(dock){
-        if(sy>lastY&&sy>200){dock.classList.add('nav-hidden');}
-        else{dock.classList.remove('nav-hidden');}
-      }
+      if(dock){if(sy>lastY&&sy>200){dock.classList.add('nav-hidden');}else{dock.classList.remove('nav-hidden');}}
       var aid='';
-      for(var i=sIds.length-1;i>=0;i--){
-        var el=pdoc.querySelector('[data-section-id="'+sIds[i]+'"]');
-        if(el&&el.getBoundingClientRect().top<=120){aid=sIds[i];break;}
-      }
-      pdoc.querySelectorAll('.spp-nav-pill').forEach(function(p){p.classList.remove('active');});
-      if(aid&&pMap[aid]){var ap=pdoc.getElementById(pMap[aid]);if(ap){ap.classList.add('active');}}
+      for(var i=sIds.length-1;i>=0;i--){var el=document.querySelector('[data-section-id="'+sIds[i]+'"]');if(el&&el.getBoundingClientRect().top<=120){aid=sIds[i];break;}}
+      document.querySelectorAll('.spp-nav-pill').forEach(function(p){p.classList.remove('active');});
+      if(aid&&pMap[aid]){var ap=document.getElementById(pMap[aid]);if(ap){ap.classList.add('active');}}
       lastY=sy;
     }
-    var scrollTarget=sc||pwin;
-    scrollTarget.addEventListener('scroll',onScroll,{passive:true});
+    (sc||window).addEventListener('scroll',onScroll,{passive:true});
     onScroll();
+    /* Expose clickCreateTab globally so footer CTA can reuse it */
+    window.__sppClickCreateTab=clickCreateTab;
+    window.__sppScrollTop=scrollTop;
   }
   init();
+})();
+`;
+    pdoc.body.appendChild(s);
+  }catch(e){}
 })();
 </script>""")
 
@@ -3648,91 +3621,97 @@ a.spp-nav-pill, a.spp-nav-cta, a.spp-btt {{
         </div>
       </div>
     </div>
+    </div><!-- /ag-section part 1 -->
 
-    <!-- ── SAFE Score Visual Explainer ── -->
-    <div class="ag-reveal" style="text-align:center;padding:48px 20px 32px;max-width:680px;margin:0 auto">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
-           color:rgba(0,213,89,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
-        Our Secret Weapon</div>
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:800;
-           color:rgba(255,255,255,0.9);margin-bottom:24px">
-        How the <span style="background:linear-gradient(135deg,#00D559,#2D9EFF);
-        -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">SAFE Score&trade;</span> Works</div>
+    """, unsafe_allow_html=True)
 
-      <!-- Pipeline: 6 models → vote → SAFE -->
-      <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:24px">
-        <!-- Model chips -->
-        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:360px">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               padding:5px 10px;border-radius:8px;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);
-               color:rgba(0,213,89,0.7)">XGBoost</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               padding:5px 10px;border-radius:8px;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15);
-               color:rgba(45,158,255,0.7)">LightGBM</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               padding:5px 10px;border-radius:8px;background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.15);
-               color:rgba(192,132,252,0.7)">Ridge</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               padding:5px 10px;border-radius:8px;background:rgba(249,198,43,0.08);border:1px solid rgba(249,198,43,0.15);
-               color:rgba(249,198,43,0.7)">Bayesian</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               padding:5px 10px;border-radius:8px;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);
-               color:rgba(0,213,89,0.7)">LSTM</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               padding:5px 10px;border-radius:8px;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15);
-               color:rgba(45,158,255,0.7)">Random Forest</span>
-        </div>
+    # ── SAFE Score Visual Explainer — rendered via st.html() to bypass
+    #    Streamlit's markdown parser which chokes on deeply nested inline-style divs ──
+    st.html("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;overflow-y:hidden}
+</style>
+<div style="text-align:center;padding:48px 20px 32px;max-width:680px;margin:0 auto">
+  <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
+       color:rgba(0,213,89,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
+    Our Secret Weapon</div>
+  <div style="font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:800;
+       color:rgba(255,255,255,0.9);margin-bottom:24px">
+    How the <span style="background:linear-gradient(135deg,#00D559,#2D9EFF);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">SAFE Score&trade;</span> Works</div>
 
-        <!-- Arrow -->
-        <div style="font-size:1.2rem;color:rgba(255,255,255,0.2)">&#x2192;</div>
-
-        <!-- Vote box -->
-        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
-             border-radius:12px;padding:12px 18px;text-align:center">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
-            Ensemble Vote</div>
-          <div style="font-size:1.2rem">&#x1F5F3;&#xFE0F;</div>
-        </div>
-
-        <!-- Arrow -->
-        <div style="font-size:1.2rem;color:rgba(255,255,255,0.2)">&#x2192;</div>
-
-        <!-- SAFE Score output -->
-        <div style="background:linear-gradient(135deg,rgba(0,213,89,0.1),rgba(45,158,255,0.08));
-             border:1.5px solid rgba(0,213,89,0.2);border-radius:14px;padding:14px 20px;text-align:center;
-             position:relative;overflow:hidden">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
-               color:rgba(0,213,89,0.5);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
-            SAFE Score</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;
-               background:linear-gradient(135deg,#00D559,#2D9EFF);
-               -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">84</div>
-        </div>
-      </div>
-
-      <!-- Gradient bar 0-100 -->
-      <div style="max-width:440px;margin:0 auto 16px">
-        <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,
-             #ff4444 0%,#ff8800 25%,#F9C62B 40%,#00D559 65%,#2D9EFF 100%);
-             position:relative;overflow:visible">
-          <div style="position:absolute;left:84%;top:-3px;width:14px;height:14px;
-               background:#00D559;border:2px solid rgba(8,12,24,0.9);border-radius:50%;
-               transform:translateX(-50%);box-shadow:0 0 10px rgba(0,213,89,0.4)"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-top:6px;
-             font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:rgba(255,255,255,0.25)">
-          <span>0 &mdash; Skip</span><span>50 &mdash; Caution</span><span>70 &mdash; Play</span><span>100 &mdash; Lock</span>
-        </div>
-      </div>
-
-      <p style="font-family:'Inter',sans-serif;font-size:0.7rem;color:rgba(255,255,255,0.35);
-         max-width:460px;margin:0 auto;line-height:1.6">
-        Six AI models independently analyze every prop. They vote, and the SAFE Score
-        synthesizes their agreement, historical accuracy, matchup context, and line movement
-        into a single number you can act on.</p>
+  <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:360px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           padding:5px 10px;border-radius:8px;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);
+           color:rgba(0,213,89,0.7)">XGBoost</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           padding:5px 10px;border-radius:8px;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15);
+           color:rgba(45,158,255,0.7)">LightGBM</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           padding:5px 10px;border-radius:8px;background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.15);
+           color:rgba(192,132,252,0.7)">Ridge</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           padding:5px 10px;border-radius:8px;background:rgba(249,198,43,0.08);border:1px solid rgba(249,198,43,0.15);
+           color:rgba(249,198,43,0.7)">Bayesian</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           padding:5px 10px;border-radius:8px;background:rgba(0,213,89,0.08);border:1px solid rgba(0,213,89,0.15);
+           color:rgba(0,213,89,0.7)">LSTM</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           padding:5px 10px;border-radius:8px;background:rgba(45,158,255,0.08);border:1px solid rgba(45,158,255,0.15);
+           color:rgba(45,158,255,0.7)">Random Forest</span>
     </div>
 
+    <div style="font-size:1.2rem;color:rgba(255,255,255,0.2)">&#x2192;</div>
+
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+         border-radius:12px;padding:12px 18px;text-align:center">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
+        Ensemble Vote</div>
+      <div style="font-size:1.2rem">&#x1F5F3;&#xFE0F;</div>
+    </div>
+
+    <div style="font-size:1.2rem;color:rgba(255,255,255,0.2)">&#x2192;</div>
+
+    <div style="background:linear-gradient(135deg,rgba(0,213,89,0.1),rgba(45,158,255,0.08));
+         border:1.5px solid rgba(0,213,89,0.2);border-radius:14px;padding:14px 20px;text-align:center;
+         position:relative;overflow:hidden">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;
+           color:rgba(0,213,89,0.5);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
+        SAFE Score</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;
+           background:linear-gradient(135deg,#00D559,#2D9EFF);
+           -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">84</div>
+    </div>
+  </div>
+
+  <div style="max-width:440px;margin:0 auto 16px">
+    <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,
+         #ff4444 0%,#ff8800 25%,#F9C62B 40%,#00D559 65%,#2D9EFF 100%);
+         position:relative;overflow:visible">
+      <div style="position:absolute;left:84%;top:-3px;width:14px;height:14px;
+           background:#00D559;border:2px solid rgba(8,12,24,0.9);border-radius:50%;
+           transform:translateX(-50%);box-shadow:0 0 10px rgba(0,213,89,0.4)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;
+         font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:rgba(255,255,255,0.25)">
+      <span>0 &mdash; Skip</span><span>50 &mdash; Caution</span><span>70 &mdash; Play</span><span>100 &mdash; Lock</span>
+    </div>
+  </div>
+
+  <p style="font-family:'Inter',sans-serif;font-size:0.7rem;color:rgba(255,255,255,0.35);
+     max-width:460px;margin:0 auto;line-height:1.6">
+    Six AI models independently analyze every prop. They vote, and the SAFE Score
+    synthesizes their agreement, historical accuracy, matchup context, and line movement
+    into a single number you can act on.</p>
+</div>
+""")
+
+    # ── 60-Second Demo + rest of below-fold (continued st.markdown) ──
+    st.markdown("""
+    <div class="ag-section">
     <!-- ── 60-Second Demo ── -->
     <div class="ag-reveal" style="text-align:center;padding:40px 0 16px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
@@ -4171,105 +4150,35 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
     st.markdown("""
     <div class="ag-section">
 
-    <!-- ── METRIC COUNTERS (animated countUp on scroll) ── -->
-    <div class="ag-stats-strip ag-reveal" id="statsStrip">
+    <!-- ── METRIC COUNTERS ── -->
+    <div class="ag-stats-strip ag-visible" id="statsStrip">
     <div class="ag-stats">
       <div class="ag-stat">
-        <div class="ag-stat-val" data-target="62.4" data-suffix="%" data-decimals="1">0%</div>
+        <div class="ag-stat-val">62.4%</div>
         <div class="ag-stat-label">Hit Rate</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val" data-target="18.3" data-prefix="+" data-suffix="%" data-decimals="1">0%</div>
+        <div class="ag-stat-val">+18.3%</div>
         <div class="ag-stat-label">ROI</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val" data-target="347" data-suffix="" data-decimals="0">0</div>
+        <div class="ag-stat-val">347</div>
         <div class="ag-stat-label">Props / Night</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val" data-target="92" data-suffix="%" data-decimals="0">0%</div>
+        <div class="ag-stat-val">92%</div>
         <div class="ag-stat-label">CLV Capture</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val" data-target="6" data-suffix="" data-decimals="0">0</div>
+        <div class="ag-stat-val">6</div>
         <div class="ag-stat-label">AI Models</div>
       </div>
       <div class="ag-stat">
-        <div class="ag-stat-val" data-target="10" data-suffix="s" data-decimals="0">0s</div>
+        <div class="ag-stat-val">10s</div>
         <div class="ag-stat-label">Setup Time</div>
       </div>
     </div>
     </div>
-    <script>
-    (function(){
-      var fired=false;
-      function countUp(el){
-        var target=parseFloat(el.getAttribute('data-target'));
-        var suffix=el.getAttribute('data-suffix')||'';
-        var prefix=el.getAttribute('data-prefix')||'';
-        var decimals=parseInt(el.getAttribute('data-decimals'))||0;
-        var duration=1800;
-        var start=performance.now();
-        function tick(now){
-          var elapsed=now-start;
-          var progress=Math.min(elapsed/duration,1);
-          var eased=1-Math.pow(1-progress,3);
-          var current=eased*target;
-          el.textContent=prefix+current.toFixed(decimals)+suffix;
-          if(progress<1) requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-      }
-      function init(){
-        if(fired)return;
-        var strip=document.getElementById('statsStrip');
-        if(!strip)return;
-        var obs=new IntersectionObserver(function(entries){
-          entries.forEach(function(e){
-            if(e.isIntersecting&&!fired){
-              fired=true;
-              var vals=strip.querySelectorAll('.ag-stat-val[data-target]');
-              vals.forEach(function(v,i){
-                setTimeout(function(){countUp(v)},i*120);
-              });
-              obs.disconnect();
-            }
-          });
-        },{threshold:0.3});
-        obs.observe(strip);
-      }
-      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
-      else setTimeout(init,100);
-    })();
-    </script>
-    <!-- ── Scroll reveal observer ── -->
-    <script>
-    (function(){
-      function initReveal(){
-        var els=document.querySelectorAll('.ag-reveal');
-        if(!els.length)return;
-        /* Use Streamlit scroll container as root so observer fires on scroll */
-        var root=document.querySelector('section.main')
-                ||document.querySelector('[data-testid="stMain"]')
-                ||null;
-        var opts={threshold:0.1,rootMargin:'0px 0px -20px 0px'};
-        if(root)opts.root=root;
-        var obs=new IntersectionObserver(function(entries){
-          entries.forEach(function(e){
-            if(e.isIntersecting){e.target.classList.add('ag-visible');obs.unobserve(e.target);}
-          });
-        },opts);
-        els.forEach(function(el){obs.observe(el);});
-        /* Re-observe any new ag-reveal elements added later by Streamlit */
-        var mo=new MutationObserver(function(){
-          document.querySelectorAll('.ag-reveal:not(.ag-visible)').forEach(function(el){obs.observe(el);});
-        });
-        mo.observe(document.body,{childList:true,subtree:true});
-      }
-      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initReveal);
-      else setTimeout(initReveal,150);
-    })();
-    </script>
 
     <!-- ── RECENT WINS TICKER ── -->
     <div style="margin:28px 0 8px;overflow:hidden;position:relative;border-radius:12px;
@@ -4405,72 +4314,77 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
     </div>
     """, unsafe_allow_html=True)
 
-    # ── What's New / Recently Shipped ──
-    st.markdown("""
-    <div class="ag-reveal" style="text-align:center;padding:40px 20px 32px;max-width:600px;margin:0 auto">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
-           color:rgba(45,158,255,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
-        &#x1F680; Recently Shipped</div>
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:800;
-           color:rgba(255,255,255,0.9);margin-bottom:20px">
-        What&rsquo;s <span style="background:linear-gradient(135deg,#2D9EFF,#c084fc);
-        -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">New</span></div>
+    # ── What's New / Recently Shipped — rendered via st.html() to bypass
+    #    Streamlit's markdown parser which strips nested div structures ──
+    st.html("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;overflow-y:hidden}
+</style>
+<div style="text-align:center;padding:40px 20px 32px;max-width:600px;margin:0 auto">
+  <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;
+       color:rgba(45,158,255,0.6);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px">
+    &#x1F680; Recently Shipped</div>
+  <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:800;
+       color:rgba(255,255,255,0.9);margin-bottom:20px">
+    What&rsquo;s <span style="background:linear-gradient(135deg,#2D9EFF,#c084fc);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">New</span></div>
 
-      <div style="text-align:left;display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
-             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
-          <div style="min-width:28px;height:28px;border-radius:8px;
-               background:rgba(0,213,89,0.1);display:flex;align-items:center;justify-content:center;
-               font-size:0.8rem">&#x2705;</div>
-          <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
-                 color:rgba(255,255,255,0.8)">Parlay Optimizer &amp; Correlation Engine</div>
-            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
-              Multi-leg analysis with true correlation scoring between props</div>
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
-             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
-          <div style="min-width:28px;height:28px;border-radius:8px;
-               background:rgba(45,158,255,0.1);display:flex;align-items:center;justify-content:center;
-               font-size:0.8rem">&#x2705;</div>
-          <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
-                 color:rgba(255,255,255,0.8)">Live Sweat Mode v2</div>
-            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
-              Real-time pace projection, live probability updates, and in-game alerts</div>
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
-             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
-          <div style="min-width:28px;height:28px;border-radius:8px;
-               background:rgba(192,132,252,0.1);display:flex;align-items:center;justify-content:center;
-               font-size:0.8rem">&#x2705;</div>
-          <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
-                 color:rgba(255,255,255,0.8)">Defensive DNA Profiles</div>
-            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
-              Positional defense matchup data with pace-adjusted projections</div>
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
-             background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
-          <div style="min-width:28px;height:28px;border-radius:8px;
-               background:rgba(249,198,43,0.1);display:flex;align-items:center;justify-content:center;
-               font-size:0.8rem">&#x1F527;</div>
-          <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
-                 color:rgba(255,255,255,0.8)">Coming Soon: MLB &amp; NFL Coverage</div>
-            <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
-              Same 6-model ensemble pipeline expanding to new leagues</div>
-          </div>
-        </div>
+  <div style="text-align:left;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+         background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+      <div style="min-width:28px;height:28px;border-radius:8px;
+           background:rgba(0,213,89,0.1);display:flex;align-items:center;justify-content:center;
+           font-size:0.8rem">&#x2705;</div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+             color:rgba(255,255,255,0.8)">Parlay Optimizer &amp; Correlation Engine</div>
+        <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+          Multi-leg analysis with true correlation scoring between props</div>
       </div>
     </div>
-    """, unsafe_allow_html=True)
+
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+         background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+      <div style="min-width:28px;height:28px;border-radius:8px;
+           background:rgba(45,158,255,0.1);display:flex;align-items:center;justify-content:center;
+           font-size:0.8rem">&#x2705;</div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+             color:rgba(255,255,255,0.8)">Live Sweat Mode v2</div>
+        <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+          Real-time pace projection, live probability updates, and in-game alerts</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+         background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+      <div style="min-width:28px;height:28px;border-radius:8px;
+           background:rgba(192,132,252,0.1);display:flex;align-items:center;justify-content:center;
+           font-size:0.8rem">&#x2705;</div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+             color:rgba(255,255,255,0.8)">Defensive DNA Profiles</div>
+        <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+          Positional defense matchup data with pace-adjusted projections</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+         background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px">
+      <div style="min-width:28px;height:28px;border-radius:8px;
+           background:rgba(249,198,43,0.1);display:flex;align-items:center;justify-content:center;
+           font-size:0.8rem">&#x1F527;</div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.72rem;
+             color:rgba(255,255,255,0.8)">Coming Soon: MLB &amp; NFL Coverage</div>
+        <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:2px">
+          Same 6-model ensemble pipeline expanding to new leagues</div>
+      </div>
+    </div>
+  </div>
+</div>
+""")
 
     # ── Section anchor: Bet Tracker ──
     st.markdown('<div id="sec-tracker" data-section-id="tracker" style="height:0;overflow:hidden;"></div>', unsafe_allow_html=True)
@@ -6057,19 +5971,23 @@ html,body{background:transparent;font-family:'Inter',sans-serif;color:rgba(255,2
 document.getElementById('ctaScrollBtn').addEventListener('click',function(e){
   e.preventDefault();
   try{
-    var sel='button[data-baseweb="tab"], button[role="tab"], button[data-testid="stTab"]';
-    var doc=window.parent.document;
-    var tabs=doc.querySelectorAll(sel);
-    /* Walk up if the immediate parent has no tabs (nested iframe) */
-    if(!tabs.length){
-      try{doc=window.parent.parent.document;tabs=doc.querySelectorAll(sel);}catch(e2){}
+    var pwin=window.parent;
+    /* Use the global helper injected by the nav script */
+    if(pwin.__sppClickCreateTab){
+      if(!pwin.__sppClickCreateTab()) pwin.__sppScrollTop();
+      return;
     }
+    /* Fallback: direct parent DOM access */
+    var sel='button[data-baseweb="tab"], button[role="tab"], button[data-testid="stTab"]';
+    var doc=pwin.document;
+    var tabs=doc.querySelectorAll(sel);
+    if(!tabs.length){try{doc=pwin.parent.document;tabs=doc.querySelectorAll(sel);}catch(e2){}}
     for(var i=0;i<tabs.length;i++){
       if(tabs[i].textContent.indexOf('Create')!==-1){
         tabs[i].click();tabs[i].scrollIntoView({behavior:'smooth',block:'center'});return;
       }
     }
-    window.parent.scrollTo({top:0,behavior:'smooth'});
+    pwin.scrollTo({top:0,behavior:'smooth'});
   }catch(err){
     try{window.parent.scrollTo({top:0,behavior:'smooth'});}catch(e3){}
   }
